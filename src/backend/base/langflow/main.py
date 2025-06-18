@@ -34,7 +34,7 @@ from langflow.initial_setup.setup import (
 from langflow.interface.components import get_and_cache_all_types_dict
 from langflow.interface.utils import setup_llm_caching
 from langflow.logging.logger import configure
-from langflow.middleware import ContentSizeLimitMiddleware
+from langflow.middleware import ContentSizeLimitMiddleware, OrgDatabaseMiddleware # Added import
 from langflow.services.deps import (
     get_queue_service,
     get_settings_service,
@@ -218,6 +218,19 @@ def create_app():
     app.add_middleware(
         ContentSizeLimitMiddleware,
     )
+
+    # Get settings service
+    settings_service = get_settings_service()
+
+    # Conditionally register OrgDatabaseMiddleware
+    # TODO: Remove `not` when the feature flag is correctly in place and defaults to False
+    # For now, assuming we want to enable it if the var is NOT explicitly False in .env
+    # or if it's not present at all (getattr default to True for testing)
+    if getattr(settings_service.settings, "LANGFLOW_FEATURE_MULTI_ORG_DB", False):
+        app.add_middleware(OrgDatabaseMiddleware)
+        logger.info("OrgDatabaseMiddleware registered as LANGFLOW_FEATURE_MULTI_ORG_DB is True.")
+    else:
+        logger.info("OrgDatabaseMiddleware not registered as LANGFLOW_FEATURE_MULTI_ORG_DB is False or not set.")
 
     setup_sentry(app)
     origins = ["*"]

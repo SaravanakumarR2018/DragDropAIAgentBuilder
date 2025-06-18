@@ -328,7 +328,7 @@ class Settings(BaseSettings):
     def set_database_url(cls, value, info):
         # Check if multi_org_db is True and database_url_template is provided
         if info.data.get("multi_org_db") and info.data.get("database_url_template"):
-            logger.debug("Using database_url_template for multi-org setup.")
+            logger.debug("Using database_url_template for multi-org setup because multi_org_db is True.")
             # At this stage, we set the database_url to the template.
             # The actual organization ID will be interpolated later in the application,
             # presumably when a request comes in and the organization context is known.
