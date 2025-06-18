@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
 from cryptography.fernet import Fernet
-from fastapi import Depends, HTTPException, Security, WebSocketException, status
+# Request is added here
+from fastapi import Depends, HTTPException, Security, WebSocketException, status, Request
 from fastapi.security import APIKeyHeader, APIKeyQuery, OAuth2PasswordBearer
 from jose import JWTError, jwt
 from loguru import logger
@@ -19,6 +20,9 @@ from langflow.services.database.models.user.crud import get_user_by_id, get_user
 from langflow.services.database.models.user.model import User, UserRead
 from langflow.services.deps import get_db_service, get_session, get_settings_service
 from langflow.services.settings.service import SettingsService
+# Imports for Clerk provider
+from langflow.services.auth.clerk_provider import verify_clerk_token, get_or_create_clerk_user
+
 
 if TYPE_CHECKING:
     from langflow.services.database.models.api_key.model import ApiKey
@@ -136,21 +140,102 @@ async def ws_api_key_security(
 
 
 async def get_current_user(
-    token: Annotated[str, Security(oauth2_login)],
-    query_param: Annotated[str, Security(api_key_query)],
-    header_param: Annotated[str, Security(api_key_header)],
+    request: Request,  # Added request parameter
     db: Annotated[AsyncSession, Depends(get_session)],
+    # Parameters made optional for when Clerk auth is primary
+    token: Annotated[str | None, Security(oauth2_login)] = None,
+    query_param: Annotated[str | None, Security(api_key_query)] = None,
+    header_param: Annotated[str | None, Security(api_key_header)] = None,
 ) -> User:
-    if token:
-        return await get_current_user_by_jwt(token, db)
-    user = await api_key_security(query_param, header_param)
-    if user:
-        return user
+    settings_service = get_settings_service()
 
-    raise HTTPException(
-        status_code=status.HTTP_403_FORBIDDEN,
-        detail="Invalid or missing API key",
-    )
+    if settings_service.auth_settings.CLERK_AUTH_ENABLED:
+        # Clerk authentication logic
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            logger.debug("Clerk Auth: Missing or invalid Authorization header.")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Missing or invalid Clerk token (Authorization header)",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        clerk_token = auth_header.split("Bearer ")[1]
+        if not clerk_token:
+            logger.debug("Clerk Auth: Token missing after Bearer prefix.")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Missing Clerk token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        if not settings_service.auth_settings.CLERK_SECRET_KEY:
+            logger.error("Clerk Auth: CLERK_SECRET_KEY is not configured.")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Clerk authentication is not configured correctly."
+            )
+
+        try:
+            claims = await verify_clerk_token(clerk_token, settings_service.auth_settings.CLERK_SECRET_KEY)
+        except ValueError as e:  # Catch specific exception from placeholder verify_clerk_token
+            logger.debug(f"Clerk Auth: Token verification failed (ValueError): {e}")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Invalid Clerk token: {e}")
+        except Exception as e:  # Catch generic exceptions during verification
+            logger.error(f"Clerk Auth: An unexpected error occurred during token verification: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Clerk token verification failed"
+            )
+
+        try:
+            user = await get_or_create_clerk_user(claims, db)
+            if not user: # Should not happen if get_or_create_clerk_user is implemented correctly
+                logger.error("Clerk Auth: get_or_create_clerk_user returned None unexpectedly.")
+                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to retrieve or create user for Clerk.")
+            logger.info(f"Clerk Auth: User {user.id} authenticated successfully.")
+            return user
+        except ValueError as e: # Catch specific exceptions from get_or_create_clerk_user
+            logger.error(f"Clerk Auth: Failed to get or create user (ValueError): {e}")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Clerk user processing error: {e}")
+        except Exception as e:
+            logger.error(f"Clerk Auth: An unexpected error occurred during user retrieval/creation: {e}")
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to process Clerk user")
+
+    else:
+        # Existing logic for JWT and API key (Clerk disabled)
+        if token:
+            try:
+                # If token is invalid, get_current_user_by_jwt will raise HTTPException
+                return await get_current_user_by_jwt(token, db)
+            except HTTPException as exc:
+                # Propagate the exception if JWT auth fails (original behavior)
+                logger.debug(f"JWT authentication failed: {exc.detail}. Status: {exc.status_code}")
+                raise exc
+
+        # If no token was provided, try API key authentication
+        # api_key_security itself handles raising HTTPException if auto_login=False and keys are missing/invalid
+        user_read_from_api_key = await api_key_security(query_param, header_param)
+
+        if user_read_from_api_key:
+            # api_key_security returns UserRead, need to fetch the full User object
+            # This assumes api_key_security will raise if the key is invalid and AUTO_LOGIN is False.
+            # If AUTO_LOGIN is True and no key is provided, it might return the superuser.
+            db_user = await get_user_by_id(db, user_read_from_api_key.id)
+            if not db_user:
+                logger.warning(f"User ID {user_read_from_api_key.id} from API key not found in DB.")
+                # This case should ideally not happen if api_key_security validated a real user/key
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="User associated with API key not found."
+                )
+            return db_user
+
+        # If neither JWT nor API key authentication succeeded
+        logger.debug("No valid JWT or API key provided.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, # Changed from 403 for consistency
+            detail="Invalid or missing credentials (JWT or API key required).",
+            headers={"WWW-Authenticate": "Bearer"}, # Indicate JWT is an option
+        )
 
 
 async def get_current_user_by_jwt(

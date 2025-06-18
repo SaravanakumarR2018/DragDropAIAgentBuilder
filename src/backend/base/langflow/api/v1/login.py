@@ -27,6 +27,11 @@ async def login_to_get_access_token(
     db: DbSession,
 ):
     auth_settings = get_settings_service().auth_settings
+    if auth_settings.CLERK_AUTH_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Clerk authentication is enabled. Traditional login is disabled.",
+        )
     try:
         user = await authenticate_user(form_data.username, form_data.password, db)
     except Exception as exc:
@@ -81,6 +86,12 @@ async def login_to_get_access_token(
 async def auto_login(response: Response, db: DbSession):
     auth_settings = get_settings_service().auth_settings
 
+    if auth_settings.CLERK_AUTH_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Clerk authentication is enabled. Auto-login is disabled.",
+        )
+
     if auth_settings.AUTO_LOGIN:
         user_id, tokens = await create_user_longterm_token(db)
         response.set_cookie(
@@ -127,6 +138,12 @@ async def refresh_token(
     db: DbSession,
 ):
     auth_settings = get_settings_service().auth_settings
+
+    if auth_settings.CLERK_AUTH_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Clerk authentication is enabled. Token refresh is handled by Clerk.",
+        )
 
     token = request.cookies.get("refresh_token_lf")
 

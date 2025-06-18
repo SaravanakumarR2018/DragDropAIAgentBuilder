@@ -23,6 +23,10 @@ class AuthSettings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_SECONDS: int = 60 * 60  # 1 hour
     REFRESH_TOKEN_EXPIRE_SECONDS: int = 60 * 60 * 24 * 7  # 7 days
 
+    # Clerk authentication settings
+    CLERK_AUTH_ENABLED: bool = Field(default=False)
+    CLERK_SECRET_KEY: str | None = Field(default=None)
+
     # API Key to execute /process endpoint
     API_KEY_ALGORITHM: str = "HS256"
     API_V1_STR: str = "/api/v1"

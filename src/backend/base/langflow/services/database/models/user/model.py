@@ -24,6 +24,8 @@ class UserOptin(BaseModel):
 
 class User(SQLModel, table=True):  # type: ignore[call-arg]
     id: UUIDstr = Field(default_factory=uuid4, primary_key=True, unique=True)
+    # User id from Clerk
+    clerk_user_id: str | None = Field(default=None, index=True, unique=True, sa_column_kwargs={"nullable": True})
     username: str = Field(index=True, unique=True)
     password: str = Field()
     profile_image: str | None = Field(default=None, nullable=True)
