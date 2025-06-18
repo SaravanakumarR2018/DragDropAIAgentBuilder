@@ -38,14 +38,45 @@ if TYPE_CHECKING:
 class DatabaseService(Service):
     name = "database_service"
 
-    def __init__(self, settings_service: SettingsService):
+    def __init__(self, settings_service: SettingsService, database_url_template: str | None = None):
         self._logged_pragma = False
         self.settings_service = settings_service
-        if settings_service.settings.database_url is None:
-            msg = "No database URL provided"
+        self.database_url_template: str | None = database_url_template
+        self.engines: dict[str, AsyncEngine] = {}
+
+        if settings_service.settings.database_url is None and database_url_template is None:
+            msg = "No database URL provided and no template to create one."
             raise ValueError(msg)
-        self.database_url: str = settings_service.settings.database_url
-        self._sanitize_database_url()
+        
+        # We will assume that if database_url_template is provided,
+        # the actual database_url will be set later on a per-request basis or similar.
+        # For now, if a template is given, self.database_url might be None or a default.
+        # If no template, database_url from settings is mandatory.
+        if database_url_template is None:
+            if settings_service.settings.database_url is None:
+                msg = "No database URL provided in settings and no template was given."
+                raise ValueError(msg)
+            self.database_url: str = settings_service.settings.database_url
+        else:
+            # If a template is provided, self.database_url could be set to a default,
+            # or be None if we expect it to be formatted later using an org_id.
+            # For now, let's keep the existing logic for database_url if no template.
+            # If there's a template, database_url could be a placeholder or default.
+            # This part might need further refinement based on how shared/default org_id is handled.
+            if settings_service.settings.database_url:
+                self.database_url: str = settings_service.settings.database_url
+            else:
+                # If there's a template but no explicit default URL,
+                # we might leave self.database_url as None or set it to a formatted
+                # URL if a "default" or "shared" org_id is implied by the settings.
+                # For this change, we'll prioritize the settings.database_url if available,
+                # otherwise it might remain None until formatted.
+                # This behavior depends on higher-level logic for org_id.
+                # For now, let's ensure it's at least a string if possible, or None.
+                self.database_url: str | None = None # Or format with a default/shared org_id if applicable
+
+        if self.database_url: # Only sanitize if a URL is set
+            self.database_url = self._sanitize_database_url(self.database_url)
 
         # This file is in langflow.services.database.manager.py
         # the ini is in langflow
@@ -56,10 +87,21 @@ class DatabaseService(Service):
         # register the event listener for sqlite as part of this class.
         # Using decorator will make the method not able to use self
         event.listen(Engine, "connect", self.on_connection)
-        if self.settings_service.settings.database_connection_retry:
-            self.engine = self._create_engine_with_retry()
+        # The main engine is now created based on self.database_url,
+        # which would be the default/shared database.
+        # Individual organization engines will be stored in self.engines.
+        if self.database_url: # Only create default engine if a URL is set
+            if self.settings_service.settings.database_connection_retry:
+                self.engine: AsyncEngine = self._create_engine_with_retry(self.database_url)
+            else:
+                self.engine: AsyncEngine = self._create_engine(self.database_url)
         else:
-            self.engine = self._create_engine()
+            # If no default database_url is set (e.g. only template provided),
+            # self.engine might not be immediately available or needed.
+            # This depends on whether a "default" engine is required.
+            # For now, let's make it potentially None if no URL.
+            self.engine: AsyncEngine | None = None
+
 
         alembic_log_file = self.settings_service.settings.alembic_log_file
         # Check if the provided path is absolute, cross-platform.
@@ -73,16 +115,74 @@ class DatabaseService(Service):
         await anyio.Path(self.alembic_log_path.parent).mkdir(parents=True, exist_ok=True)
         await anyio.Path(self.alembic_log_path).touch(exist_ok=True)
 
-    def reload_engine(self) -> None:
-        self._sanitize_database_url()
-        if self.settings_service.settings.database_connection_retry:
-            self.engine = self._create_engine_with_retry()
-        else:
-            self.engine = self._create_engine()
+    def get_engine(self, org_id: str) -> AsyncEngine:
+        """
+        Retrieves or creates an AsyncEngine for the given organization ID.
 
-    def _sanitize_database_url(self):
-        """Create the engine for the database."""
-        url_components = self.database_url.split("://", maxsplit=1)
+        If an engine for the org_id already exists in the cache, it's returned.
+        If a database_url_template is set, it's used to format a specific URL
+        for the org_id, a new engine is created, cached, and returned.
+        If no template is set, the default engine (self.engine) is returned.
+        Raises ValueError if no template is set and no default engine is available,
+        or if the template is set but org_id results in an empty database URL.
+        """
+        if org_id in self.engines:
+            return self.engines[org_id]
+
+        if self.database_url_template:
+            # Format and sanitize the URL for the organization
+            # Assuming the template uses {org_id} as a placeholder
+            org_specific_db_url = self.database_url_template.format(org_id=org_id)
+            if not org_specific_db_url:
+                raise ValueError(
+                    f"Formatted database URL for org_id '{org_id}' is empty. "
+                    "Check the database_url_template and org_id."
+                )
+            
+            sanitized_org_db_url = self._sanitize_database_url(org_specific_db_url)
+
+            # Create and cache the new engine
+            # Using _create_engine_with_retry for robustness
+            logger.info(f"Creating new database engine for organization: {org_id}")
+            engine = self._create_engine_with_retry(sanitized_org_db_url)
+            self.engines[org_id] = engine
+            return engine
+        
+        # No template, try to return the default/shared engine
+        if self.engine:
+            return self.engine
+        
+        # No template and no default engine
+        raise ValueError(
+            "DatabaseService has no database_url_template and no default engine. "
+            "Cannot provide an engine."
+        )
+
+    def reload_engine(self) -> None:
+        logger.info("Reloading database engines.")
+        # Clear cached organization-specific engines
+        self.engines.clear()
+        logger.debug("Cleared cached organization-specific engines.")
+
+        # Re-initialize the default engine if a database_url is set
+        if not self.database_url:
+            # This case should ideally not happen if reload_engine is called appropriately
+            # and a default engine was expected.
+            # If only a template is used, self.database_url might be None,
+            # in which case there's no "default" engine to reload here.
+            logger.warning("No default database_url set. Skipping reload of default engine.")
+            return
+        self.database_url = self._sanitize_database_url(self.database_url)
+        if self.settings_service.settings.database_connection_retry:
+            self.engine = self._create_engine_with_retry(self.database_url)
+        else:
+            self.engine = self._create_engine(self.database_url)
+
+    def _sanitize_database_url(self, db_url: str) -> str:
+        """Sanitizes the database URL by replacing the driver part with a compatible one."""
+        if not db_url: # Add a check for empty or None db_url
+            raise ValueError("Database URL cannot be empty or None for sanitization.")
+        url_components = db_url.split("://", maxsplit=1)
 
         driver = url_components[0]
 
@@ -97,7 +197,7 @@ class DatabaseService(Service):
                 )
             driver = "postgresql+psycopg"
 
-        self.database_url = f"{driver}://{url_components[1]}"
+        return f"{driver}://{url_components[1]}"
 
     def _build_connection_kwargs(self):
         """Build connection kwargs by merging deprecated settings with db_connection_settings.
@@ -119,7 +219,7 @@ class DatabaseService(Service):
 
         return connection_kwargs
 
-    def _create_engine(self) -> AsyncEngine:
+    def _create_engine(self, db_url: str) -> AsyncEngine:
         # Get connection settings from config, with defaults if not specified
         # if the user specifies an empty dict, we allow it.
         kwargs = self._build_connection_kwargs()
@@ -134,23 +234,26 @@ class DatabaseService(Service):
                 logger.error(f"Invalid poolclass '{poolclass_key}' specified. Using default pool class.")
 
         return create_async_engine(
-            self.database_url,
-            connect_args=self._get_connect_args(),
+            db_url,
+            connect_args=self._get_connect_args(db_url),
             **kwargs,
         )
 
     @retry(wait=wait_fixed(2), stop=stop_after_attempt(10))
-    def _create_engine_with_retry(self) -> AsyncEngine:
+    def _create_engine_with_retry(self, db_url: str) -> AsyncEngine:
         """Create the engine for the database with retry logic."""
-        return self._create_engine()
+        return self._create_engine(db_url)
 
-    def _get_connect_args(self):
+    def _get_connect_args(self, db_url: str | None = None): # Added db_url parameter
         settings = self.settings_service.settings
 
         if settings.db_driver_connection_settings is not None:
             return settings.db_driver_connection_settings
 
-        if settings.database_url and settings.database_url.startswith("sqlite"):
+        # Use the passed db_url, fallback to self.database_url if None
+        target_db_url = db_url if db_url is not None else self.database_url
+        
+        if target_db_url and target_db_url.startswith("sqlite"):
             return {
                 "check_same_thread": False,
                 "timeout": settings.db_connect_timeout,
@@ -181,8 +284,24 @@ class DatabaseService(Service):
                     cursor.close()
 
     @asynccontextmanager
-    async def with_session(self):
-        async with AsyncSession(self.engine, expire_on_commit=False) as session:
+    async def with_session(self, org_id: str | None = None):
+        engine_to_use: AsyncEngine | None = None
+        if org_id:
+            engine_to_use = self.get_engine(org_id)
+        else:
+            if self.engine:
+                engine_to_use = self.engine
+            else:
+                raise ValueError(
+                    "A session cannot be created without an org_id if no default engine is configured."
+                )
+        
+        if not engine_to_use:
+             # This case should ideally be caught by the logic above,
+             # but as a safeguard:
+            raise ValueError("Failed to determine engine for session.")
+
+        async with AsyncSession(engine_to_use, expire_on_commit=False) as session:
             # Start of Selection
             try:
                 yield session
