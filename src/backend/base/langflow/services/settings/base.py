@@ -79,6 +79,10 @@ class Settings(BaseSettings):
     The driver shall be an async one like `sqlite+aiosqlite` (`sqlite` and `postgresql`
     will be automatically converted to the async drivers `sqlite+aiosqlite` and
     `postgresql+psycopg` respectively)."""
+    database_url_template: str | None = Field(default=None, env="LANGFLOW_DATABASE_URL_TEMPLATE")
+    """Template for database URL for Langflow when using multi-org setup.
+    This will be used to generate the database URL for each organization.
+    The template should contain a placeholder for the organization ID, e.g. `postgresql+psycopg://user:pass@host:port/db_{org_id}`."""
     database_connection_retry: bool = False
     """If True, Langflow will retry to connect to the database if it fails."""
     pool_size: int = 20
@@ -248,6 +252,8 @@ class Settings(BaseSettings):
     lazy_load_components: bool = False
     """If set to True, Langflow will only partially load components at startup and fully load them on demand.
     This significantly reduces startup time but may cause a slight delay when a component is first used."""
+    multi_org_db: bool = Field(default=False, env="LANGFLOW_FEATURE_MULTI_ORG_DB")
+    """If set to True, Langflow will use a multi-org database setup."""
 
     @field_validator("event_delivery", mode="before")
     @classmethod
@@ -320,11 +326,31 @@ class Settings(BaseSettings):
     @field_validator("database_url", mode="before")
     @classmethod
     def set_database_url(cls, value, info):
+        # Check if multi_org_db is True and database_url_template is provided
+        if info.data.get("multi_org_db") and info.data.get("database_url_template"):
+            logger.debug("Using database_url_template for multi-org setup.")
+            # At this stage, we set the database_url to the template.
+            # The actual organization ID will be interpolated later in the application,
+            # presumably when a request comes in and the organization context is known.
+            value = info.data["database_url_template"]
+            # We still need to validate if the template itself is a valid URL structure,
+            # though it might contain placeholders like {org_id}
+            # For now, we assume the template itself should be a valid URL or will be validated later.
+            # We can do a basic check, replacing known placeholders for validation purposes if necessary.
+            # This part might need more sophisticated validation depending on template complexity.
+            # For instance, replacing {org_id} with a dummy value for validation.
+            temp_val_for_validation = value.replace("{org_id}", "dummy_org_id")
+            if not is_valid_database_url(temp_val_for_validation):
+                msg = f"Invalid database_url_template provided: '{value}'"
+                raise ValueError(msg)
+            return value
+
+        # Existing logic
         if value and not is_valid_database_url(value):
             msg = f"Invalid database_url provided: '{value}'"
             raise ValueError(msg)
 
-        logger.debug("No database_url provided, trying LANGFLOW_DATABASE_URL env variable")
+        logger.debug("No database_url provided or not using multi-org template, trying LANGFLOW_DATABASE_URL env variable")
         if langflow_database_url := os.getenv("LANGFLOW_DATABASE_URL"):
             value = langflow_database_url
             logger.debug("Using LANGFLOW_DATABASE_URL env variable.")
@@ -333,7 +359,7 @@ class Settings(BaseSettings):
             # Originally, we used sqlite:///./langflow.db
             # so we need to migrate to the new format
             # if there is a database in that location
-            if not info.data["config_dir"]:
+            if not info.data.get("config_dir"):  # Ensure config_dir is available
                 msg = "config_dir not set, please set it or provide a database_url"
                 raise ValueError(msg)
 
@@ -343,7 +369,7 @@ class Settings(BaseSettings):
             version = get_version_info()["version"]
             is_pre_release = langflow_is_pre_release(version)
 
-            if info.data["save_db_in_config_dir"]:
+            if info.data.get("save_db_in_config_dir", False):  # Default to False if not set
                 database_dir = info.data["config_dir"]
                 logger.debug(f"Saving database to config_dir: {database_dir}")
             else:
@@ -358,33 +384,34 @@ class Settings(BaseSettings):
             if is_pre_release:
                 if Path(new_pre_path).exists():
                     final_path = new_pre_path
-                elif Path(new_path).exists() and info.data["save_db_in_config_dir"]:
-                    # We need to copy the current db to the new location
-                    logger.debug("Copying existing database to new location")
+                elif Path(new_path).exists() and info.data.get("save_db_in_config_dir", False):
+                    logger.debug("Copying existing database to new location for pre-release")
                     copy2(new_path, new_pre_path)
-                    logger.debug(f"Copied existing database to {new_pre_path}")
-                elif Path(f"./{db_file_name}").exists() and info.data["save_db_in_config_dir"]:
-                    logger.debug("Copying existing database to new location")
+                    final_path = new_pre_path
+                elif Path(f"./{db_file_name}").exists() and info.data.get("save_db_in_config_dir", False):
+                    logger.debug("Copying existing database from root to new location for pre-release")
                     copy2(f"./{db_file_name}", new_pre_path)
-                    logger.debug(f"Copied existing database to {new_pre_path}")
+                    final_path = new_pre_path
                 else:
-                    logger.debug(f"Creating new database at {new_pre_path}")
+                    logger.debug(f"Creating new pre-release database at {new_pre_path}")
                     final_path = new_pre_path
             elif Path(new_path).exists():
                 logger.debug(f"Database already exists at {new_path}, using it")
                 final_path = new_path
             elif Path(f"./{db_file_name}").exists():
                 try:
-                    logger.debug("Copying existing database to new location")
+                    logger.debug("Copying existing database from root to new location")
                     copy2(f"./{db_file_name}", new_path)
-                    logger.debug(f"Copied existing database to {new_path}")
+                    final_path = new_path
                 except Exception:  # noqa: BLE001
                     logger.exception("Failed to copy database, using default path")
-                    new_path = f"./{db_file_name}"
+                    # Fallback to using the ./langflow.db path directly if copy fails
+                    final_path = f"./{db_file_name}"
             else:
+                logger.debug(f"Creating new database at {new_path}")
                 final_path = new_path
 
-            if final_path is None:
+            if final_path is None:  # Should ideally not happen with the logic above
                 final_path = new_pre_path if is_pre_release else new_path
 
             value = f"sqlite:///{final_path}"
