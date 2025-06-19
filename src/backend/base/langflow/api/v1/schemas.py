@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Optional
 from uuid import UUID
 
 from pydantic import (
@@ -388,6 +388,12 @@ class ConfigResponse(BaseModel):
     public_flow_cleanup_interval: int
     public_flow_expiration: int
     event_delivery: Literal["polling", "streaming", "direct"]
+    auth: "AuthConfigResponse"  # Forward reference if AuthConfigResponse is defined later or to avoid circular import issues if in same file
+
+
+class AuthConfigResponse(BaseModel):
+    CLERK_AUTH_ENABLED: bool
+    CLERK_PUBLISHABLE_KEY: Optional[str] = None
 
 
 class CancelFlowResponse(BaseModel):

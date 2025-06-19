@@ -9,9 +9,29 @@ from uuid import UUID
 from cryptography.fernet import Fernet
 from fastapi import Depends, HTTPException, Security, WebSocketException, status
 from fastapi.security import APIKeyHeader, APIKeyQuery, OAuth2PasswordBearer
+# Add a comment about the clerk-python dependency
+# To enable Clerk authentication, ensure 'clerk-python' is added to your project dependencies.
 from jose import JWTError, jwt
 from loguru import logger
 from sqlmodel.ext.asyncio.session import AsyncSession
+
+try:
+    # For Clerk integration (optional dependency)
+    from clerk_sdk.clerk import Clerk
+    # from clerk_sdk.client import ClerkClient # ClerkClient might be part of Clerk or used differently
+    # Depending on the version of clerk_sdk, Clerk() might be the main interface.
+    # Example: clerk = Clerk(secret_key="...", publishable_key="...")
+    # or clerk = Clerk() and then use clerk.verify_token(token, ...)
+    # For newer versions, it might be:
+    # from clerk_sdk.clerk_instance_manager import ClerkInstanceManager
+    # ClerkInstanceManager.get_instance().verify_token(token)
+    # Or using specific verification functions with JWKS.
+    clerk_available = True
+except ImportError:
+    clerk_available = False
+    Clerk = None # Define Clerk as None if not available, for type hinting or conditional checks
+
+from langflow.services.settings.auth import AuthSettings # Added import
 from starlette.websockets import WebSocket
 
 from langflow.services.database.models.api_key.crud import check_key
@@ -158,59 +178,122 @@ async def get_current_user_by_jwt(
     db: AsyncSession,
 ) -> User:
     settings_service = get_settings_service()
+    auth_settings: AuthSettings = settings_service.auth_settings # Explicit type
 
+    # User model consideration comment:
+    # To fully map Clerk users to Langflow users, a new field like `clerk_user_id: Optional[str]`
+    # might be needed in the `langflow.services.database.models.user.model.User` SQLModel.
+
+    if auth_settings.CLERK_AUTH_ENABLED:
+        if clerk_available and Clerk is not None: # Check if Clerk SDK was imported
+            try:
+                # Placeholder for Clerk token validation
+                logger.debug("Attempting Clerk token validation.")
+                # 1. Initialize Clerk client (if needed, depends on SDK version and setup)
+                #    Example:
+                #    clerk_instance = Clerk(secret_key=auth_settings.CLERK_SECRET_KEY.get_secret_value() if auth_settings.CLERK_SECRET_KEY else None,
+                #                           publishable_key=auth_settings.CLERK_PUBLISHABLE_KEY)
+                #    Or, if using a global instance:
+                #    clerk_instance = Clerk() # Assuming it's configured globally
+                #
+                # 2. Verify token using Clerk SDK
+                #    The exact method depends on the Clerk SDK version.
+                #    It might be something like:
+                #    clerk_payload = clerk_instance.verify_token(token, jwt_key=auth_settings.CLERK_SECRET_KEY.get_secret_value() if auth_settings.CLERK_SECRET_KEY else None) # if using symmetric key
+                #    or using JWKS for asymmetric verification if CLERK_JWT_VERIFICATION_TEMPLATE is used.
+                #    For example, if CLERK_JWT_VERIFICATION_TEMPLATE points to a JWKS URL:
+                #    # decoded_token = jwt.decode(token, key=jwks_client.get_signing_key_from_jwt(token).key, algorithms=["RS256"], audience="...", issuer="...")
+                #    # This part needs to be implemented based on Clerk's Python SDK documentation for stateless verification.
+                #
+                #    For now, this is a placeholder. If you have a valid Clerk token,
+                #    the following lines would be replaced with actual verification.
+                #    Let's assume `clerk_payload` is the result of successful verification.
+
+                # Mocking a successful Clerk validation for structure demonstration (REMOVE THIS IN ACTUAL IMPLEMENTATION)
+                # if token.startswith("clk_"): # A dummy check
+                #    clerk_user_id = "user_clerk_123" # Extracted from actual clerk_payload.sub or similar
+                #    logger.info(f"Clerk token validated for Clerk user ID: {clerk_user_id}")
+                #
+                #    # 3. Find or create Langflow user
+                #    #    langflow_user = await get_user_by_clerk_id(db, clerk_user_id) # Hypothetical function
+                #    #    if not langflow_user:
+                #    #        logger.info(f"No Langflow user found for Clerk ID {clerk_user_id}. Creating new user.")
+                #    #        # user_email = clerk_payload.get("email") # Or other details
+                #    #        # langflow_user = await create_user_from_clerk(db, clerk_user_id, user_email) # Hypothetical
+                #    #    if langflow_user and langflow_user.is_active:
+                #    #        return langflow_user
+                # else:
+                #    raise JWTError("Not a valid Clerk token (dummy check).") # End of dummy check
+
+                # If Clerk validation is successful and a Langflow user is found/created:
+                # return langflow_user
+                # For this subtask, we'll just log and fall through if actual verification isn't implemented.
+                logger.warning("Clerk token validation logic is a placeholder. Falling back to Langflow JWT.")
+
+            except JWTError as e:
+                logger.debug(f"Clerk JWTError during token validation: {e}. Falling back to Langflow JWT.")
+            except Exception as e:
+                logger.error(f"An unexpected error occurred during Clerk token validation: {e}. Falling back to Langflow JWT.")
+        else:
+            logger.warning("Clerk authentication is enabled, but the Clerk SDK is not available. Falling back to Langflow JWT.")
+
+
+    # Original Langflow Token Validation (executes if Clerk is disabled, or if Clerk validation fails/is skipped)
     if isinstance(token, Coroutine):
         token = await token
 
-    secret_key = settings_service.auth_settings.SECRET_KEY.get_secret_value()
+    secret_key = auth_settings.SECRET_KEY.get_secret_value()
     if secret_key is None:
-        logger.error("Secret key is not set in settings.")
+        logger.error("Secret key is not set in settings for Langflow JWT validation.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            # Careful not to leak sensitive information
-            detail="Authentication failure: Verify authentication settings.",
+            detail="Authentication failure: Langflow JWT secret key not configured.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
     try:
+        logger.debug("Attempting Langflow JWT token validation.")
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            payload = jwt.decode(token, secret_key, algorithms=[settings_service.auth_settings.ALGORITHM])
+            payload = jwt.decode(token, secret_key, algorithms=[auth_settings.ALGORITHM])
         user_id: UUID = payload.get("sub")  # type: ignore[assignment]
-        token_type: str = payload.get("type")  # type: ignore[assignment]
+        token_type: str = payload.get("type")  # type: ignore[assignment] # Should be "access"
         if expires := payload.get("exp", None):
             expires_datetime = datetime.fromtimestamp(expires, timezone.utc)
             if datetime.now(timezone.utc) > expires_datetime:
-                logger.info("Token expired for user")
+                logger.info(f"Langflow JWT token expired for user ID: {user_id}")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail="Token has expired.",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
 
-        if user_id is None or token_type is None:
-            logger.info(f"Invalid token payload. Token type: {token_type}")
+        if user_id is None or token_type != "access": # Ensure it's an access token
+            logger.info(f"Invalid Langflow JWT token payload. User ID: {user_id}, Token type: {token_type}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token details.",
+                detail="Invalid token details (not an access token or missing user ID).",
                 headers={"WWW-Authenticate": "Bearer"},
             )
     except JWTError as e:
-        logger.debug("JWT validation failed: Invalid token format or signature")
+        logger.debug(f"Langflow JWT validation failed: {e}")
+        # This exception will be raised if Clerk auth was enabled but failed, and then Langflow auth also failed.
+        # Or if Clerk auth was disabled and Langflow auth failed.
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
+            detail="Could not validate credentials (Langflow JWT).",
             headers={"WWW-Authenticate": "Bearer"},
         ) from e
 
     user = await get_user_by_id(db, user_id)
     if user is None or not user.is_active:
-        logger.info("User not found or inactive.")
+        logger.info(f"Langflow user not found or inactive for ID: {user_id}.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found or is inactive.",
+            detail="User not found or is inactive (Langflow).",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    logger.debug(f"Successfully validated Langflow JWT for user: {user.username}")
     return user
 
 

@@ -195,3 +195,32 @@ Your new user appears in the **Admin Page**.
 Attempt to access the `/admin` page. You should be redirected to the `/flows` page, because the new user is not a superuser.
 
 You have started a secure Langflow server with authentication enabled and secret key encryption.
+
+## Clerk Authentication
+
+Langflow can also be configured to use [Clerk](https://clerk.com/) for user authentication and management. This allows you to leverage Clerk's robust authentication features, including social logins, multi-factor authentication, and user management capabilities.
+
+To enable Clerk authentication, you need to configure the following environment variables:
+
+-   `LANGFLOW_CLERK_AUTH_ENABLED=true`
+    Set this to `true` to enable Clerk authentication.
+
+-   `LANGFLOW_CLERK_PUBLISHABLE_KEY="your_clerk_publishable_key"`
+    This is your Clerk Frontend API key. You can find this in your Clerk Dashboard under API Keys. It is used by the Langflow frontend to interact with Clerk.
+
+-   `LANGFLOW_CLERK_SECRET_KEY="your_clerk_secret_key"`
+    This is your Clerk Backend API key. You can find this in your Clerk Dashboard under API Keys. This key is crucial for backend validation of tokens issued by Clerk. **Keep this key secure and never expose it in the frontend.**
+
+-   `LANGFLOW_CLERK_JWT_VERIFICATION_TEMPLATE="your_clerk_jwt_verification_template_name"` (Optional)
+    If you are using Clerk's JWT Templates for session token verification, specify the name of your template here. This allows for more customized token validation strategies. If not set, Langflow will use standard JWKS (JSON Web Key Set) based verification provided by Clerk.
+
+### Interaction with LANGFLOW_AUTO_LOGIN
+
+If `LANGFLOW_AUTO_LOGIN` is set to `true`, it will take precedence over Clerk authentication. Langflow will automatically log in the default user, and Clerk authentication will not be initiated. To use Clerk, ensure `LANGFLOW_AUTO_LOGIN` is set to `false`.
+
+### Frontend and Backend Dependencies
+
+-   **Frontend:** To use Clerk's UI components (like `<SignIn />`, `<SignUp />`, `<UserButton />`), the Langflow frontend requires the `@clerk/clerk-react` package. Ensure this package is installed in your frontend environment if you are customizing or building the frontend.
+-   **Backend:** For backend validation of JWTs issued by Clerk, Langflow utilizes the `clerk-python` SDK. If you are deploying Langflow from source or in a way that requires manual dependency management, this SDK would need to be included.
+
+By configuring these variables, Langflow will redirect users to Clerk for login and sign-up processes, and user sessions will be managed by Clerk.

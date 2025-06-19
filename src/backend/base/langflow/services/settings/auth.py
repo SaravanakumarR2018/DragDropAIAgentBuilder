@@ -1,6 +1,6 @@
 import secrets
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Optional
 
 from loguru import logger
 from passlib.context import CryptContext
@@ -49,6 +49,28 @@ class AuthSettings(BaseSettings):
 
     COOKIE_DOMAIN: str | None = None
     """The domain attribute of the cookies. If None, the domain is not set."""
+
+    # Clerk Auth Settings
+    CLERK_AUTH_ENABLED: bool = Field(
+        default=False,
+        description="Enable Clerk authentication.",
+        env="LANGFLOW_CLERK_AUTH_ENABLED",
+    )
+    CLERK_PUBLISHABLE_KEY: Optional[str] = Field(
+        default=None,
+        description="Clerk publishable key.",
+        env="LANGFLOW_CLERK_PUBLISHABLE_KEY",
+    )
+    CLERK_SECRET_KEY: Optional[SecretStr] = Field(
+        default=None,
+        description="Clerk secret key.",
+        env="LANGFLOW_CLERK_SECRET_KEY",
+    )
+    CLERK_JWT_VERIFICATION_TEMPLATE: Optional[str] = Field(
+        default=None,
+        description="Clerk JWT verification template.",
+        env="LANGFLOW_CLERK_JWT_VERIFICATION_TEMPLATE",
+    )
 
     pwd_context: CryptContext = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

@@ -4,10 +4,13 @@ import {
   createRoutesFromElements,
   Outlet,
   Route,
+// TODO: Ensure @clerk/clerk-react is installed
+import { SignIn, SignUp as ClerkSignUp } from "@clerk/clerk-react"; // Renamed SignUp to ClerkSignUp to avoid conflict
 } from "react-router-dom";
 import { ProtectedAdminRoute } from "./components/authorization/authAdminGuard";
 import { ProtectedRoute } from "./components/authorization/authGuard";
 import { ProtectedLoginRoute } from "./components/authorization/authLoginGuard";
+import useClerkConfigStore from "../stores/clerkConfigStore"; // Added import
 import { AuthSettingsGuard } from "./components/authorization/authSettingsGuard";
 import ContextWrapper from "./contexts";
 import CustomDashboardWrapperPage from "./customization/components/custom-DashboardWrapperPage";
@@ -23,7 +26,7 @@ import { AppAuthenticatedPage } from "./pages/AppAuthenticatedPage";
 import { AppInitPage } from "./pages/AppInitPage";
 import { AppWrapperPage } from "./pages/AppWrapperPage";
 import FlowPage from "./pages/FlowPage";
-import LoginPage from "./pages/LoginPage";
+import LoginPage from "./pages/LoginPage"; // Original LoginPage
 import FilesPage from "./pages/MainPage/pages/filesPage";
 import HomePage from "./pages/MainPage/pages/homePage";
 import CollectionPage from "./pages/MainPage/pages/main-page";
@@ -41,7 +44,20 @@ const DeleteAccountPage = lazy(() => import("./pages/DeleteAccountPage"));
 
 const PlaygroundPage = lazy(() => import("./pages/Playground"));
 
-const SignUp = lazy(() => import("./pages/SignUpPage"));
+const SignUpPage = lazy(() => import("./pages/SignUpPage")); // Original SignUpPage, renamed import
+
+// Wrapper components for conditional rendering
+const ClerkOrNativeLoginRoute = () => {
+  const clerkAuthEnabled = useClerkConfigStore((state) => state.clerkAuthEnabled);
+  // When Clerk is enabled, Clerk's <SignIn /> handles its own state and redirection if user is already signed in.
+  // ProtectedLoginRoute for native login should prevent access if already logged in through native means.
+  return clerkAuthEnabled ? <SignIn routing="path" path="/login" /> : <ProtectedLoginRoute><LoginPage /></ProtectedLoginRoute>;
+};
+
+const ClerkOrNativeSignUpRoute = () => {
+  const clerkAuthEnabled = useClerkConfigStore((state) => state.clerkAuthEnabled);
+  return clerkAuthEnabled ? <ClerkSignUp routing="path" path="/signup" /> : <ProtectedLoginRoute><SignUpPage /></ProtectedLoginRoute>;
+};
 
 const router = createBrowserRouter(
   createRoutesFromElements([
@@ -161,19 +177,11 @@ const router = createBrowserRouter(
           </Route>
           <Route
             path="login"
-            element={
-              <ProtectedLoginRoute>
-                <LoginPage />
-              </ProtectedLoginRoute>
-            }
+            element={<ClerkOrNativeLoginRoute />} // Updated route
           />
           <Route
             path="signup"
-            element={
-              <ProtectedLoginRoute>
-                <SignUp />
-              </ProtectedLoginRoute>
-            }
+            element={<ClerkOrNativeSignUpRoute />} // Updated route
           />
           <Route
             path="login/admin"

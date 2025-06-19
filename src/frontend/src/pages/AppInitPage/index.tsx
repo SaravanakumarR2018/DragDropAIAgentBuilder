@@ -8,6 +8,7 @@ import { useGetVersionQuery } from "@/controllers/API/queries/version";
 import { CustomLoadingPage } from "@/customization/components/custom-loading-page";
 import { useCustomPrimaryLoading } from "@/customization/hooks/use-custom-primary-loading";
 import { useDarkStore } from "@/stores/darkStore";
+import useClerkConfigStore from "@/stores/clerkConfigStore"; // Added import
 import useFlowsManagerStore from "@/stores/flowsManagerStore";
 import { useEffect } from "react";
 import { Outlet } from "react-router-dom";
@@ -22,9 +23,11 @@ export function AppInitPage() {
 
   const { isFetched: isLoaded } = useCustomPrimaryLoading();
 
+  const setClerkConfig = useClerkConfigStore((state) => state.setClerkConfig); // Added store access
+
   const { isFetched, refetch } = useGetAutoLogin({ enabled: isLoaded });
   useGetVersionQuery({ enabled: isFetched });
-  const { isFetched: isConfigFetched } = useGetConfig({ enabled: isFetched });
+  const { data: configData, isFetched: isConfigFetched } = useGetConfig({ enabled: isFetched }); // Get configData
   useGetGlobalVariables({ enabled: isFetched });
   useGetTagsQuery({ enabled: isFetched });
   useGetFoldersQuery({ enabled: isFetched });
@@ -40,8 +43,17 @@ export function AppInitPage() {
     if (isConfigFetched) {
       refetch();
       refetchExamples();
+      // Set Clerk configuration from fetched config
+      if (configData) {
+        setClerkConfig(
+          configData.auth?.CLERK_AUTH_ENABLED ?? false,
+          configData.auth?.CLERK_PUBLISHABLE_KEY ?? null,
+        );
+      } else {
+        setClerkConfig(false, null); // Default if configData is undefined
+      }
     }
-  }, [isFetched, isConfigFetched]);
+  }, [isFetched, isConfigFetched, configData, setClerkConfig]); // Added dependencies
 
   return (
     //need parent component with width and height

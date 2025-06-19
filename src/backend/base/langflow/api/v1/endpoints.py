@@ -749,10 +749,21 @@ async def custom_component_update(
 async def get_config():
     try:
         settings_service: SettingsService = get_settings_service()
+        auth_settings = settings_service.auth_settings
 
+        auth_config_response = {
+            "CLERK_AUTH_ENABLED": auth_settings.CLERK_AUTH_ENABLED,
+            "CLERK_PUBLISHABLE_KEY": auth_settings.CLERK_PUBLISHABLE_KEY,
+        }
+
+        # Assuming settings_service.settings is the main settings object that ConfigResponse is based on
+        # and it already includes most fields for ConfigResponse.
+        # We are adding 'auth' key specifically.
         return {
+            **settings_service.settings.model_dump(exclude_none=True),  # Exclude_none might be useful
             "feature_flags": FEATURE_FLAGS,
-            **settings_service.settings.model_dump(),
+            "auth": auth_config_response,
         }
     except Exception as exc:
+        logger.exception("Error getting config") # Added logger for better debugging
         raise HTTPException(status_code=500, detail=str(exc)) from exc

@@ -27,6 +27,11 @@ async def login_to_get_access_token(
     db: DbSession,
 ):
     auth_settings = get_settings_service().auth_settings
+    if not auth_settings.AUTO_LOGIN and auth_settings.CLERK_AUTH_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Clerk authentication is enabled. Please use the Clerk login flow.",
+        )
     try:
         user = await authenticate_user(form_data.username, form_data.password, db)
     except Exception as exc:
