@@ -16,84 +16,87 @@ import { LoadingPage } from "@/pages/LoadingPage";
 
 export const ProtectedRoute = ({ children }) => {
   const location = useLocation();
-  const { isAuthenticated, autoLogin: autoLoginState } = useAuthStore(); // Renamed autoLogin to avoid conflict with variable name
-  const clerkAuthEnabled = useClerkConfigStore((state) => state.clerkAuthEnabled);
-  const { isLoaded: clerkIsLoaded, isSignedIn: clerkIsSignedIn } = useAuth();
+  const { isAuthenticated, autoLogin: autoLoginState } = useAuthStore();
+  const { clerkAuthEnabled, clerkConfigLoaded } = useClerkConfigStore(); // Get clerkConfigLoaded
+
+  // Conditionally call useAuth to prevent errors if ClerkProvider is not yet in the tree
+  const clerkAuthHookResult = (clerkConfigLoaded && clerkAuthEnabled)
+    ? useAuth()
+    : { isLoaded: false, isSignedIn: false };
+  const { isLoaded: clerkIsLoaded, isSignedIn: clerkIsSignedIn } = clerkAuthHookResult;
+
   const cookies = new Cookies();
   const autoLoginCookie = cookies.get(LANGFLOW_AUTO_LOGIN_OPTION);
-  const { mutate: mutateRefresh } = useRefreshAccessToken(); // For native token refresh
+  const { mutate: mutateRefresh } = useRefreshAccessToken();
 
-  // This test mock seems specific and might need to be re-evaluated or integrated differently
-  // For now, if it exists, it forces a redirect similar to shouldRedirect.
   const testMockAutoLogin = sessionStorage.getItem("testMockAutoLogin");
 
-
-  // Priority 1: If Langflow authentication is established (e.g., via auto-login or previous session)
+  // Priority 1: If Langflow (native) authentication is established
   if (isAuthenticated) {
     return children;
   }
 
-  // Priority 2: Clerk Authentication (if enabled and no existing Langflow session)
+  // Priority 2: Clerk Authentication (if enabled via config and no existing Langflow session)
   if (clerkAuthEnabled) {
+    if (!clerkConfigLoaded) {
+      // Waiting for Clerk config to be loaded from backend (e.g. publishable key)
+      return <LoadingPage />;
+    }
+    // At this point, config IS loaded, and Clerk is the chosen auth method.
+    // Now rely on Clerk's own loading state.
     if (!clerkIsLoaded) {
-      // Clerk SDK is loading its state
+      // Clerk SDK itself is loading (e.g., checking session with Clerk servers)
       return <LoadingPage />;
     }
     if (clerkIsSignedIn) {
-      // User is signed in with Clerk
-      // At this point, AuthContext should sync Langflow's isAuthenticated
-      // For now, assuming children implies authenticated state is being handled by AuthContext sync
+      // User is signed in with Clerk. AuthContext should handle setting isAuthenticated.
       return children;
     }
-    // User is not signed in with Clerk, redirect to Clerk's login page
+    // Clerk is loaded, but user is not signed in. Redirect to Clerk's login.
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Priority 3: Native Langflow Login Path (Clerk is disabled and Langflow session not authenticated)
-  // This is where the native token refresh logic comes into play.
-  // The useEffect for token refresh should be here.
+  // Priority 3: Native Langflow Login Path
+  // (Clerk is disabled, or Clerk config is loaded but clerkAuthEnabled is false)
+  // And Langflow session is not authenticated (checked by Priority 1)
+
+  // The useEffect for native token refresh was here. As discussed,
+  // interval-based refresh for an *active* session belongs in AuthContext.
+  // For an *unauthenticated* user hitting a protected route, the main goal is
+  // to redirect to login or show loading if an auto-login attempt is pending.
   useEffect(() => {
-    if (!clerkAuthEnabled && !isAuthenticated && !autoLoginCookie) {
-      // Only attempt refresh if not using clerk, not already auth'd,
-      // and not in an explicit auto-login flow (autoLoginCookie might indicate this)
-      // However, typical token refresh is for an existing session.
-      // This original logic for interval refresh might be better suited inside AuthContext
-      // or when a user is already authenticated.
-      // For an unauthenticated user hitting a protected route, we usually redirect or check auto-login.
-      // The original logic: `if (autoLoginState !== undefined && !autoLoginState && isAuthenticated)`
-      // was for refreshing an already active non-auto-login session.
-      // Let's refine this: if we're here, user is NOT authenticated.
-      // We should check if an auto-login attempt is expected (via autoLoginCookie).
-      // If not, direct to login. If auto-login is expected, show loading.
-      // The token refresh logic from before was for *maintaining* a session.
-      // Here, we are trying to *establish* one or redirect.
-      // For now, removing the interval refresh from here as it doesn't fit the unauthenticated flow.
-      // It should be in AuthContext for an active session.
-    }
+    // This effect might be reconsidered or simplified.
+    // If !isAuthenticated and !clerkAuthEnabled, the logic below handles redirection.
+    // No active token refresh should happen here for an unauthenticated user.
   }, [clerkAuthEnabled, isAuthenticated, autoLoginState, mutateRefresh, autoLoginCookie]);
 
-
-  // If testMockAutoLogin exists, it forces a redirect (mimicking failed auth)
   if (testMockAutoLogin) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // If Clerk is disabled, and user is not authenticated:
-  if (!clerkAuthEnabled && !isAuthenticated) {
-    // If autoLoginCookie exists, it implies AppInitPage's useGetAutoLogin is (or was) pending.
-    // AuthContext should handle setting isAuthenticated if auto-login succeeds.
-    // If it fails, AppInitPage/AuthContext should clear the autoLoginCookie.
-    if (autoLoginCookie) {
-      // We are likely waiting for auto-login to resolve.
-      // AuthContext will update isAuthenticated, which will re-evaluate ProtectedRoute.
+  // This block executes if:
+  // 1. Native `isAuthenticated` is false (Priority 1 check failed)
+  // 2. AND (`clerkAuthEnabled` is false OR (`clerkAuthEnabled` is true BUT `clerkConfigLoaded` is false - covered by loading above))
+  // Essentially, this is the path if Clerk is not the active and ready auth method.
+  if (!isAuthenticated) { // Re-check isAuthenticated as it's the definitive native flag
+    if (clerkConfigLoaded && !clerkAuthEnabled) { // Config loaded, Clerk definitively disabled
+      if (autoLoginCookie) {
+        return <LoadingPage />; // Waiting for native auto-login to resolve
+      }
+      return <Navigate to="/login" state={{ from: location }} replace />; // No auto-login, redirect to native
+    } else if (!clerkConfigLoaded && autoLoginCookie) {
+      // Config not loaded yet, but an autoLoginCookie exists (could be native). Show loading.
+      // This state implies we don't know yet if Clerk will be enabled.
+      return <LoadingPage />;
+    } else if (!clerkConfigLoaded && !autoLoginCookie) {
+      // Config not loaded, no autoLoginCookie. This is an ambiguous state.
+      // It might be initial load. Showing LoadingPage is safest.
+      // AppInitPage should eventually set clerkConfigLoaded.
       return <LoadingPage />;
     }
-    // No auto-login cookie, and not authenticated: redirect to native login.
-    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Fallback/Default: Should ideally be covered by other conditions.
-  // This might be hit if clerkAuthEnabled is true but clerk is not loaded yet,
-  // or if native auto-login is resolving.
+  // Fallback: Should ideally not be reached if logic above is comprehensive.
+  // Covers transitions or unexpected states.
   return <LoadingPage />;
 };

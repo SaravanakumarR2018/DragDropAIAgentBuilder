@@ -27,6 +27,7 @@ import { AppInitPage } from "./pages/AppInitPage";
 import { AppWrapperPage } from "./pages/AppWrapperPage";
 import FlowPage from "./pages/FlowPage";
 import LoginPage from "./pages/LoginPage"; // Original LoginPage
+import { LoadingPage } from "./pages/LoadingPage"; // Added import
 import FilesPage from "./pages/MainPage/pages/filesPage";
 import HomePage from "./pages/MainPage/pages/homePage";
 import CollectionPage from "./pages/MainPage/pages/main-page";
@@ -48,15 +49,33 @@ const SignUpPage = lazy(() => import("./pages/SignUpPage")); // Original SignUpP
 
 // Wrapper components for conditional rendering
 const ClerkOrNativeLoginRoute = () => {
-  const clerkAuthEnabled = useClerkConfigStore((state) => state.clerkAuthEnabled);
-  // When Clerk is enabled, Clerk's <SignIn /> handles its own state and redirection if user is already signed in.
-  // ProtectedLoginRoute for native login should prevent access if already logged in through native means.
-  return clerkAuthEnabled ? <SignIn routing="path" path="/login" /> : <ProtectedLoginRoute><LoginPage /></ProtectedLoginRoute>;
+  const { clerkAuthEnabled, clerkConfigLoaded } = useClerkConfigStore();
+
+  if (!clerkConfigLoaded) {
+    return <LoadingPage />;
+  }
+
+  // Config is loaded now. Decide based on clerkAuthEnabled.
+  if (clerkAuthEnabled) {
+    return <SignIn routing="path" path="/login" />;
+  } else {
+    return <ProtectedLoginRoute><LoginPage /></ProtectedLoginRoute>;
+  }
 };
 
 const ClerkOrNativeSignUpRoute = () => {
-  const clerkAuthEnabled = useClerkConfigStore((state) => state.clerkAuthEnabled);
-  return clerkAuthEnabled ? <ClerkSignUp routing="path" path="/signup" /> : <ProtectedLoginRoute><SignUpPage /></ProtectedLoginRoute>;
+  const { clerkAuthEnabled, clerkConfigLoaded } = useClerkConfigStore();
+
+  if (!clerkConfigLoaded) {
+    return <LoadingPage />;
+  }
+
+  // Config is loaded now. Decide based on clerkAuthEnabled.
+  if (clerkAuthEnabled) {
+    return <ClerkSignUp routing="path" path="/signup" />;
+  } else {
+    return <ProtectedLoginRoute><SignUpPage /></ProtectedLoginRoute>;
+  }
 };
 
 const router = createBrowserRouter(

@@ -54,15 +54,28 @@ export function AuthProvider({ children }): React.ReactElement {
   const { mutate: mutateGetGlobalVariables } = useGetGlobalVariablesMutation();
 
   // Clerk related state and hooks
-  const clerkAuthEnabled = useClerkConfigStore((state) => state.clerkAuthEnabled);
-  const { isLoaded, isSignedIn, sessionId, getToken } = useAuth();
-  const { user: clerkUser } = useUser();
-  const { signOut: clerkSignOut } = useClerk();
+  const { clerkAuthEnabled, clerkConfigLoaded } = useClerkConfigStore(); // Get clerkConfigLoaded
+
+  // Conditionally call Clerk hooks only if config is loaded and Clerk is enabled
+  const clerkAuthState = (clerkConfigLoaded && clerkAuthEnabled)
+    ? useAuth()
+    : { isLoaded: false, isSignedIn: false, sessionId: null, getToken: async () => null };
+  const { isLoaded, isSignedIn, sessionId, getToken } = clerkAuthState;
+
+  const clerkUserState = (clerkConfigLoaded && clerkAuthEnabled)
+    ? useUser()
+    : { user: null };
+  const { user: clerkUser } = clerkUserState;
+
+  const clerkInstance = (clerkConfigLoaded && clerkAuthEnabled)
+    ? useClerk()
+    : { signOut: async () => {} };
+  const { signOut: clerkSignOut } = clerkInstance;
 
 
   // Effect to initialize accessToken from cookies if Clerk is not enabled
   useEffect(() => {
-    if (!clerkAuthEnabled) {
+    if (clerkConfigLoaded && !clerkAuthEnabled) { // Ensure config is loaded before deciding native path
       const storedAccessToken = cookies.get(LANGFLOW_ACCESS_TOKEN);
       if (storedAccessToken) {
         setAccessToken(storedAccessToken);
@@ -76,10 +89,9 @@ export function AuthProvider({ children }): React.ReactElement {
 
   // Effect to set accessToken from Clerk token
   useEffect(() => {
-    if (clerkAuthEnabled && isSignedIn && getToken) {
+    if (clerkConfigLoaded && clerkAuthEnabled && isSignedIn && getToken) { // Check clerkConfigLoaded
       const fetchToken = async () => {
         try {
-          // TODO: Potentially use a template here from Clerk dashboard for backend authentication
           const clerkToken = await getToken();
           setAccessToken(clerkToken ?? null);
           setIsAuthenticated(true);
@@ -90,11 +102,11 @@ export function AuthProvider({ children }): React.ReactElement {
         }
       };
       fetchToken();
-    } else if (clerkAuthEnabled && !isSignedIn) {
+    } else if (clerkConfigLoaded && clerkAuthEnabled && !isSignedIn) { // Check clerkConfigLoaded
       setAccessToken(null);
       setIsAuthenticated(false);
     }
-  }, [clerkAuthEnabled, isSignedIn, getToken, setIsAuthenticated, sessionId]);
+  }, [clerkConfigLoaded, clerkAuthEnabled, isSignedIn, getToken, setIsAuthenticated, sessionId]); // Added clerkConfigLoaded
 
 
   // Effect to initialize apiKey from cookies (applies to both modes)
@@ -107,7 +119,7 @@ export function AuthProvider({ children }): React.ReactElement {
 
 
   const getUser = useCallback(() => {
-    if (clerkAuthEnabled) {
+    if (clerkConfigLoaded && clerkAuthEnabled) { // Check clerkConfigLoaded
       if (isSignedIn && clerkUser) {
         const langflowUser: Users = {
           id: clerkUser.id,
@@ -131,7 +143,7 @@ export function AuthProvider({ children }): React.ReactElement {
         setUserData(null); // Clear user data if not signed in via Clerk
         // setIsAuthenticated(false); // Handled by accessToken effect
       }
-    } else {
+    } else if (clerkConfigLoaded && !clerkAuthEnabled) { // Ensure config is loaded before deciding native path
       // Native Langflow user fetching
       mutateLoggedUser(
         {},
@@ -155,21 +167,20 @@ export function AuthProvider({ children }): React.ReactElement {
 
   // Effect to call getUser when authentication state changes
    useEffect(() => {
-    // For native auth, trigger if accessToken is present (set from cookie)
-    // For Clerk auth, trigger if isSignedIn and clerkUser are available
-    if (!clerkAuthEnabled && accessToken && !userData) { // Only if native auth, token exists, but no user data yet
+    if (clerkConfigLoaded && !clerkAuthEnabled && accessToken && !userData) {
       getUser();
-    } else if (clerkAuthEnabled && isSignedIn && clerkUser && !userData) { // Clerk signed in, user data available, but not yet set in context
+    } else if (clerkConfigLoaded && clerkAuthEnabled && isSignedIn && clerkUser && !userData) {
        getUser();
-    } else if (clerkAuthEnabled && !isSignedIn) { // Clerk signed out
+    } else if (clerkConfigLoaded && clerkAuthEnabled && !isSignedIn) {
       setUserData(null);
     }
-   }, [clerkAuthEnabled, accessToken, isSignedIn, clerkUser, getUser, userData]);
+   }, [clerkConfigLoaded, clerkAuthEnabled, accessToken, isSignedIn, clerkUser, getUser, userData]); // Added clerkConfigLoaded
 
 
   const login = useCallback(
     (newAccessToken: string, autoLogin: string, refreshToken?: string) => {
-      if (clerkAuthEnabled) {
+      // This function should only be called if Clerk is disabled or config not loaded yet (though latter is less likely)
+      if (clerkConfigLoaded && clerkAuthEnabled) {
         console.warn(
           "Native login function called while Clerk authentication is enabled. Please use Clerk's <SignIn /> component.",
         );
@@ -188,7 +199,7 @@ export function AuthProvider({ children }): React.ReactElement {
       getUser(); // Fetch user data after native login
       getGlobalVariables();
     },
-    [clerkAuthEnabled, cookies, setIsAuthenticated, getUser, getGlobalVariables], // Added getGlobalVariables
+    [clerkConfigLoaded, clerkAuthEnabled, cookies, setIsAuthenticated, getUser, getGlobalVariables], // Added clerkConfigLoaded
   );
 
   const storeApiKey = useCallback((newApiKey: string) => {
@@ -203,7 +214,7 @@ export function AuthProvider({ children }): React.ReactElement {
   }, [mutateGetGlobalVariables]);
 
   const logout = useCallback(async () => {
-    if (clerkAuthEnabled) {
+    if (clerkConfigLoaded && clerkAuthEnabled) { // Check clerkConfigLoaded
       try {
         await clerkSignOut();
       } catch (error) {
@@ -224,37 +235,36 @@ export function AuthProvider({ children }): React.ReactElement {
     useAuthStore.getState().setIsAdmin(false); // Reset admin status
 
     navigate("/login");
-  }, [clerkAuthEnabled, clerkSignOut, cookies, navigate, setIsAuthenticated]);
+  }, [clerkConfigLoaded, clerkAuthEnabled, clerkSignOut, cookies, navigate, setIsAuthenticated]); // Added clerkConfigLoaded
 
 
   // This effect ensures that if the native isAuthenticated state changes (e.g. due to cookie expiry not handled elsewhere)
   // or clerk's isSignedIn changes, the UI reflects it.
-  // This is particularly for the case where Clerk is not enabled.
   useEffect(() => {
-    if (!clerkAuthEnabled && !nativeIsAuthenticated && accessToken) {
+    if (clerkConfigLoaded && !clerkAuthEnabled && !nativeIsAuthenticated && accessToken) { // Check clerkConfigLoaded
       // If native token expired or was removed, but state still thinks it's auth'd
       setAccessToken(null);
       setUserData(null);
     }
-  }, [clerkAuthEnabled, nativeIsAuthenticated, accessToken]);
+  }, [clerkConfigLoaded, clerkAuthEnabled, nativeIsAuthenticated, accessToken]); // Added clerkConfigLoaded
 
 
   // Initial check for user data if already authenticated (e.g. page refresh)
-  // This needs to be handled carefully with clerk's isLoaded
   useEffect(() => {
-    if (clerkAuthEnabled) {
+    if (clerkConfigLoaded && clerkAuthEnabled) { // Check clerkConfigLoaded
       if (isLoaded && isSignedIn && !userData) {
         getUser();
       }
-    } else {
+    } else if (clerkConfigLoaded && !clerkAuthEnabled) { // Check clerkConfigLoaded before native logic
       if (cookies.get(LANGFLOW_ACCESS_TOKEN) && !userData && !accessToken) {
-        // If native token exists in cookie, but not in state yet (e.g. initial load)
-        // The accessToken effect should handle setting it, then the getUser effect will trigger.
+        // Native token exists in cookie, but not in state yet (initial load)
+        // The accessToken effect (for native) should handle setting it, then the getUser effect will trigger.
       } else if (accessToken && !userData) {
         getUser(); // If accessToken is set (from cookie or login) but no user data
       }
     }
-  }, [clerkAuthEnabled, isLoaded, isSignedIn, userData, accessToken, cookies, getUser]);
+    // If clerkConfigLoaded is false, we wait for config to load. AppInitPage handles initial loading.
+  }, [clerkConfigLoaded, clerkAuthEnabled, isLoaded, isSignedIn, userData, accessToken, cookies, getUser]); // Added clerkConfigLoaded
 
 
   return (
