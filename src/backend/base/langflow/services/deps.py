@@ -4,6 +4,8 @@ from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
 from loguru import logger
+from fastapi import Request
+import os
 
 from langflow.services.schema import ServiceType
 
@@ -142,15 +144,40 @@ def get_db_service() -> DatabaseService:
     return get_service(ServiceType.DATABASE_SERVICE, DatabaseServiceFactory())
 
 
-async def get_session() -> AsyncGenerator[AsyncSession, None]:
+async def get_session(request: Request) -> AsyncGenerator[AsyncSession, None]:
     """Retrieves an async session from the database service.
+    If the multi-org feature is active, it attempts to use an org-specific session.
+
+    Args:
+        request (Request): The FastAPI request object.
 
     Yields:
         AsyncSession: An async session object.
 
     """
-    async with get_db_service().with_session() as session:
-        yield session
+    db_service = get_db_service()
+    org_id: str | None = None
+
+    if os.getenv("LANGFLOW_FEATURE_MULTI_ORG_DB", "false").lower() == "true":
+        try:
+            org_id = request.state.org_id
+            if not isinstance(org_id, str):  # Ensure org_id is a string
+                org_id = None
+        except AttributeError:
+            logger.warning("request.state.org_id not found, using default database session.")
+            org_id = None
+        except Exception as e:
+            logger.warning(f"Error accessing request.state.org_id: {e}, using default database session.")
+            org_id = None
+
+    if org_id:
+        logger.debug(f"Using database session for org_id: {org_id}")
+        async with db_service.with_session(org_id=org_id) as session:
+            yield session
+    else:
+        logger.debug("Using default database session.")
+        async with db_service.with_session() as session:
+            yield session
 
 
 @asynccontextmanager
