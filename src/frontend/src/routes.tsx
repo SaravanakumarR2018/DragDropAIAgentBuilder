@@ -3,10 +3,10 @@ import {
   createBrowserRouter,
   createRoutesFromElements,
   Outlet,
-  Route,
+  Route
+} from "react-router-dom";
 // TODO: Ensure @clerk/clerk-react is installed
 import { SignIn, SignUp as ClerkSignUp } from "@clerk/clerk-react"; // Renamed SignUp to ClerkSignUp to avoid conflict
-} from "react-router-dom";
 import { ProtectedAdminRoute } from "./components/authorization/authAdminGuard";
 import { ProtectedRoute } from "./components/authorization/authGuard";
 import { ProtectedLoginRoute } from "./components/authorization/authLoginGuard";

@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional # Added Optional
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel
@@ -25,7 +25,7 @@ class UserOptin(BaseModel):
 class User(SQLModel, table=True):  # type: ignore[call-arg]
     id: UUIDstr = Field(default_factory=uuid4, primary_key=True, unique=True)
     username: str = Field(index=True, unique=True)
-    password: str = Field()
+    password: Optional[str] = Field(default=None, nullable=True) # Made password optional and nullable
     profile_image: str | None = Field(default=None, nullable=True)
     is_active: bool = Field(default=False)
     is_superuser: bool = Field(default=False)
@@ -49,6 +49,7 @@ class User(SQLModel, table=True):  # type: ignore[call-arg]
     optins: dict[str, Any] | None = Field(
         sa_column=Column(JSON, default=lambda: UserOptin().model_dump(), nullable=True)
     )
+    clerk_user_id: Optional[str] = Field(default=None, index=True, unique=True, nullable=True)
 
 
 class UserCreate(SQLModel):
@@ -70,6 +71,7 @@ class UserRead(SQLModel):
     updated_at: datetime = Field()
     last_login_at: datetime | None = Field(nullable=True)
     optins: dict[str, Any] | None = Field(default=None)
+    clerk_user_id: Optional[str] = Field(default=None)
 
 
 class UserUpdate(SQLModel):

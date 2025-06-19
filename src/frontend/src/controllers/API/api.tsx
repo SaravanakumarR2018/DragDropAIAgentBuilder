@@ -1,8 +1,11 @@
+// TODO: Ensure @clerk/clerk-react is installed (e.g., npm install @clerk/clerk-react)
+import { Clerk } from "@clerk/clerk-react"; // Added import
 import { IS_AUTO_LOGIN } from "@/constants/constants";
 import { baseURL } from "@/customization/constants";
 import { useCustomApiHeaders } from "@/customization/hooks/use-custom-api-headers";
 import { customGetAccessToken } from "@/customization/utils/custom-get-access-token";
 import useAuthStore from "@/stores/authStore";
+import useClerkConfigStore from "@/stores/clerkConfigStore"; // Added import
 import { useUtilityStore } from "@/stores/utilityStore";
 import axios, { AxiosError, AxiosInstance, AxiosRequestConfig } from "axios";
 import * as fetchIntercept from "fetch-intercept";
@@ -42,13 +45,33 @@ function ApiInterceptor() {
 
   useEffect(() => {
     const unregister = fetchIntercept.register({
-      request: function (url, config) {
-        const accessToken = customGetAccessToken();
+      request: async function (url, config) { // Made async
+        const { clerkAuthEnabled, clerkConfigLoaded } = useClerkConfigStore.getState();
 
-        if (accessToken && !isAuthorizedURL(config?.url)) {
-          config.headers["Authorization"] = `Bearer ${accessToken}`;
+        if (clerkConfigLoaded && clerkAuthEnabled) {
+          // @ts-ignore
+          if (Clerk?.session) {
+            try {
+              // @ts-ignore
+              const clerkToken = await Clerk.session.getToken();
+              if (clerkToken && !isAuthorizedURL(url)) {
+                config.headers["Authorization"] = `Bearer ${clerkToken}`;
+              } else if (!clerkToken && !isAuthorizedURL(url)) {
+                delete config.headers["Authorization"];
+              }
+            } catch (error) {
+              console.error("Error getting Clerk token for fetch:", error);
+            }
+          }
+        } else {
+          // Existing Langflow native token logic
+          const accessToken = customGetAccessToken();
+          if (accessToken && !isAuthorizedURL(url)) { // url here, not config.url for fetch
+            config.headers["Authorization"] = `Bearer ${accessToken}`;
+          }
         }
 
+        // Keep existing custom header logic
         if (!isExternalURL(url)) {
           for (const [key, value] of Object.entries(customHeaders)) {
             config.headers[key] = value;
@@ -156,12 +179,32 @@ function ApiInterceptor() {
           console.error(error.message);
         }
 
-        const accessToken = customGetAccessToken();
+        const { clerkAuthEnabled, clerkConfigLoaded } = useClerkConfigStore.getState();
 
-        if (accessToken && !isAuthorizedURL(config?.url)) {
-          config.headers["Authorization"] = `Bearer ${accessToken}`;
+        if (clerkConfigLoaded && clerkAuthEnabled) {
+          // @ts-ignore
+          if (Clerk?.session) {
+            try {
+              // @ts-ignore
+              const clerkToken = await Clerk.session.getToken();
+              if (clerkToken && !isAuthorizedURL(config?.url)) {
+                config.headers["Authorization"] = `Bearer ${clerkToken}`;
+              } else if (!clerkToken && !isAuthorizedURL(config?.url)) {
+                delete config.headers["Authorization"];
+              }
+            } catch (error) {
+              console.error("Error getting Clerk token for axios:", error);
+            }
+          }
+        } else {
+          // Existing Langflow native token logic
+          const accessToken = customGetAccessToken();
+          if (accessToken && !isAuthorizedURL(config?.url)) {
+            config.headers["Authorization"] = `Bearer ${accessToken}`;
+          }
         }
 
+        // Keep existing custom header logic
         const currentOrigin = window.location.origin;
         const requestUrl = new URL(config?.url as string, currentOrigin);
 

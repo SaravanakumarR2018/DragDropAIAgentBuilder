@@ -205,11 +205,12 @@ To enable Clerk authentication, you need to configure the following environment 
 -   `LANGFLOW_CLERK_AUTH_ENABLED=true`
     Set this to `true` to enable Clerk authentication.
 
--   `LANGFLOW_CLERK_PUBLISHABLE_KEY="your_clerk_publishable_key"`
-    This is your Clerk Frontend API key. You can find this in your Clerk Dashboard under API Keys. It is used by the Langflow frontend to interact with Clerk.
-
 -   `LANGFLOW_CLERK_SECRET_KEY="your_clerk_secret_key"`
     This is your Clerk Backend API key. You can find this in your Clerk Dashboard under API Keys. This key is crucial for backend validation of tokens issued by Clerk. **Keep this key secure and never expose it in the frontend.**
+
+-   `VITE_CLERK_PUBLISHABLE_KEY="pk_your_clerk_publishable_key"`
+    This is your Clerk Frontend API key (Publishable Key). You can find this in your Clerk Dashboard under API Keys. It is used by the Langflow frontend to interact with Clerk. This variable should be set in your frontend environment (e.g., a `.env` file at the root of the project, which Vite will pick up, or through your deployment platform's environment variable settings for the frontend). **Note the `VITE_` prefix required by Vite to expose it to the frontend code.**
+    (The backend also has a `LANGFLOW_CLERK_PUBLISHABLE_KEY` setting, which receives the same value but is used by the backend to render this key in the frontend configuration endpoint; `VITE_CLERK_PUBLISHABLE_KEY` is what the frontend code directly uses during its build process or runtime via `import.meta.env`).
 
 -   `LANGFLOW_CLERK_JWT_VERIFICATION_TEMPLATE="your_clerk_jwt_verification_template_name"` (Optional)
     If you are using Clerk's JWT Templates for session token verification, specify the name of your template here. This allows for more customized token validation strategies. If not set, Langflow will use standard JWKS (JSON Web Key Set) based verification provided by Clerk.
