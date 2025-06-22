@@ -10,8 +10,7 @@ from loguru import logger
 from langflow.services.deps import get_settings_service
 
 # Middleware for handling organization-specific database connections and JWT validation
-CLERK_FRONTEND_API_URL = os.environ.get("CLERK_FRONTEND_API_URL", "https://your-clerk-domain.com") # Replace with your actual Clerk Frontend API URL or set ENV
-CLERK_JWT_AUDIENCE = os.environ.get("CLERK_JWT_AUDIENCE", None) # Replace/set if audience validation is needed
+CLERK_FRONTEND_API_URL = os.environ.get("CLERK_FRONTEND_API_URL", "https://proven-liger-3.clerk.accounts.dev") # Replace with your actual Clerk Frontend API URL or set ENV
 CLERK_ALGORITHM = "RS256" # Algorithm for JWKS
 
 class MaxFileSizeException(HTTPException):
@@ -111,7 +110,6 @@ class OrgDatabaseMiddleware(BaseHTTPMiddleware):
                                 token,
                                 rsa_key, # Pass the specific key, not the whole JWKS
                                 algorithms=[CLERK_ALGORITHM],
-                                audience=CLERK_JWT_AUDIENCE,
                             )
                             org_id = decoded_token.get("org_id")
                             if org_id:
