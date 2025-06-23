@@ -226,7 +226,7 @@ def create_app():
     # TODO: Remove `not` when the feature flag is correctly in place and defaults to False
     # For now, assuming we want to enable it if the var is NOT explicitly False in .env
     # or if it's not present at all (getattr default to True for testing)
-    if getattr(settings_service.settings, "LANGFLOW_FEATURE_MULTI_ORG_DB", False):
+    if getattr(settings_service.settings, "LANGFLOW_FEATURE_MULTI_ORG_DB", True):
         app.add_middleware(OrgDatabaseMiddleware)
         logger.info("OrgDatabaseMiddleware registered as LANGFLOW_FEATURE_MULTI_ORG_DB is True.")
     else:

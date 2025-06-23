@@ -349,13 +349,12 @@ class Settings(BaseSettings):
         if value and not is_valid_database_url(value):
             msg = f"Invalid database_url provided: '{value}'"
             raise ValueError(msg)
-
-        logger.debug("No database_url provided or not using multi-org template, trying LANGFLOW_DATABASE_URL env variable")
+            
         if langflow_database_url := os.getenv("LANGFLOW_DATABASE_URL"):
             value = langflow_database_url
-            logger.debug("Using LANGFLOW_DATABASE_URL env variable.")
+            logger.info("Using LANGFLOW_DATABASE_URL env variable.")
         else:
-            logger.debug("No database_url env variable, using sqlite database")
+            logger.info("No database_url env variable, using sqlite database")
             # Originally, we used sqlite:///./langflow.db
             # so we need to migrate to the new format
             # if there is a database in that location
