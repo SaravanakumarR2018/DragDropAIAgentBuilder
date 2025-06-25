@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
 from cryptography.fernet import Fernet
-from fastapi import Depends, HTTPException, Security, WebSocketException, status
+from fastapi import Depends, HTTPException, Request, Security, WebSocketException, status
 from fastapi.security import APIKeyHeader, APIKeyQuery, OAuth2PasswordBearer
 from jose import JWTError, jwt
 from loguru import logger
@@ -19,6 +19,7 @@ from langflow.services.database.models.user.crud import get_user_by_id, get_user
 from langflow.services.database.models.user.model import User, UserRead
 from langflow.services.deps import get_db_service, get_session, get_settings_service
 from langflow.services.settings.service import SettingsService
+from langflow.services.auth.clerk_utils import verify_clerk_token, get_clerk_user_id, get_clerk_username, get_clerk_user_email
 
 if TYPE_CHECKING:
     from langflow.services.database.models.api_key.model import ApiKey
@@ -162,56 +163,83 @@ async def get_current_user_by_jwt(
     if isinstance(token, Coroutine):
         token = await token
 
-    secret_key = settings_service.auth_settings.SECRET_KEY.get_secret_value()
-    if secret_key is None:
-        logger.error("Secret key is not set in settings.")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            # Careful not to leak sensitive information
-            detail="Authentication failure: Verify authentication settings.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+    if settings_service.auth_settings.CLERK_AUTH_ENABLED:
+        try:
+            claims = verify_clerk_token(token)
+            clerk_user_id = get_clerk_user_id(claims)
+            email = get_clerk_user_email(claims)
+            username = get_clerk_username(claims)  # optional, you could use clerk_user_id too
 
-    try:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            payload = jwt.decode(token, secret_key, algorithms=[settings_service.auth_settings.ALGORITHM])
-        user_id: UUID = payload.get("sub")  # type: ignore[assignment]
-        token_type: str = payload.get("type")  # type: ignore[assignment]
-        if expires := payload.get("exp", None):
-            expires_datetime = datetime.fromtimestamp(expires, timezone.utc)
-            if datetime.now(timezone.utc) > expires_datetime:
-                logger.info("Token expired for user")
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Token has expired.",
-                    headers={"WWW-Authenticate": "Bearer"},
+            user = await get_user_by_username(db, clerk_user_id)
+            if not user:
+                # ✅ Auto-provision new user from Clerk
+                user = User(
+                    username=clerk_user_id,
+                    is_active=True,
+                    is_superuser=False,
                 )
+                db.add(user)
+                await db.commit()
+                await db.refresh(user)
 
-        if user_id is None or token_type is None:
-            logger.info(f"Invalid token payload. Token type: {token_type}")
+            if not user.is_active:
+                raise HTTPException(status_code=401, detail="User is inactive")
+
+            return user
+        except Exception as e:
+            logger.exception("Clerk JWT validation failed")
+            raise HTTPException(status_code=401, detail="Invalid Clerk token") from e
+    else:
+        secret_key = settings_service.auth_settings.SECRET_KEY.get_secret_value()
+        if secret_key is None:
+            logger.error("Secret key is not set in settings.")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token details.",
+                # Careful not to leak sensitive information
+                detail="Authentication failure: Verify authentication settings.",
                 headers={"WWW-Authenticate": "Bearer"},
             )
-    except JWTError as e:
-        logger.debug("JWT validation failed: Invalid token format or signature")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        ) from e
 
-    user = await get_user_by_id(db, user_id)
-    if user is None or not user.is_active:
-        logger.info("User not found or inactive.")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found or is inactive.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    return user
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                payload = jwt.decode(token, secret_key, algorithms=[settings_service.auth_settings.ALGORITHM])
+            user_id: UUID = payload.get("sub")  # type: ignore[assignment]
+            token_type: str = payload.get("type")  # type: ignore[assignment]
+            if expires := payload.get("exp", None):
+                expires_datetime = datetime.fromtimestamp(expires, timezone.utc)
+                if datetime.now(timezone.utc) > expires_datetime:
+                    logger.info("Token expired for user")
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Token has expired.",
+                        headers={"WWW-Authenticate": "Bearer"},
+                    )
+
+            if user_id is None or token_type is None:
+                logger.info(f"Invalid token payload. Token type: {token_type}")
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid token details.",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+        except JWTError as e:
+            logger.debug("JWT validation failed: Invalid token format or signature")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials",
+                headers={"WWW-Authenticate": "Bearer"},
+            ) from e
+
+        user = await get_user_by_id(db, user_id)
+        if user is None or not user.is_active:
+            logger.info("User not found or inactive.")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found or is inactive.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        return user
 
 
 async def get_current_user_for_websocket(
@@ -473,3 +501,42 @@ def decrypt_api_key(encrypted_api_key: str, settings_service: SettingsService):
             )
             return fernet.decrypt(encrypted_api_key).decode()
     return ""
+
+async def get_current_user_flexible(
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_session)],
+    token: Annotated[str | None, Depends(oauth2_login)],
+    query_key: Annotated[str | None, Security(api_key_query)] = None,
+    header_key: Annotated[str | None, Security(api_key_header)] = None,
+) -> User:
+    settings = get_settings_service()
+
+    if token and not token.startswith("Bearer "):
+        token = token.strip()
+
+    if settings.auth_settings.CLERK_AUTH_ENABLED:
+        # Prefer Authorization header; if not available, fallback to Clerk cookies
+        if not token:
+            token = request.cookies.get("__session") or request.cookies.get("access_token_lf")
+
+        if token:
+            try:
+                return await get_current_user_by_jwt(token, db)
+            except HTTPException as e:
+                # Allow fallback to legacy if Clerk token is invalid
+                pass
+
+    # Fallback: legacy API key auth or legacy bearer token
+    key = query_key or header_key or token  # token might be legacy JWT
+
+    if not key:
+        raise HTTPException(status_code=401, detail="API key or token required")
+
+    try:
+        return await get_current_user_by_jwt(key, db)
+    except Exception:
+        # If legacy token fails, try API key flow
+        user = await check_key(db, key)
+        if not user:
+            raise HTTPException(status_code=403, detail="Invalid API key")
+        return user

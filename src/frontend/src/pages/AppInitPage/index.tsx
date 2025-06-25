@@ -1,3 +1,7 @@
+// src/frontend/src/pages/AppInitPage/index.tsx
+import { useEffect } from "react";
+import { Outlet, useNavigate } from "react-router-dom";
+
 import { useGetAutoLogin } from "@/controllers/API/queries/auth";
 import { useGetConfig } from "@/controllers/API/queries/config/use-get-config";
 import { useGetBasicExamplesQuery } from "@/controllers/API/queries/flows/use-get-basic-examples";
@@ -5,55 +9,101 @@ import { useGetFoldersQuery } from "@/controllers/API/queries/folders/use-get-fo
 import { useGetTagsQuery } from "@/controllers/API/queries/store";
 import { useGetGlobalVariables } from "@/controllers/API/queries/variables";
 import { useGetVersionQuery } from "@/controllers/API/queries/version";
-import { CustomLoadingPage } from "@/customization/components/custom-loading-page";
+
 import { useCustomPrimaryLoading } from "@/customization/hooks/use-custom-primary-loading";
-import { useDarkStore } from "@/stores/darkStore";
-import useFlowsManagerStore from "@/stores/flowsManagerStore";
-import { useEffect } from "react";
-import { Outlet } from "react-router-dom";
 import { LoadingPage } from "../LoadingPage";
 
-export function AppInitPage() {
-  const refreshStars = useDarkStore((state) => state.refreshStars);
-  const refreshDiscordCount = useDarkStore(
-    (state) => state.refreshDiscordCount,
-  );
-  const isLoading = useFlowsManagerStore((state) => state.isLoading);
+import useAuthStore from "@/stores/authStore";
+import { useDarkStore } from "@/stores/darkStore";
+import useFlowsManagerStore from "@/stores/flowsManagerStore";
 
+import { useUser } from "@clerk/clerk-react";
+import { useAuth } from "@/contexts/authContext";
+
+const IS_CLERK_ENABLED = import.meta.env.VITE_CLERK_AUTH_ENABLED === "true";
+
+export function AppInitPage() {
+  const navigate = useNavigate();
+
+  const refreshStars = useDarkStore((s) => s.refreshStars);
+  const refreshDiscordCount = useDarkStore((s) => s.refreshDiscordCount);
+  const isLoading = useFlowsManagerStore((s) => s.isLoading);
   const { isFetched: isLoaded } = useCustomPrimaryLoading();
 
-  const { isFetched, refetch } = useGetAutoLogin({ enabled: isLoaded });
-  useGetVersionQuery({ enabled: isFetched });
-  const { isFetched: isConfigFetched } = useGetConfig({ enabled: isFetched });
-  useGetGlobalVariables({ enabled: isFetched });
-  useGetTagsQuery({ enabled: isFetched });
-  useGetFoldersQuery({ enabled: isFetched });
-  const { isFetched: isExamplesFetched, refetch: refetchExamples } =
-    useGetBasicExamplesQuery();
+  const { isSignedIn, isLoaded: isClerkLoaded } = useUser();
+  const setAutoLogin = useAuthStore((s) => s.setAutoLogin);
+  const { getUser, userData } = useAuth();
+
+  // 1️⃣ Clerk Routing
+  useEffect(() => {
+    if (!IS_CLERK_ENABLED) return;
+    if (!isClerkLoaded) return;
+
+    if (isSignedIn) {
+      navigate("/flows");
+    } else {
+      navigate("/login");
+    }
+  }, [isClerkLoaded, isSignedIn, navigate]);
 
   useEffect(() => {
-    if (isFetched) {
+    if (IS_CLERK_ENABLED && isClerkLoaded && isSignedIn && !userData) {
+      getUser();
+    }
+  }, [isClerkLoaded, isSignedIn, userData]);
+
+  // 2️⃣ Legacy Auth
+  const { isFetched: autoFetched, refetch: refetchAuto } = useGetAutoLogin({
+    enabled: !IS_CLERK_ENABLED && isLoaded,
+  });
+
+  useGetVersionQuery({ enabled: IS_CLERK_ENABLED ? isSignedIn && isClerkLoaded : autoFetched, });
+  const { isFetched: configFetched } = useGetConfig({
+    enabled: IS_CLERK_ENABLED ? isSignedIn && isClerkLoaded : autoFetched,
+  });
+  useGetGlobalVariables({ enabled: IS_CLERK_ENABLED ? isSignedIn && isClerkLoaded : autoFetched, });
+  useGetTagsQuery({ enabled: IS_CLERK_ENABLED ? isSignedIn && isClerkLoaded : autoFetched, });
+  useGetFoldersQuery({ enabled: IS_CLERK_ENABLED ? isSignedIn && isClerkLoaded : autoFetched, });
+
+  const {
+    isFetched: examplesFetched,
+    refetch: refetchExamples,
+  } = useGetBasicExamplesQuery({
+    enabled: IS_CLERK_ENABLED ? isSignedIn && isClerkLoaded : autoFetched,
+  });
+
+  useEffect(() => {
+    if (!IS_CLERK_ENABLED && configFetched) {
+      setAutoLogin(true);
+      refetchAuto();
+      refetchExamples();
       refreshStars();
       refreshDiscordCount();
     }
+  }, [
+    IS_CLERK_ENABLED,
+    configFetched,
+    refetchAuto,
+    refetchExamples,
+    refreshStars,
+    refreshDiscordCount,
+    setAutoLogin,
+  ]);
 
-    if (isConfigFetched) {
-      refetch();
-      refetchExamples();
-    }
-  }, [isFetched, isConfigFetched]);
+  // 3️⃣ Loader
+  const showLoader = IS_CLERK_ENABLED
+    ? !isClerkLoaded
+    : !autoFetched || !examplesFetched || isLoading;
+
+  // 4️⃣ Outlet rendering
+  const canRenderOutlet = IS_CLERK_ENABLED
+  ? isClerkLoaded
+  : autoFetched && examplesFetched;
 
   return (
-    //need parent component with width and height
     <>
-      {isLoaded ? (
-        (isLoading || !isFetched || !isExamplesFetched) && (
-          <LoadingPage overlay />
-        )
-      ) : (
-        <CustomLoadingPage />
-      )}
-      {isFetched && isExamplesFetched && <Outlet />}
+      {showLoader && <LoadingPage overlay />}
+      {canRenderOutlet && <Outlet />}
     </>
   );
 }
