@@ -236,28 +236,43 @@ def create_app():
     # they are added. This middleware validates Clerk tokens when enabled.
     @app.middleware("http")
     async def clerk_auth_middleware(request: Request, call_next):
+        logger.info("clerk_auth_middleware called")
         settings_service = get_settings_service()
+
+        # Skip auth for docs and openapi
+        public_paths = ["/docs", "/openapi.json", "/redoc"]
+        if any(request.url.path.startswith(path) for path in public_paths):
+            return await call_next(request)
+
         if not settings_service.auth_settings.CLERK_AUTH_ENABLED:
             return await call_next(request)
 
         header = request.headers.get("Authorization")
-        ctx_token = auth_header_ctx.set(None)
+        token = None
 
         if header and header.lower().startswith("bearer "):
             token = header.split(" ", 1)[1]
+
+        ctx_token = auth_header_ctx.set(None)
+        if token:
             try:
                 payload = await verify_clerk_token(token)
             except Exception as exc:
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication failed") from exc
             auth_header_ctx.reset(ctx_token)
             ctx_token = auth_header_ctx.set(payload)
+            data = auth_header_ctx.get()
+            if data:
+                if "uuid" not in data:
+                    logger.warning("uuid not found in auth_header_ctx payload")  
 
         try:
             response = await call_next(request)
         finally:
             auth_header_ctx.reset(ctx_token)
-        return response
 
+        return response
+ 
     @app.middleware("http")
     async def check_boundary(request: Request, call_next):
         if "/api/v1/files/upload" in request.url.path:

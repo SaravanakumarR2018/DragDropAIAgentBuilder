@@ -1,8 +1,10 @@
 from contextvars import ContextVar
 from typing import Any
+import uuid
 
 import httpx
 from jose import JWTError, jwk, jwt
+from loguru import logger
 
 # Context variable to store decoded clerk claims per request
 auth_header_ctx: ContextVar[dict | None] = ContextVar("auth_header_ctx", default=None)
@@ -24,35 +26,38 @@ async def _get_jwks(issuer: str) -> dict[str, Any]:
 
 
 async def verify_clerk_token(token: str) -> dict[str, Any]:
-    """Verify a Clerk token and return its decoded payload."""
+    """Verify a Clerk token, add a UUID derived from the Clerk ID, and return the payload."""
     try:
         unverified_header = jwt.get_unverified_header(token)
         unverified_claims = jwt.get_unverified_claims(token)
         issuer: str | None = unverified_claims.get("iss")
         kid: str | None = unverified_header.get("kid")
         if not issuer or not kid:
-            msg = "Missing issuer or kid"
-            raise JWTError(msg)
+            raise JWTError("Missing issuer or kid")
+
         jwks = await _get_jwks(issuer)
         key = jwks.get(kid)
         if not key:
-            # refresh once in case key rotated
-            _jwks_cache.pop(issuer, None)
+            _jwks_cache.pop(issuer, None)  # force refresh
             jwks = await _get_jwks(issuer)
             key = jwks.get(kid)
             if not key:
-                msg = "Public key not found"
-                raise JWTError(msg)
+                raise JWTError("Public key not found")
+
         public_key = jwk.construct(key, unverified_header.get("alg", "RS256"))
         payload = jwt.decode(
             token,
             public_key,
             algorithms=[unverified_header.get("alg", "RS256")],
             audience=unverified_claims.get("aud"),
-            issuer=issuer,
+            issuer=issuer
         )
+        # ✅ Add deterministic UUID to the payload
+        clerk_id = payload.get("sub")
+        if clerk_id:
+            payload["uuid"] = str(uuid.uuid5(uuid.NAMESPACE_DNS, str(clerk_id)))
+
     except JWTError as exc:
-        msg = "Invalid token"
-        raise ValueError(msg) from exc
-    else:
-        return payload
+        raise ValueError("Invalid token") from exc
+
+    return payload
