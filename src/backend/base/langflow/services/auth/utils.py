@@ -19,7 +19,7 @@ from langflow.services.database.models.user.crud import get_user_by_id, get_user
 from langflow.services.database.models.user.model import User, UserRead
 from langflow.services.deps import get_db_service, get_session, get_settings_service
 from langflow.services.settings.service import SettingsService
-from langflow.services.auth.clerk_utils import auth_header_ctx
+from langflow.services.auth.clerk_utils import get_user_from_clerk_payload
 
 if TYPE_CHECKING:
     from langflow.services.database.models.api_key.model import ApiKey
@@ -165,78 +165,52 @@ async def get_current_user_by_jwt(
 
     # ✅ Clerk auth path — use UUID from payload already set in middleware
     if settings_service.auth_settings.CLERK_AUTH_ENABLED:
-        payload = auth_header_ctx.get()
-        if not payload:
+        return await get_user_from_clerk_payload(token, db)
+
+    secret_key = settings_service.auth_settings.SECRET_KEY.get_secret_value()
+    if not secret_key:
+        logger.error("Secret key is not set in settings.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication failure: Verify authentication settings.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            payload = jwt.decode(
+                token,
+                secret_key,
+                algorithms=[settings_service.auth_settings.ALGORITHM],
+            )
+
+        user_id: UUID = payload.get("sub")  # type: ignore[assignment]
+        token_type: str = payload.get("type")  # type: ignore[assignment]
+        if not user_id or not token_type:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Missing Clerk payload",
+                detail="Invalid token details.",
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
-        uuid_str = payload.get("uuid")
-        logger.info(f"uuid_str: {uuid_str}")
-        if not uuid_str:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Missing Clerk UUID",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-
-        try:
-            user_id = UUID(uuid_str)
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid Clerk UUID format",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-
-    # ✅ Legacy auth path — decode JWT and extract `sub` as user_id
-    else:
-        secret_key = settings_service.auth_settings.SECRET_KEY.get_secret_value()
-        if not secret_key:
-            logger.error("Secret key is not set in settings.")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication failure: Verify authentication settings.",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-
-        try:
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                payload = jwt.decode(
-                    token,
-                    secret_key,
-                    algorithms=[settings_service.auth_settings.ALGORITHM],
-                )
-
-            user_id: UUID = payload.get("sub")  # type: ignore[assignment]
-            token_type: str = payload.get("type")  # type: ignore[assignment]
-            if not user_id or not token_type:
+        if exp := payload.get("exp"):
+            expires_datetime = datetime.fromtimestamp(exp, timezone.utc)
+            if datetime.now(timezone.utc) > expires_datetime:
+                logger.info("Token expired for user")
                 raise HTTPException(
                     status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid token details.",
+                    detail="Token has expired.",
                     headers={"WWW-Authenticate": "Bearer"},
                 )
 
-            if exp := payload.get("exp"):
-                expires_datetime = datetime.fromtimestamp(exp, timezone.utc)
-                if datetime.now(timezone.utc) > expires_datetime:
-                    logger.info("Token expired for user")
-                    raise HTTPException(
-                        status_code=status.HTTP_401_UNAUTHORIZED,
-                        detail="Token has expired.",
-                        headers={"WWW-Authenticate": "Bearer"},
-                    )
-
-        except JWTError:
-            logger.debug("JWT validation failed: Invalid token format or signature")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Could not validate credentials",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+    except JWTError:
+        logger.debug("JWT validation failed: Invalid token format or signature")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     # ✅ DB lookup for both Clerk and Legacy paths
     user = await get_user_by_id(db, user_id)
