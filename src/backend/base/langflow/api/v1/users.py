@@ -1,7 +1,6 @@
 from typing import Annotated
 from uuid import UUID
-from loguru import logger
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
@@ -18,50 +17,35 @@ from langflow.services.auth.utils import (
 from langflow.services.database.models.user import User, UserCreate, UserRead, UserUpdate
 from langflow.services.database.models.user.crud import get_user_by_id, update_user
 from langflow.services.deps import get_settings_service
-from langflow.services.auth.clerk_utils import auth_header_ctx
+from langflow.services.auth.clerk_utils import process_new_user_with_clerk
 
 router = APIRouter(tags=["Users"], prefix="/users")
-
-
-from uuid import UUID
 
 @router.post("/", response_model=UserRead, status_code=201)
 async def add_user(
     user: UserCreate,
     session: DbSession,
+    request:Request
 ) -> User:
     """Add a new user to the database."""
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+    token = auth_header[len("Bearer "):]
     new_user = User.model_validate(user, from_attributes=True)
-    settings = get_settings_service().auth_settings
-
     try:
-        # ✅ If Clerk is enabled, pull UUID from enriched auth_header_ctx payload
-        if settings.CLERK_AUTH_ENABLED:
-            payload = auth_header_ctx.get()
-            if not payload:
-                raise HTTPException(status_code=401, detail="Missing Clerk payload")
-            clerk_uuid = payload.get("uuid")
-            if not clerk_uuid:
-                raise HTTPException(status_code=401, detail="Missing Clerk UUID")
-            new_user.id = UUID(clerk_uuid)
-            logger.info(new_user.id)
-        # ✅ Set password + activation flag
+        await process_new_user_with_clerk(user, new_user, token)
         new_user.password = get_password_hash(user.password)
-        new_user.is_active = settings.NEW_USER_IS_ACTIVE
-
-        # ✅ Persist the user
+        new_user.is_active = get_settings_service().auth_settings.NEW_USER_IS_ACTIVE
         session.add(new_user)
         await session.commit()
         await session.refresh(new_user)
-        logger.info(f"new_user: {new_user}")
-        # ✅ Create default folder
         folder = await get_or_create_default_folder(session, new_user.id)
         if not folder:
             raise HTTPException(status_code=500, detail="Error creating default project")
-
-    except IntegrityError:
+    except IntegrityError as e:
         await session.rollback()
-        raise HTTPException(status_code=400, detail="This username is unavailable.")
+        raise HTTPException(status_code=400, detail="This username is unavailable.") from e
 
     return new_user
 
