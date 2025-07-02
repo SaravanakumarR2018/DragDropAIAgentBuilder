@@ -35,7 +35,6 @@ from langflow.interface.components import get_and_cache_all_types_dict
 from langflow.interface.utils import setup_llm_caching
 from langflow.logging.logger import configure
 from langflow.middleware import ContentSizeLimitMiddleware
-from langflow.services.auth.clerk_utils import auth_header_ctx, verify_clerk_token
 from langflow.services.deps import (
     get_queue_service,
     get_settings_service,
@@ -232,47 +231,6 @@ def create_app():
     )
     app.add_middleware(JavaScriptMIMETypeMiddleware)
 
-    # FastAPI supports multiple middleware functions which run in the order
-    # they are added. This middleware validates Clerk tokens when enabled.
-    @app.middleware("http")
-    async def clerk_auth_middleware(request: Request, call_next):
-        logger.info("clerk_auth_middleware called")
-        settings_service = get_settings_service()
-
-        # Skip auth for docs and openapi
-        public_paths = ["/docs", "/openapi.json", "/redoc"]
-        if any(request.url.path.startswith(path) for path in public_paths):
-            return await call_next(request)
-
-        if not settings_service.auth_settings.CLERK_AUTH_ENABLED:
-            return await call_next(request)
-
-        header = request.headers.get("Authorization")
-        token = None
-
-        if header and header.lower().startswith("bearer "):
-            token = header.split(" ", 1)[1]
-
-        ctx_token = auth_header_ctx.set(None)
-        if token:
-            try:
-                payload = await verify_clerk_token(token)
-            except Exception as exc:
-                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication failed") from exc
-            auth_header_ctx.reset(ctx_token)
-            ctx_token = auth_header_ctx.set(payload)
-            data = auth_header_ctx.get()
-            if data:
-                if "uuid" not in data:
-                    logger.warning("uuid not found in auth_header_ctx payload")  
-
-        try:
-            response = await call_next(request)
-        finally:
-            auth_header_ctx.reset(ctx_token)
-
-        return response
- 
     @app.middleware("http")
     async def check_boundary(request: Request, call_next):
         if "/api/v1/files/upload" in request.url.path:
