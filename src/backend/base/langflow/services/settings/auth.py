@@ -27,13 +27,10 @@ class AuthSettings(BaseSettings):
     API_KEY_ALGORITHM: str = "HS256"
     API_V1_STR: str = "/api/v1"
 
-    # Clerk authentication. Set via the LANGFLOW_CLERK_AUTH_ENABLED env var.
-    CLERK_AUTH_ENABLED: bool = True
-
     # If AUTO_LOGIN = True
     # > The application does not request login and logs in automatically as a super user.
-    AUTO_LOGIN: bool = False
-    NEW_USER_IS_ACTIVE: bool = True
+    AUTO_LOGIN: bool = True
+    NEW_USER_IS_ACTIVE: bool = False
     SUPERUSER: str = DEFAULT_SUPERUSER
     SUPERUSER_PASSWORD: str = DEFAULT_SUPERUSER_PASSWORD
 
