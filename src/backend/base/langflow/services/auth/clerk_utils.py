@@ -5,6 +5,15 @@ import uuid
 import httpx
 from jose import JWTError, jwk, jwt
 from loguru import logger
+from fastapi import HTTPException, Request, status
+from uuid import UUID
+from loguru import logger
+from langflow.services.deps import get_settings_service
+from langflow.services.database.models.user import UserCreate, User
+from sqlmodel.ext.asyncio.session import AsyncSession
+
+from langflow.services.database.models.user.crud import get_user_by_id
+from langflow.services.database.models.user.model import User
 
 # Context variable to store decoded clerk claims per request
 auth_header_ctx: ContextVar[dict | None] = ContextVar("auth_header_ctx", default=None)
@@ -54,10 +63,73 @@ async def verify_clerk_token(token: str) -> dict[str, Any]:
         )
         # ✅ Add deterministic UUID to the payload
         clerk_id = payload.get("sub")
-        if clerk_id:
-            payload["uuid"] = str(uuid.uuid5(uuid.NAMESPACE_DNS, str(clerk_id)))
+        if not clerk_id:
+            raise JWTError("Missing 'sub' (Clerk ID) in token payload")
+        payload["uuid"] = str(uuid.uuid5(uuid.NAMESPACE_DNS, str(clerk_id)))
 
     except JWTError as exc:
         raise ValueError("Invalid token") from exc
 
     return payload
+
+async def process_new_user_with_clerk(user: UserCreate, new_user: User, token:str):
+    settings = get_settings_service().auth_settings
+    # ✅ If Clerk is enabled, pull UUID from enriched auth_header_ctx payload
+    if settings.CLERK_AUTH_ENABLED:
+        payload = await verify_clerk_token(token)
+        if not payload:
+            raise HTTPException(status_code=401, detail="Missing Clerk payload")
+        clerk_uuid = payload.get("uuid")
+        if not clerk_uuid:
+            raise HTTPException(status_code=401, detail="Missing Clerk UUID")
+        new_user.id = UUID(clerk_uuid)
+        logger.info(new_user.id)
+
+async def get_user_from_clerk_payload(token: str, db: AsyncSession) -> User:
+    """Retrieve the current user using the payload from ``verify_clerk_token``."""
+    try:
+        payload = await verify_clerk_token(token)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication failed",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+
+    uuid_str = payload.get("uuid")
+    logger.info(f"uuid_str: {uuid_str}")
+    if not uuid_str:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing Clerk UUID",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    try:
+        user_id = UUID(uuid_str)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Clerk UUID format",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user = await get_user_by_id(db, user_id)
+    logger.info(f"Retrieved user: {user}")
+    if user is None:
+        logger.info("User not found.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    if not user.is_active:
+        logger.info(f"User {user.id} is inactive.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User is inactive.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return user
