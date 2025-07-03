@@ -17,8 +17,8 @@ from langflow.services.auth.utils import (
 from langflow.services.database.models.user import User, UserCreate, UserRead, UserUpdate
 from langflow.services.database.models.user.crud import get_user_by_id, update_user
 from langflow.services.deps import get_settings_service
-from langflow.services.auth.clerk_utils import process_new_user_with_clerk
-
+from langflow.services.auth.clerk_utils import create_context_var_for_api, process_new_user_with_clerk
+ 
 router = APIRouter(tags=["Users"], prefix="/users")
 
 @router.post("/", response_model=UserRead, status_code=201)
@@ -28,13 +28,10 @@ async def add_user(
     request:Request
 ) -> User:
     """Add a new user to the database."""
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
-    token = auth_header[len("Bearer "):]
+    await create_context_var_for_api(request)
     new_user = User.model_validate(user, from_attributes=True)
     try:
-        await process_new_user_with_clerk(user, new_user, token)
+        await process_new_user_with_clerk(user, new_user)
         new_user.password = get_password_hash(user.password)
         new_user.is_active = get_settings_service().auth_settings.NEW_USER_IS_ACTIVE
         session.add(new_user)
