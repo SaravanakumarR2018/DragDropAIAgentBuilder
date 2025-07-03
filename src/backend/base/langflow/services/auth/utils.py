@@ -162,8 +162,7 @@ async def get_current_user_by_jwt(
 
     if isinstance(token, Coroutine):
         token = await token
-
-    # ✅ Clerk auth path — use UUID from payload already set in middleware
+ 
     if settings_service.auth_settings.CLERK_AUTH_ENABLED:
         return await get_user_from_clerk_payload(token, db)
 
