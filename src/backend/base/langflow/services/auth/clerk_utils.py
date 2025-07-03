@@ -1,24 +1,25 @@
-from contextvars import ContextVar
-from typing import Any
 import uuid
+from contextvars import ContextVar, Token
+from typing import Any
+from uuid import UUID
 
 import httpx
+from fastapi import HTTPException, Request, status
 from jose import JWTError, jwk, jwt
 from loguru import logger
-from fastapi import HTTPException, Request, status
-from uuid import UUID
-from loguru import logger
-from langflow.services.deps import get_settings_service
-from langflow.services.database.models.user import UserCreate, User
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from langflow.services.database.models.user import User, UserCreate
 from langflow.services.database.models.user.crud import get_user_by_id
-from langflow.services.database.models.user.model import User
+from langflow.services.deps import get_settings_service
 
 # Context variable to store decoded clerk claims per request
 auth_header_ctx: ContextVar[dict | None] = ContextVar("auth_header_ctx", default=None)
 
 _jwks_cache: dict[str, dict[str, Any]] = {}
+
+# APIs that require Clerk token decoding in middleware
+PROTECTED_PATHS = ["/api/v1/users/"]
 
 
 async def _get_jwks(issuer: str) -> dict[str, Any]:
@@ -59,7 +60,7 @@ async def verify_clerk_token(token: str) -> dict[str, Any]:
             public_key,
             algorithms=[unverified_header.get("alg", "RS256")],
             audience=unverified_claims.get("aud"),
-            issuer=issuer
+            issuer=issuer,
         )
         # ✅ Add deterministic UUID to the payload
         clerk_id = payload.get("sub")
@@ -71,7 +72,8 @@ async def verify_clerk_token(token: str) -> dict[str, Any]:
         raise ValueError("Invalid token") from exc
 
     return payload
- 
+
+
 async def process_new_user_with_clerk(user: UserCreate, new_user: User):
     settings = get_settings_service().auth_settings
     # ✅ If Clerk is enabled, pull UUID from enriched auth_header_ctx payload
@@ -84,6 +86,7 @@ async def process_new_user_with_clerk(user: UserCreate, new_user: User):
             raise HTTPException(status_code=401, detail="Missing Clerk UUID")
         new_user.id = UUID(clerk_uuid)
         logger.info(new_user.id)
+
 
 async def get_user_from_clerk_payload(token: str, db: AsyncSession) -> User:
     """Retrieve the current user using the payload from ``verify_clerk_token``."""
@@ -133,28 +136,53 @@ async def get_user_from_clerk_payload(token: str, db: AsyncSession) -> User:
         )
 
     return user
- 
+
+
 async def create_context_var_for_api(request: Request) -> None:
     """Extracts and verifies Clerk token from request and sets it in context variable if Clerk auth is enabled."""
     settings = get_settings_service()
- 
+
     if not settings.auth_settings.CLERK_AUTH_ENABLED:
         return
- 
+
     auth_header = request.headers.get("Authorization")
     if not auth_header or not auth_header.startswith("Bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or invalid Authorization header"
+            detail="Missing or invalid Authorization header",
         )
- 
-    token = auth_header[len("Bearer "):]
+
+    token = auth_header[len("Bearer ") :]
     try:
         payload = await verify_clerk_token(token)
-        auth_header_ctx.set(payload)     # Set new context
+        auth_header_ctx.set(payload)  # Set new context
         logger.info(f"Clerk token verified: {payload}")
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication failed"
+            detail="Authentication failed",
         ) from exc
+
+
+async def clerk_token_middleware(request: Request, call_next):
+    """Middleware to decode Clerk token for specific paths."""
+    settings = get_settings_service()
+
+    ctx_token: Token | None = None
+    if settings.auth_settings.CLERK_AUTH_ENABLED and request.url.path in PROTECTED_PATHS:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header[len("Bearer ") :]
+            try:
+                payload = await verify_clerk_token(token)
+                ctx_token = auth_header_ctx.set(payload)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"Failed to verify Clerk token: {exc}")
+
+    try:
+        return await call_next(request)
+    finally:
+        if ctx_token is not None:
+            auth_header_ctx.reset(ctx_token)
+        else:
+            auth_header_ctx.set(None)
