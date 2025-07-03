@@ -168,10 +168,11 @@ async def get_current_user_by_jwt(
         return await get_user_from_clerk_payload(token, db)
 
     secret_key = settings_service.auth_settings.SECRET_KEY.get_secret_value()
-    if not secret_key:
+    if secret_key is None:
         logger.error("Secret key is not set in settings.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
+            # Careful not to leak sensitive information
             detail="Authentication failure: Verify authentication settings.",
             headers={"WWW-Authenticate": "Bearer"},
         )
@@ -179,23 +180,11 @@ async def get_current_user_by_jwt(
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            payload = jwt.decode(
-                token,
-                secret_key,
-                algorithms=[settings_service.auth_settings.ALGORITHM],
-            )
-
+            payload = jwt.decode(token, secret_key, algorithms=[settings_service.auth_settings.ALGORITHM])
         user_id: UUID = payload.get("sub")  # type: ignore[assignment]
         token_type: str = payload.get("type")  # type: ignore[assignment]
-        if not user_id or not token_type:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token details.",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-
-        if exp := payload.get("exp"):
-            expires_datetime = datetime.fromtimestamp(exp, timezone.utc)
+        if expires := payload.get("exp", None):
+            expires_datetime = datetime.fromtimestamp(expires, timezone.utc)
             if datetime.now(timezone.utc) > expires_datetime:
                 logger.info("Token expired for user")
                 raise HTTPException(
@@ -204,33 +193,29 @@ async def get_current_user_by_jwt(
                     headers={"WWW-Authenticate": "Bearer"},
                 )
 
-    except JWTError:
+        if user_id is None or token_type is None:
+            logger.info(f"Invalid token payload. Token type: {token_type}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token details.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    except JWTError as e:
         logger.debug("JWT validation failed: Invalid token format or signature")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from e
 
-    # ✅ DB lookup for both Clerk and Legacy paths
     user = await get_user_by_id(db, user_id)
-    logger.info(f"Retrieved user: {user}")
-    if user is None:
-        logger.info("User not found.")
+    if user is None or not user.is_active:
+        logger.info("User not found or inactive.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found.",
+            detail="User not found or is inactive.",
             headers={"WWW-Authenticate": "Bearer"},
         )
-
-    if not user.is_active:
-        logger.info(f"User {user.id} is inactive.")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User is inactive.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
     return user
 
 
