@@ -138,32 +138,6 @@ async def get_user_from_clerk_payload(token: str, db: AsyncSession) -> User:
     return user
 
 
-async def create_context_var_for_api(request: Request) -> None:
-    """Extracts and verifies Clerk token from request and sets it in context variable if Clerk auth is enabled."""
-    settings = get_settings_service()
-
-    if not settings.auth_settings.CLERK_AUTH_ENABLED:
-        return
-
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or invalid Authorization header",
-        )
-
-    token = auth_header[len("Bearer ") :]
-    try:
-        payload = await verify_clerk_token(token)
-        auth_header_ctx.set(payload)  # Set new context
-        logger.info(f"Clerk token verified: {payload}")
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication failed",
-        ) from exc
-
-
 async def clerk_token_middleware(request: Request, call_next):
     """Middleware to decode Clerk token for specific paths."""
     settings = get_settings_service()

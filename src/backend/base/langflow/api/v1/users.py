@@ -1,6 +1,7 @@
 from typing import Annotated
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, Request
+
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
@@ -9,6 +10,7 @@ from sqlmodel.sql.expression import SelectOfScalar
 from langflow.api.utils import CurrentActiveUser, DbSession
 from langflow.api.v1.schemas import UsersResponse
 from langflow.initial_setup.setup import get_or_create_default_folder
+from langflow.services.auth.clerk_utils import process_new_user_with_clerk
 from langflow.services.auth.utils import (
     get_current_active_superuser,
     get_password_hash,
@@ -17,18 +19,16 @@ from langflow.services.auth.utils import (
 from langflow.services.database.models.user import User, UserCreate, UserRead, UserUpdate
 from langflow.services.database.models.user.crud import get_user_by_id, update_user
 from langflow.services.deps import get_settings_service
-from langflow.services.auth.clerk_utils import create_context_var_for_api, process_new_user_with_clerk
- 
+
 router = APIRouter(tags=["Users"], prefix="/users")
+
 
 @router.post("/", response_model=UserRead, status_code=201)
 async def add_user(
     user: UserCreate,
     session: DbSession,
-    request:Request
 ) -> User:
     """Add a new user to the database."""
-    await create_context_var_for_api(request)
     new_user = User.model_validate(user, from_attributes=True)
     try:
         await process_new_user_with_clerk(user, new_user)
