@@ -6,8 +6,8 @@ from uuid import UUID
 import httpx
 from fastapi import HTTPException, Request, status
 from jose import JWTError, jwk, jwt
-from loguru import logger
 from sqlmodel.ext.asyncio.session import AsyncSession
+from src.backend.base.langflow.logging.logger import logger
 
 from langflow.services.database.models.user import User, UserCreate
 from langflow.services.database.models.user.crud import get_user_by_id
@@ -43,8 +43,8 @@ async def verify_clerk_token(token: str) -> dict[str, Any]:
         issuer: str | None = unverified_claims.get("iss")
         kid: str | None = unverified_header.get("kid")
         if not issuer or not kid:
-            raise JWTError("Missing issuer or kid")
-
+            msg = "Missing issuer or kid"
+            raise JWTError(msg)
         jwks = await _get_jwks(issuer)
         key = jwks.get(kid)
         if not key:
@@ -52,7 +52,8 @@ async def verify_clerk_token(token: str) -> dict[str, Any]:
             jwks = await _get_jwks(issuer)
             key = jwks.get(kid)
             if not key:
-                raise JWTError("Public key not found")
+                msg = "Public key not found"
+                raise JWTError(msg)
 
         public_key = jwk.construct(key, unverified_header.get("alg", "RS256"))
         payload = jwt.decode(
@@ -65,16 +66,17 @@ async def verify_clerk_token(token: str) -> dict[str, Any]:
         # ✅ Add deterministic UUID to the payload
         clerk_id = payload.get("sub")
         if not clerk_id:
-            raise JWTError("Missing 'sub' (Clerk ID) in token payload")
+            msg = "Missing 'sub' (Clerk ID) in token payload"
+            raise JWTError(msg)
         payload["uuid"] = str(uuid.uuid5(uuid.NAMESPACE_DNS, str(clerk_id)))
 
     except JWTError as exc:
-        raise ValueError("Invalid token") from exc
-
+        msg = "Invalid token"
+        raise ValueError(msg) from exc
     return payload
 
 
-async def process_new_user_with_clerk(user: UserCreate, new_user: User):
+async def process_new_user_with_clerk(_user: UserCreate, new_user: User):
     settings = get_settings_service().auth_settings
     # ✅ If Clerk is enabled, pull UUID from enriched auth_header_ctx payload
     if settings.CLERK_AUTH_ENABLED:
@@ -85,8 +87,7 @@ async def process_new_user_with_clerk(user: UserCreate, new_user: User):
         if not clerk_uuid:
             raise HTTPException(status_code=401, detail="Missing Clerk UUID")
         new_user.id = UUID(clerk_uuid)
-        logger.info(new_user.id)
-
+        logger.info(f"[process_new_user_with_clerk] Assigned Clerk UUID {new_user.id} to new user object")
 
 async def get_user_from_clerk_payload(token: str, db: AsyncSession) -> User:
     """Retrieve the current user using the payload from ``verify_clerk_token``."""
@@ -110,12 +111,12 @@ async def get_user_from_clerk_payload(token: str, db: AsyncSession) -> User:
 
     try:
         user_id = UUID(uuid_str)
-    except ValueError:
+    except ValueError as err:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid Clerk UUID format",
             headers={"WWW-Authenticate": "Bearer"},
-        )
+        ) from err
 
     user = await get_user_by_id(db, user_id)
     logger.info(f"Retrieved user: {user}")
