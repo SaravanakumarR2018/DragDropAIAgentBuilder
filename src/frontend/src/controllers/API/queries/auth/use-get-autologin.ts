@@ -13,6 +13,8 @@ import { api } from "../../api";
 import { getURL } from "../../helpers/constants";
 import { UseRequestProcessor } from "../../services/request-processor";
 import { useLogout } from "./use-post-logout";
+import { useClerkLogout } from "@/clerk/queries/use-clerk-logout";
+import { IS_CLERK_AUTH } from "@/constants/constants";
 
 export interface AutoLoginResponse {
   frontend_timeout: number;
@@ -31,6 +33,7 @@ export const useGetAutoLogin: useQueryFunctionType<undefined, undefined> = (
   const isLoginPage = location.pathname.includes("login");
   const navigate = useCustomNavigate();
   const { mutateAsync: mutationLogout } = useLogout();
+  const clerkLogout = useClerkLogout();
   const autoLogin = useAuthStore((state) => state.autoLogin);
 
   const retryCountRef = useRef(0);
@@ -77,7 +80,11 @@ export const useGetAutoLogin: useQueryFunctionType<undefined, undefined> = (
       (!isAuthenticated && autoLogin !== undefined && autoLogin);
 
     if (manualLoginNotAuthenticated) {
-      await mutationLogout();
+      if (IS_CLERK_AUTH) {
+        await clerkLogout();
+      } else {
+        await mutationLogout();
+      }
       const currentPath = window.location.pathname;
       const isHomePath = currentPath === "/" || currentPath === "/flows";
       navigate(

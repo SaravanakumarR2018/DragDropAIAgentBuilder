@@ -13,6 +13,7 @@ import ContextWrapper from "./contexts";
 import CustomDashboardWrapperPage from "./customization/components/custom-DashboardWrapperPage";
 import { CustomNavigate } from "./customization/components/custom-navigate";
 import { BASENAME } from "./customization/config-constants";
+import { IS_CLERK_AUTH } from "./constants/constants";
 import {
   ENABLE_CUSTOM_PARAM,
   ENABLE_FILE_MANAGEMENT,
@@ -24,6 +25,8 @@ import { AppInitPage } from "./pages/AppInitPage";
 import { AppWrapperPage } from "./pages/AppWrapperPage";
 import FlowPage from "./pages/FlowPage";
 import LoginPage from "./pages/LoginPage";
+import ClerkLoginPage from "./pages/ClerkLoginPage";
+import ClerkSignUpPage from "./pages/ClerkSignUpPage";
 import FilesPage from "./pages/MainPage/pages/filesPage";
 import HomePage from "./pages/MainPage/pages/homePage";
 import CollectionPage from "./pages/MainPage/pages/main-page";
@@ -41,7 +44,10 @@ const DeleteAccountPage = lazy(() => import("./pages/DeleteAccountPage"));
 
 const PlaygroundPage = lazy(() => import("./pages/Playground"));
 
-const SignUp = lazy(() => import("./pages/SignUpPage"));
+const SignUpPage = lazy(() => import("./pages/SignUpPage"));
+
+const LoginRoute = IS_CLERK_AUTH ? ClerkLoginPage : LoginPage;
+const SignUpRoute = IS_CLERK_AUTH ? ClerkSignUpPage : SignUpPage;
 
 const router = createBrowserRouter(
   createRoutesFromElements([
@@ -163,7 +169,7 @@ const router = createBrowserRouter(
             path="login"
             element={
               <ProtectedLoginRoute>
-                <LoginPage />
+                <LoginRoute />
               </ProtectedLoginRoute>
             }
           />
@@ -171,7 +177,7 @@ const router = createBrowserRouter(
             path="signup"
             element={
               <ProtectedLoginRoute>
-                <SignUp />
+                <SignUpRoute />
               </ProtectedLoginRoute>
             }
           />

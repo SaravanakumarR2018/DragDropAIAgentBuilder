@@ -13,6 +13,8 @@ import useAlertStore from "../../stores/alertStore";
 import useFlowStore from "../../stores/flowStore";
 import { checkDuplicateRequestAndStoreRequest } from "./helpers/check-duplicate-requests";
 import { useLogout, useRefreshAccessToken } from "./queries/auth";
+import { useClerkLogout } from "@/clerk/queries/use-clerk-logout";
+import { IS_CLERK_AUTH } from "@/constants/constants";
 
 // Create a new Axios instance
 const api: AxiosInstance = axios.create({
@@ -32,6 +34,7 @@ function ApiInterceptor() {
   );
 
   const { mutate: mutationLogout } = useLogout();
+  const clerkLogout = useClerkLogout();
   const { mutate: mutationRenewAccessToken } = useRefreshAccessToken();
   const isLoginPage = location.pathname.includes("login");
   const customHeaders = useCustomApiHeaders();
@@ -197,7 +200,11 @@ function ApiInterceptor() {
 
     if (authenticationErrorCount > 3) {
       setAuthenticationErrorCount(0);
-      mutationLogout();
+      if (IS_CLERK_AUTH) {
+        clerkLogout();
+      } else {
+        mutationLogout();
+      }
       return false;
     }
 
@@ -219,7 +226,11 @@ function ApiInterceptor() {
       },
       onError: (error) => {
         console.error(error);
-        mutationLogout();
+        if (IS_CLERK_AUTH) {
+          clerkLogout();
+        } else {
+          mutationLogout();
+        }
         return Promise.reject("Authentication error");
       },
     });
