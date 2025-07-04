@@ -10,10 +10,23 @@ import "./style/applies.css";
 
 // @ts-ignore
 import App from "./customization/custom-App";
+import { IS_CLERK_AUTH } from "./constants/constants";
+import ClerkAuthProvider from "./clerk/clerk-provider";
+import ContextWrapper from "./contexts";
 
 const root = ReactDOM.createRoot(
   document.getElementById("root") as HTMLElement,
 );
 
-root.render(<App />);
+root.render(
+  IS_CLERK_AUTH ? (
+    <ClerkAuthProvider>
+      <App />
+    </ClerkAuthProvider>
+  ) : (
+    <ContextWrapper>
+      <App />
+    </ContextWrapper>
+  ),
+);
 reportWebVitals();

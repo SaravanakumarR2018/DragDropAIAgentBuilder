@@ -6,7 +6,9 @@ import {
   GITHUB_URL,
   TWITTER_URL,
 } from "@/constants/constants";
+import { IS_CLERK_AUTH } from "@/constants/constants";
 import { useLogout } from "@/controllers/API/queries/auth";
+import { useClerkLogout } from "@/clerk/queries/use-clerk-logout";
 import { CustomProfileIcon } from "@/customization/components/custom-profile-icon";
 import { ENABLE_DATASTAX_LANGFLOW } from "@/customization/feature-flags";
 import { useCustomNavigate } from "@/customization/hooks/use-custom-navigate";
@@ -31,6 +33,7 @@ export const AccountMenu = () => {
   const latestVersion = useDarkStore((state) => state.latestVersion);
   const navigate = useCustomNavigate();
   const { mutate: mutationLogout } = useLogout();
+  const clerkLogout = useClerkLogout();
 
   const { isAdmin, autoLogin } = useAuthStore((state) => ({
     isAdmin: state.isAdmin,
@@ -38,7 +41,11 @@ export const AccountMenu = () => {
   }));
 
   const handleLogout = () => {
-    mutationLogout();
+    if (IS_CLERK_AUTH) {
+      clerkLogout();
+    } else {
+      mutationLogout();
+    }
   };
 
   const isLatestVersion = version === latestVersion;
