@@ -1,36 +1,50 @@
-import React, { ReactNode, useEffect, useContext, useState } from "react";
-import App from "../customization/custom-App";
-import { ClerkProvider, useAuth, useUser, useClerk } from "@clerk/clerk-react";
-import { Cookies } from "react-cookie";
-import useAuthStore from "@/stores/authStore";
-import { LANGFLOW_ACCESS_TOKEN } from "@/constants/constants";
+import { lazy, ReactNode, useContext, useEffect, useRef } from "react";
 import { AuthContext } from "@/contexts/authContext";
 import { api } from "@/controllers/API/api";
 import { getURL } from "@/controllers/API/helpers/constants";
 import { useLogout as useLogoutMutation } from "@/controllers/API/queries/auth";
+import useAuthStore from "@/stores/authStore";
+import { ClerkProvider, useAuth, useClerk, useUser } from "@clerk/clerk-react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 // Clerk constants
 export const IS_CLERK_AUTH =
-  String(process.env.CLERK_AUTH_ENABLED).toLowerCase() === "true";
-export const CLERK_PUBLISHABLE_KEY = process.env.CLERK_PUBLISHABLE_KEY || "";
+  String(import.meta.env.VITE_CLERK_AUTH_ENABLED).toLowerCase() === "true";
+console.log("IS_CLERK_AUTH:", IS_CLERK_AUTH);
+
+console.log(useAuthStore.getState().isAuthenticated, "useAuthStore.isAuthenticated");
+export const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || "";
 export const CLERK_DUMMY_PASSWORD = "clerk_dummy_password";
 
 // Backend synchronization helpers
-export async function ensureLangflowUser(token: string, username: string) {
+export async function ensureLangflowUser(token: string, username: string): Promise<boolean> {
+  console.log("[ensureLangflowUser] START");
+
   try {
-    await api.get(`${getURL("USERS")}/whoami`, {
+    const whoAmIRes = await api.get(`${getURL("USERS")}/whoami`, {
       headers: { Authorization: `Bearer ${token}` },
     });
+
+    console.log(`[ensureLangflowUser] user exists: ${username}`);
+    return false;
   } catch (err: any) {
-    if (err?.response?.status === 404) {
-      await api.post(
+    console.log("[ensureLangflowUser] inside catch block");
+
+    const status = err?.response?.status;
+    console.warn(`[ensureLangflowUser] whoami failed (${status})`);
+
+    if (status === 401) {
+      console.log("[ensureLangflowUser] trying to create user...");
+      const createRes = await api.post(
         `${getURL("USERS")}/`,
         { username, password: CLERK_DUMMY_PASSWORD },
         { headers: { Authorization: `Bearer ${token}` } },
       );
-    } else {
-      throw err;
+      console.log(`[ensureLangflowUser] created user: ${createRes.status}`);
+      return true;
     }
+
+    throw err;
   }
 }
 
@@ -51,15 +65,24 @@ export async function backendLogin(username: string) {
 }
 
 // Component that syncs Clerk session with backend
+// auth.tsx
 export function ClerkAuthAdapter() {
   const { getToken, isSignedIn, sessionId } = useAuth();
   const { user } = useUser();
   const { login } = useContext(AuthContext);
+  const { mutateAsync: logout } = useLogout();
+  const prevSession = useRef<string | null>(null);
 
   useEffect(() => {
-    const cookies = new Cookies();
+      // only run when we go from "no session" → "new session"
     async function syncToken() {
       if (isSignedIn) {
+        if (sessionId === prevSession.current) {
+          return;
+        }
+
+        prevSession.current = sessionId;
+        console.log("[ClerkAuthAdapter] new Clerk session, syncing…");
         const token = await getToken();
         if (token) {
           const username =
@@ -68,20 +91,31 @@ export function ClerkAuthAdapter() {
             user?.id ||
             "clerk_user";
           try {
-            await ensureLangflowUser(token, username);
-            const data = await backendLogin(username);
-            login(token, "login", data.refresh_token);
+            const justCreated = await ensureLangflowUser(token, username);
+            console.log("[ClerkAuthAdapter] justCreated:", justCreated, "for user:", username);
+            if (justCreated) {
+              console.log("[ClerkAuthAdapter] user created → signing out");
+              await logout();
+              window.location.replace("/login");
+              return;
+            }
+
+            try {
+              const { refresh_token } = await backendLogin(username);
+              login(token, "login", refresh_token);
+              window.location.replace("/");
+              console.log("[ClerkAuthAdapter] backend login successful");
+            } catch (loginErr) {
+              console.error("[ClerkAuthAdapter] backend login failed", loginErr);
+            }
           } catch {
             // ignore errors and continue login
           }
         }
-      } else {
-        cookies.remove(LANGFLOW_ACCESS_TOKEN, { path: "/" });
-        useAuthStore.getState().logout();
-      }
+    }
     }
     syncToken();
-  }, [isSignedIn, getToken, sessionId, user, login]);
+  }, [isSignedIn, sessionId, getToken, user, login, logout]);
 
   return null;
 }
@@ -123,16 +157,25 @@ export function useLogout(options?: Parameters<typeof useLogoutMutation>[0]) {
   return { mutate: wrappedMutate, mutateAsync: wrappedMutateAsync, clerkSignOut, ...rest };
 }
 
+const LazyApp = lazy(() => import("../customization/custom-App"));
+
 // App wrapper that conditionally enables Clerk
+const queryClient = new QueryClient();
+
 export function AppWithProvider() {
-  return IS_CLERK_AUTH ? (
-    <ClerkAuthProvider>
-      <App />
-    </ClerkAuthProvider>
-  ) : (
-    <App />
+  return (
+    <QueryClientProvider client={queryClient}>
+      {IS_CLERK_AUTH ? (
+        <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
+          <ClerkAuthAdapter />
+          <LazyApp />
+        </ClerkProvider>
+      ) : (
+        <LazyApp />
+      )}
+    </QueryClientProvider>
   );
-}
+} 
 
 // Mock mutation used when Clerk auth is enabled
 export const mockClerkMutation = {
