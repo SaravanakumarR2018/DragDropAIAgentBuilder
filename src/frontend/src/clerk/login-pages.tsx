@@ -1,8 +1,8 @@
 import { useCustomNavigate } from "@/customization/hooks/use-custom-navigate";
 import { SignIn, SignUp, useAuth, useUser , useClerk, SignedOut} from "@clerk/clerk-react";
 import { lazy, useEffect, useState } from "react";
-import { IS_CLERK_AUTH, ensureLangflowUser, useLogout } from "./auth";
-
+import { ensureLangflowUser, useLogout } from "./auth";
+import { IS_CLERK_AUTH } from "@/clerk/constants";
 // Clerk login page component
 export function ClerkLoginPage() {
   return (

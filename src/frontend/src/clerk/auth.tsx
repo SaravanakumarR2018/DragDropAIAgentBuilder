@@ -5,34 +5,31 @@ import { getURL } from "@/controllers/API/helpers/constants";
 import { useLogout as useLogoutMutation } from "@/controllers/API/queries/auth";
 import useAuthStore from "@/stores/authStore";
 import { ClerkProvider, useAuth, useClerk, useUser } from "@clerk/clerk-react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-
-// Clerk constants
-export const IS_CLERK_AUTH =
-  String(import.meta.env.VITE_CLERK_AUTH_ENABLED).toLowerCase() === "true";
+import { Users } from "@/types/api";
+import { IS_CLERK_AUTH, CLERK_PUBLISHABLE_KEY, CLERK_DUMMY_PASSWORD } from "./constants";
+import { LANGFLOW_ACCESS_TOKEN } from "@/constants/constants";
+import { Cookies } from "react-cookie";
 console.log("IS_CLERK_AUTH:", IS_CLERK_AUTH);
-
 console.log(useAuthStore.getState().isAuthenticated, "useAuthStore.isAuthenticated");
-export const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || "";
-export const CLERK_DUMMY_PASSWORD = "clerk_dummy_password";
 
 // Backend synchronization helpers
-export async function ensureLangflowUser(token: string, username: string): Promise<boolean> {
+export async function ensureLangflowUser(token: string, username: string): Promise<{
+  justCreated: boolean;
+  user: Users | null;
+}> {
   console.log("[ensureLangflowUser] START");
 
   try {
-    const whoAmIRes = await api.get(`${getURL("USERS")}/whoami`, {
+    const whoAmIRes = await api.get<Users>(`${getURL("USERS")}/whoami`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-
+    const user = whoAmIRes.data;
+    // useAuthStore.getState().setUserData(user);
     console.log(`[ensureLangflowUser] user exists: ${username}`);
-    return false;
+    return { justCreated: false, user };
   } catch (err: any) {
-    console.log("[ensureLangflowUser] inside catch block");
-
     const status = err?.response?.status;
     console.warn(`[ensureLangflowUser] whoami failed (${status})`);
-
     if (status === 401) {
       console.log("[ensureLangflowUser] trying to create user...");
       const createRes = await api.post(
@@ -41,9 +38,8 @@ export async function ensureLangflowUser(token: string, username: string): Promi
         { headers: { Authorization: `Bearer ${token}` } },
       );
       console.log(`[ensureLangflowUser] created user: ${createRes.status}`);
-      return true;
+      return { justCreated: true, user: null };
     }
-
     throw err;
   }
 }
@@ -65,55 +61,68 @@ export async function backendLogin(username: string) {
 }
 
 // Component that syncs Clerk session with backend
-// auth.tsx
 export function ClerkAuthAdapter() {
   const { getToken, isSignedIn, sessionId } = useAuth();
   const { user } = useUser();
   const { login } = useContext(AuthContext);
   const { mutateAsync: logout } = useLogout();
   const prevSession = useRef<string | null>(null);
+  const justLoggedIn = useRef(false);
+  console.log('[ClerkAuthAdapter] login function:', login);
+  const cookie = new Cookies();
 
   useEffect(() => {
-      // only run when we go from "no session" → "new session"
-    async function syncToken() {
-      if (isSignedIn) {
-        if (sessionId === prevSession.current) {
+    const syncToken = async () => {
+      if (!isSignedIn || sessionId === prevSession.current) return;
+
+      prevSession.current = sessionId;
+      console.log("[ClerkAuthAdapter] New Clerk session detected");
+
+      const token = await getToken();
+      if (!token) {
+        console.warn("[ClerkAuthAdapter] No Clerk token available");
+        return;
+      }
+      const current = cookie.get(LANGFLOW_ACCESS_TOKEN);
+      if (token === current) {
+        return;
+      }else{
+        console.log("[ClerkAuthAdapter] Clerk token changed, syncing...");
+        cookie.set(LANGFLOW_ACCESS_TOKEN, token, { path: "/" });
+        useAuthStore.getState().setAccessToken?.(token); // if you have this
+      }
+      const username =
+        user?.username ||
+        user?.primaryEmailAddress?.emailAddress ||
+        user?.id ||
+        "clerk_user";
+
+      try {
+        const { justCreated, user } = await ensureLangflowUser(token, username);
+
+        if (justCreated=== true && !user) {
+          console.warn("[ClerkAuthAdapter] User created → Signing out to restart session");
+          await logout();
+          window.location.replace("/login");
           return;
         }
 
-        prevSession.current = sessionId;
-        console.log("[ClerkAuthAdapter] new Clerk session, syncing…");
-        const token = await getToken();
-        if (token) {
-          const username =
-            user?.username ||
-            user?.primaryEmailAddress?.emailAddress ||
-            user?.id ||
-            "clerk_user";
-          try {
-            const justCreated = await ensureLangflowUser(token, username);
-            console.log("[ClerkAuthAdapter] justCreated:", justCreated, "for user:", username);
-            if (justCreated) {
-              console.log("[ClerkAuthAdapter] user created → signing out");
-              await logout();
-              window.location.replace("/login");
-              return;
-            }
-
-            try {
-              const { refresh_token } = await backendLogin(username);
-              login(token, "login", refresh_token);
-              window.location.replace("/");
-              console.log("[ClerkAuthAdapter] backend login successful");
-            } catch (loginErr) {
-              console.error("[ClerkAuthAdapter] backend login failed", loginErr);
-            }
-          } catch {
-            // ignore errors and continue login
-          }
+        const { refresh_token } = await backendLogin(username);
+        console.log("[ClerkAuthAdapter] Backend login successful");
+        console.log('[ClerkAuthAdapter] About to call login:', login);
+        login(token, "login", refresh_token);
+        justLoggedIn.current = true;
+        console.log("[ClerkAuthAdapter] login complete");
+      } catch (err) {
+        if (!justLoggedIn.current) {
+          console.error("[ClerkAuthAdapter] syncToken error:", err);
+          await logout();
+        } else {
+          console.warn("[ClerkAuthAdapter] Skipping logout due to recent login");
         }
-    }
-    }
+      }
+    };
+
     syncToken();
   }, [isSignedIn, sessionId, getToken, user, login, logout]);
 
@@ -124,7 +133,6 @@ export function ClerkAuthAdapter() {
 export function ClerkAuthProvider({ children }: { children: ReactNode }) {
   return (
     <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
-      <ClerkAuthAdapter />
       {children}
     </ClerkProvider>
   );
@@ -157,25 +165,19 @@ export function useLogout(options?: Parameters<typeof useLogoutMutation>[0]) {
   return { mutate: wrappedMutate, mutateAsync: wrappedMutateAsync, clerkSignOut, ...rest };
 }
 
+// App wrapper that conditionally enables Clerk
 const LazyApp = lazy(() => import("../customization/custom-App"));
 
-// App wrapper that conditionally enables Clerk
-const queryClient = new QueryClient();
-
 export function AppWithProvider() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      {IS_CLERK_AUTH ? (
-        <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
-          <ClerkAuthAdapter />
-          <LazyApp />
-        </ClerkProvider>
-      ) : (
-        <LazyApp />
-      )}
-    </QueryClientProvider>
+  return IS_CLERK_AUTH ? (
+    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
+      <LazyApp />
+    </ClerkProvider>
+  ) : (
+      <LazyApp />
   );
-} 
+  
+}
 
 // Mock mutation used when Clerk auth is enabled
 export const mockClerkMutation = {
