@@ -6,6 +6,9 @@ import { ReactNode } from "react";
 import { TooltipProvider } from "../components/ui/tooltip";
 import { ApiInterceptor } from "../controllers/API/api";
 import { AuthProvider } from "./authContext";
+import { IS_CLERK_AUTH } from "@/clerk/constants";
+import { ClerkAuthAdapter } from "@/clerk/auth";
+import ClerkSessionSync from "@/clerk/ClerkSessionSync";
 
 export default function ContextWrapper({ children }: { children: ReactNode }) {
   const queryClient = new QueryClient();
@@ -16,6 +19,7 @@ export default function ContextWrapper({ children }: { children: ReactNode }) {
         <GradientWrapper>
           <QueryClientProvider client={queryClient}>
             <AuthProvider>
+              {IS_CLERK_AUTH && <ClerkAuthAdapter />}
               <TooltipProvider skipDelayDuration={0}>
                 <ReactFlowProvider>
                   <ApiInterceptor />
