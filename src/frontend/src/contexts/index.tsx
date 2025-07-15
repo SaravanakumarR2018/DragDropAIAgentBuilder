@@ -8,7 +8,6 @@ import { ApiInterceptor } from "../controllers/API/api";
 import { AuthProvider } from "./authContext";
 import { IS_CLERK_AUTH } from "@/clerk/constants";
 import { ClerkAuthAdapter } from "@/clerk/auth";
-import ClerkSessionSync from "@/clerk/ClerkSessionSync";
 
 export default function ContextWrapper({ children }: { children: ReactNode }) {
   const queryClient = new QueryClient();
