@@ -90,7 +90,6 @@ export function ClerkAuthAdapter() {
 export function ClerkAuthProvider({ children }: { children: ReactNode }) {
   return (
     <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
-      <ClerkAuthAdapter />
       {children}
     </ClerkProvider>
   );
