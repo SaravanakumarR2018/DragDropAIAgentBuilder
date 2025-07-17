@@ -9,7 +9,7 @@ import { Users } from "@/types/api";
 import { IS_CLERK_AUTH, CLERK_PUBLISHABLE_KEY, CLERK_DUMMY_PASSWORD } from "./constants";
 import { LANGFLOW_ACCESS_TOKEN } from "@/constants/constants";
 import { Cookies } from "react-cookie";
-console.log("IS_CLERK_AUTH:", IS_CLERK_AUTH);
+
 console.log(useAuthStore.getState().isAuthenticated, "useAuthStore.isAuthenticated");
 
 // Backend synchronization helpers
@@ -37,7 +37,6 @@ export async function ensureLangflowUser(token: string, username: string): Promi
         { username, password: CLERK_DUMMY_PASSWORD },
         { headers: { Authorization: `Bearer ${token}` } },
       );
-      console.log(`[ensureLangflowUser] created user: ${createRes.status}`);
       return { justCreated: true, user: null };
     }
     throw err;
@@ -68,7 +67,7 @@ export function ClerkAuthAdapter() {
   const { mutateAsync: logout } = useLogout();
   const prevSession = useRef<string | null>(null);
   const justLoggedIn = useRef(false);
-  console.log('[ClerkAuthAdapter] login function:', login);
+  const clerk = useClerk();
   const cookie = new Cookies();
 
   useEffect(() => {
@@ -76,7 +75,6 @@ export function ClerkAuthAdapter() {
       if (!isSignedIn || sessionId === prevSession.current) return;
 
       prevSession.current = sessionId;
-      console.log("[ClerkAuthAdapter] New Clerk session detected");
 
       const token = await getToken();
       if (!token) {
@@ -108,8 +106,6 @@ export function ClerkAuthAdapter() {
         }
 
         const { refresh_token } = await backendLogin(username);
-        console.log("[ClerkAuthAdapter] Backend login successful");
-        console.log('[ClerkAuthAdapter] About to call login:', login);
         login(token, "login", refresh_token);
         justLoggedIn.current = true;
         console.log("[ClerkAuthAdapter] login complete");
@@ -125,6 +121,33 @@ export function ClerkAuthAdapter() {
 
     syncToken();
   }, [isSignedIn, sessionId, getToken, user, login, logout]);
+
+const prevTokenRef = useRef<string | null>(null);
+useEffect(() => {
+    const unsubscribe = clerk.addListener(async ({ session }) => {
+      console.log("[ClerkAuthAdapter] Token update event received");
+      const token = await session?.getToken();
+      if (!token) return;
+      const current = cookie.get(LANGFLOW_ACCESS_TOKEN);
+      if (prevTokenRef.current === null) {
+        // Ignore the initial event triggered on sign-in.
+        prevTokenRef.current = token;
+        return;
+      }
+      console.log("[ClerkAuthAdapter] Is Token Same:", token === current);
+      if (token !== prevTokenRef.current) {
+        prevTokenRef.current = token;
+        const current = cookie.get(LANGFLOW_ACCESS_TOKEN);
+        if (token !== current) {
+          cookie.set(LANGFLOW_ACCESS_TOKEN, token, { path: "/" });
+          useAuthStore.getState().setAccessToken?.(token);
+        }
+      }
+    });
+    return () => {
+      unsubscribe?.();
+    };
+  }, [clerk]);
 
   return null;
 }
