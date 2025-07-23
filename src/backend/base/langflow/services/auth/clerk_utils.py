@@ -19,7 +19,7 @@ auth_header_ctx: ContextVar[dict | None] = ContextVar("auth_header_ctx", default
 _jwks_cache: dict[str, dict[str, Any]] = {}
 
 # APIs that require Clerk token decoding in middleware
-PROTECTED_PATHS = ["/api/v1/users/"]
+PROTECTED_PATHS = ["/api/v1/users/","/api/v1/login/"]
 
 
 async def _get_jwks(issuer: str) -> dict[str, Any]:
@@ -161,3 +161,51 @@ async def clerk_token_middleware(request: Request, call_next):
             auth_header_ctx.reset(ctx_token)
         else:
             auth_header_ctx.set(None)
+
+async def clerk_login(request, response, form_data, db):
+    # Local import to avoid circular dependency
+    from langflow.services.auth.utils import authenticate_user, create_user_tokens
+
+    # Extract Clerk token from Authorization header
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing Clerk token")
+
+    token = auth_header[len("Bearer "):]
+    logger.info(f"clerk token {token}")
+
+    # Get user info from Clerk token
+    user = await get_user_from_clerk_payload(token, db)
+
+    # Create backend refresh token (only used for backend session management)
+    tokens = await create_user_tokens(user_id=user.id, db=db, update_last_login=True)
+    logger.info(f"langflow tokens {tokens}")
+
+    auth_settings = get_settings_service().auth_settings
+
+    # Set refresh token from backend
+    response.set_cookie(
+        "refresh_token_lf",
+        tokens["refresh_token"],
+        httponly=auth_settings.REFRESH_HTTPONLY,
+        samesite=auth_settings.REFRESH_SAME_SITE,
+        secure=auth_settings.REFRESH_SECURE,
+        expires=auth_settings.REFRESH_TOKEN_EXPIRE_SECONDS,
+        domain=auth_settings.COOKIE_DOMAIN,
+    )
+
+    # ❗ Set the Clerk token itself as the access token (as per your requirement)
+    response.set_cookie(
+        "access_token_lf",
+        token,
+        httponly=auth_settings.ACCESS_HTTPONLY,
+        samesite=auth_settings.ACCESS_SAME_SITE,
+        secure=auth_settings.ACCESS_SECURE,
+        expires=auth_settings.ACCESS_TOKEN_EXPIRE_SECONDS,
+        domain=auth_settings.COOKIE_DOMAIN,
+    )
+
+    # Optional: legacy password check
+    await authenticate_user(form_data.username, form_data.password, db)
+
+    return tokens
