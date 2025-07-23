@@ -56,11 +56,12 @@ export async function backendLogin(username: string,token:string) {
     `${getURL("LOGIN")}`,
     new URLSearchParams({
       username,
-      password: CLERK_DUMMY_PASSWORD,
+      password: "Bhlablahblah",
     }).toString(),
     {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Bearer ${token}`,
       },
     },
   );
