@@ -5,9 +5,9 @@ from uuid import UUID
 
 import httpx
 from fastapi import HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from jose import JWTError, jwk, jwt
 from sqlmodel.ext.asyncio.session import AsyncSession
-from fastapi.responses import JSONResponse
 from starlette.status import HTTP_401_UNAUTHORIZED
 
 from langflow.logging.logger import logger
@@ -148,14 +148,14 @@ async def clerk_token_middleware(request: Request, call_next):
     ctx_token: Token | None = None
     if settings.auth_settings.CLERK_AUTH_ENABLED and request.url.path in PROTECTED_PATHS:
         auth_header = request.headers.get("Authorization")
- 
+
         if not auth_header or not auth_header.startswith("Bearer "):
             logger.warning("Missing or malformed Authorization header for Clerk protected route.")
             return JSONResponse(
                 status_code=HTTP_401_UNAUTHORIZED,
                 content={"detail": "Authorization header with valid Bearer token required"},
             )
-       
+
         if auth_header and auth_header.startswith("Bearer "):
             token = auth_header[len("Bearer ") :]
             try:
@@ -167,7 +167,7 @@ async def clerk_token_middleware(request: Request, call_next):
                     status_code=HTTP_401_UNAUTHORIZED,
                     content={"detail": "Invalid Clerk token"}
                 )
- 
+
     try:
         return await call_next(request)
     finally:
