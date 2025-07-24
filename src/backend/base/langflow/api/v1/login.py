@@ -8,7 +8,6 @@ from fastapi.security import OAuth2PasswordRequestForm
 from langflow.api.utils import DbSession
 from langflow.api.v1.schemas import Token
 from langflow.initial_setup.setup import get_or_create_default_folder
-from langflow.services.auth.clerk_utils import clerk_login
 from langflow.services.auth.utils import (
     authenticate_user,
     create_refresh_token,
@@ -23,15 +22,12 @@ router = APIRouter(tags=["Login"])
 
 @router.post("/login", response_model=Token)
 async def login_to_get_access_token(
-    request:Request,
     response: Response,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: DbSession,
 ):
     auth_settings = get_settings_service().auth_settings
     try:
-        if auth_settings.CLERK_AUTH_ENABLED:
-          return await clerk_login(request, response, form_data, db)
         user = await authenticate_user(form_data.username, form_data.password, db)
     except Exception as exc:
         if isinstance(exc, HTTPException):
