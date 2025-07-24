@@ -7,11 +7,13 @@ import { IS_CLERK_AUTH } from "@/clerk/auth";
 export function ClerkLoginPage() {
   return (
     <SignedOut>
-      <SignIn
-        path="/login"
-        routing="path"
-        afterSignInUrl="/"
-      />
+      <div style={centeredStyle}>
+        <SignIn
+          path="/login"
+          routing="path"
+          afterSignInUrl="/"
+        />
+      </div>
     </SignedOut>
   );
 }
@@ -50,11 +52,13 @@ export function ClerkSignUpPage() {
 
   return (
     <SignedOut>
-      <SignUp
-        path="/sign-up"
-        routing="path"
-        afterSignUpUrl="/login"
-      />
+      <div style={centeredStyle}>
+        <SignUp
+          path="/sign-up"
+          routing="path"
+          afterSignUpUrl="/login"
+        />
+      </div>
     </SignedOut>
   );
 }
@@ -68,3 +72,9 @@ export const LoginPage = IS_CLERK_AUTH ? ClerkLoginPage : OriginalLoginPage;
 export const SignUpPage = IS_CLERK_AUTH ? ClerkSignUpPage : OriginalSignUp;
 export const LoginAdminPage = IS_CLERK_AUTH ? ClerkLoginPage : OriginalLoginAdminPage;
 
+const centeredStyle: React.CSSProperties = {
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  minHeight: "100vh",
+};
