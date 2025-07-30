@@ -330,10 +330,14 @@ docker_build_backend: dockerfile_build_be clear_dockerimage ## build Backend Doc
 docker_build_frontend: dockerfile_build_fe clear_dockerimage ## build Frontend Dockerfile
 
 dockerfile_build:
-	@echo 'BUILDING DOCKER IMAGE: ${DOCKERFILE}'
-	@docker build --rm \
-		-f ${DOCKERFILE} \
-		-t langflow:${VERSION} .
+@echo 'BUILDING DOCKER IMAGE: ${DOCKERFILE}'
+@docker build --rm \
+--build-arg VITE_CLERK_AUTH_ENABLED=${VITE_CLERK_AUTH_ENABLED} \
+--build-arg VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY} \
+--build-arg LANGFLOW_CLERK_AUTH_ENABLED=${LANGFLOW_CLERK_AUTH_ENABLED} \
+--build-arg LANGFLOW_CLERK_PUBLISHABLE_KEY=${LANGFLOW_CLERK_PUBLISHABLE_KEY} \
+-f ${DOCKERFILE} \
+-t langflow:${VERSION} .
 
 dockerfile_build_be: dockerfile_build
 	@echo 'BUILDING DOCKER IMAGE BACKEND: ${DOCKERFILE_BACKEND}'
