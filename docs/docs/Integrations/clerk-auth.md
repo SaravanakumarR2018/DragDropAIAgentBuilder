@@ -38,3 +38,15 @@ With Clerk enabled the periodic refresh is disabled and all further state change
 |----------|--------|---------|-------------|
 | <Link id="CLERK_AUTH_ENABLED"/>CLERK_AUTH_ENABLED | Boolean | `false` | When enabled, Langflow uses Clerk for authentication. After signing in or signing up with Clerk, the frontend registers the user with the backend and then logs in via `/api/v1/login` to sync cookies. The `access_token_lf` cookie stores the Clerk session token. |
 | <Link id="CLERK_PUBLISHABLE_KEY"/>CLERK_PUBLISHABLE_KEY | String | Not set | Publishable key required when `CLERK_AUTH_ENABLED` is `true`. |
+
+## Building the Docker image with Clerk
+
+To include the Clerk keys when building the Docker image, pass them as build arguments:
+
+```bash
+DOCKER_BUILDKIT=1 VITE_CLERK_AUTH_ENABLED=true \
+VITE_CLERK_PUBLISHABLE_KEY=<key> \
+make docker_build
+```
+
+Runtime variables such as `LANGFLOW_CLERK_AUTH_ENABLED` can still be supplied when launching the container using `docker run --env-file`.
