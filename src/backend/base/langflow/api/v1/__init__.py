@@ -1,5 +1,6 @@
 from langflow.api.v1.api_key import router as api_key_router
 from langflow.api.v1.chat import router as chat_router
+from langflow.api.v1.create_organisation import router as organisation_router
 from langflow.api.v1.endpoints import router as endpoints_router
 from langflow.api.v1.files import router as files_router
 from langflow.api.v1.flows import router as flows_router
@@ -27,6 +28,7 @@ __all__ = [
     "mcp_projects_router",
     "mcp_router",
     "monitor_router",
+    "organisation_router",
     "projects_router",
     "starter_projects_router",
     "store_router",
