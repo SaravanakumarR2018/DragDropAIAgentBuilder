@@ -44,8 +44,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 COPY ./src /app/src
 
-ARG LANGFLOW_AUTO_LOGIN=true
-ENV LANGFLOW_AUTO_LOGIN=$LANGFLOW_AUTO_LOGIN
+ARG VITE_AUTO_LOGIN=true
+ENV VITE_AUTO_LOGIN=$VITE_AUTO_LOGIN
     
 COPY src/frontend /tmp/src/frontend
 WORKDIR /tmp/src/frontend

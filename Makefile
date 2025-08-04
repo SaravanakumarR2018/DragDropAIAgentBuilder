@@ -338,7 +338,7 @@ dockerfile_build:
 		-f ${DOCKERFILE} \
 		--build-arg VITE_CLERK_AUTH_ENABLED=${VITE_CLERK_AUTH_ENABLED} \
 		--build-arg VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY} \
-		--build-arg LANGFLOW_AUTO_LOGIN=$(LANGFLOW_AUTO_LOGIN) \
+		--build-arg VITE_AUTO_LOGIN=$(VITE_AUTO_LOGIN) \
 		-t langflow:${VERSION} .
 
 dockerfile_build_be: dockerfile_build
