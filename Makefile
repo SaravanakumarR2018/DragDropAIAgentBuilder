@@ -336,6 +336,7 @@ dockerfile_build:
 	@echo 'BUILDING DOCKER IMAGE: ${DOCKERFILE}'
 	@docker build --rm \
 		-f ${DOCKERFILE} \
+		--build-arg NODE_OPTIONS="$(NODE_OPTIONS)" \
 		--build-arg VITE_CLERK_AUTH_ENABLED=${VITE_CLERK_AUTH_ENABLED} \
 		--build-arg VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY} \
 		--build-arg VITE_AUTO_LOGIN=$(VITE_AUTO_LOGIN) \
