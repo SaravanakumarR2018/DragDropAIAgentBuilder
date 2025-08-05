@@ -130,13 +130,18 @@ def get_settings_service() -> SettingsService:
     return get_service(ServiceType.SETTINGS_SERVICE, SettingsServiceFactory())
 
 
-def get_db_service() -> DatabaseService:
+def get_db_service(*, use_organisation: bool = True) -> DatabaseService:
     """Retrieves the DatabaseService instance from the service manager.
 
     Returns:
         The DatabaseService instance.
 
     """
+    from langflow.services.database.organisation import OrganizationService
+
+    if use_organisation and get_settings_service().auth_settings.CLERK_AUTH_ENABLED:
+        return OrganizationService.get_db_service_for_request()
+
     from langflow.services.database.factory import DatabaseServiceFactory
 
     return get_service(ServiceType.DATABASE_SERVICE, DatabaseServiceFactory())
