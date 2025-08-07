@@ -52,6 +52,7 @@ jobs:
         source: "scripts/new_deploy.sh"
         target: "/root/"
         debug: true
+        strip_components: 1
 
     - name: Deploy to Remote VM via SSH
       uses: appleboy/ssh-action@v1.0.0
