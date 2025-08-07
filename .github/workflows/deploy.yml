@@ -49,7 +49,7 @@ jobs:
         host: 139.59.72.218
         username: root
         password: f@nTaBul0us
-        source: "scripts/new_deploy.sh"
+        source: "cloned_repo/scripts/new_deploy.sh"
         target: "~/"
 
     - name: Deploy to Remote VM via SSH
