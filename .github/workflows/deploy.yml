@@ -27,7 +27,7 @@ jobs:
       uses: docker/login-action@v2
       with:
         username: forwardemailforaifirstdesk
-        password: dckr_pat_3nNBTm3KInsbZ_pRd1v-jGwNlyM
+        password: dckr_pat_eV3JetYHHyV7uNYxrccLqwhUgUs
 
     - name: Build Docker image
       run: |
