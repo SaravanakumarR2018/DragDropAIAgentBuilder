@@ -43,7 +43,16 @@ jobs:
         docker tag langflow:1.4.2 forwardemailforaifirstdesk/langflow:1.4.2
         docker push forwardemailforaifirstdesk/langflow:1.4.2
 
-    - name: Deploy to Remote VM via SSH using password
+    - name: Upload deploy script to remote server
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: 139.59.72.218
+        username: root
+        password: f@nTaBul0us
+        source: "scripts/new_deploy.sh"
+        target: "~/"
+
+    - name: Deploy to Remote VM via SSH
       uses: appleboy/ssh-action@v1.0.0
       with:
         host: 139.59.72.218
@@ -51,4 +60,5 @@ jobs:
         password: f@nTaBul0us
         script: |
           echo "Deploying on remote host..."
-          bash /scripts/new_deploy.sh
+          chmod +x ~/new_deploy.sh
+          bash ~/new_deploy.sh
