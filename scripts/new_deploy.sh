@@ -21,7 +21,7 @@ echo "[2/6] Stopping and removing any existing container..."
 docker rm -f "$CONTAINER_NAME" || true
 
 echo "[3/6] Running Docker container on internal port 7860..."
-docker run -d --name "$CONTAINER_NAME" -p 7860:7860 \
+docker run -p 7860:7860 \
   -e LANGFLOW_AUTO_LOGIN=false \
   -e LANGFLOW_CLERK_AUTH_ENABLED=true \
   -e LANGFLOW_CLERK_PUBLISHABLE_KEY=pk_test_Y2hhcm1lZC1iYXQtNDEuY2xlcmsuYWNjb3VudHMuZGV2JA \
