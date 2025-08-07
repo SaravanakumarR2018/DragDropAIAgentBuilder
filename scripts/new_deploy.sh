@@ -8,6 +8,12 @@ EMAIL="forwardemailforaifirstdesk@gmail.com"
 DOCKER_IMAGE="forwardemailforaifirstdesk/langflow:1.4.2"
 CONTAINER_NAME="langflow"
 
+echo "[0/6] Installing Docker if not present..."
+if ! command -v docker &> /dev/null; then
+  curl -fsSL https://get.docker.com -o get-docker.sh
+  sh get-docker.sh
+fi
+
 echo "[1/6] Pulling the latest Docker image..."
 docker pull "$DOCKER_IMAGE"
 
