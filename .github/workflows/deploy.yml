@@ -49,8 +49,9 @@ jobs:
         host: 139.59.72.218
         username: root
         password: f@nTaBul0us
-        source: "cloned_repo/scripts/new_deploy.sh"
-        target: "~/"
+        source: "scripts/new_deploy.sh"
+        target: "/root/"
+        debug: true
 
     - name: Deploy to Remote VM via SSH
       uses: appleboy/ssh-action@v1.0.0
@@ -60,5 +61,6 @@ jobs:
         password: f@nTaBul0us
         script: |
           echo "Deploying on remote host..."
-          chmod +x ~/new_deploy.sh
-          bash ~/new_deploy.sh
+          ls -l /root/new_deploy.sh || echo "Script not found!"
+          chmod +x /root/new_deploy.sh
+          bash /root/new_deploy.sh
