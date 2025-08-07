@@ -1,0 +1,54 @@
+name: Build and Deploy Docker Image
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Clone external repo
+      run: |
+        git clone --branch main https://github.com/SaravanakumarR2018/DragDropAIAgentBuilder.git cloned_repo
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: forwardemailforaifirstdesk
+        password: Acchair123
+
+    - name: Build Docker image
+      run: |
+        cd cloned_repo
+        DOCKER_BUILDKIT=1 \
+        VITE_AUTO_LOGIN=false \
+        VITE_CLERK_AUTH_ENABLED=true \
+        VITE_CLERK_PUBLISHABLE_KEY=pk_test_Y2hhcm1lZC1iYXQtNDEuY2xlcmsuYWNjb3VudHMuZGV2JA \
+        make docker_build
+
+    - name: Tag and Push Docker image
+      run: |
+        docker tag langflow:1.4.2 forwardemailforaifirstdesk/langflow:1.4.2
+        docker push forwardemailforaifirstdesk/langflow:1.4.2
+
+    - name: Deploy to Remote VM via SSH using password
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: 139.59.72.218
+        username: shh
+        password: f@nTaBul0us
+        script: |
+          echo "Deploying on remote host..."
+          bash /scripts/new_deploy.sh
