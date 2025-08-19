@@ -10,7 +10,7 @@ on:
       email:
         description: "Admin email for deployment"
         required: true
-        default: ""
+        default: "saravana.k.r@gmail.com"
 
 jobs:
   build-and-push:
