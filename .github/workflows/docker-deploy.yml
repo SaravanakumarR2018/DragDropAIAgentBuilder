@@ -1,9 +1,6 @@
 name: Deploy Docker Build & Push
 
 on:
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       domain:
@@ -44,7 +41,7 @@ jobs:
           VITE_AUTO_LOGIN=false \
           VITE_CLERK_AUTH_ENABLED=true \
           VITE_CLERK_PUBLISHABLE_KEY=pk_test_Y2hhcm1lZC1iYXQtNDEuY2xlcmsuYWNjb3VudHMuZGV2JA \
-          docker build
+          make docker_build
 
       - name: Tag and Push Docker Image
         run: |
