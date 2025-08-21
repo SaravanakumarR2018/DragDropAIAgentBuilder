@@ -54,7 +54,7 @@ jobs:
           host: staging.visualaiagentsbuilder.com
           username: root
           password: ${{ secrets.VM_PASSWORD }}
-          source: "./deploy/deploy.sh,./.env-file"
+          source: "deploy/deploy.sh,.env-file"
           target: /root/
 
       - name: Run script on VM
