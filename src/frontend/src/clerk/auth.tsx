@@ -166,10 +166,10 @@ export function useLogout(options?: Parameters<typeof useLogoutMutation>[0]) {
   const { mutate, mutateAsync, ...rest } = useLogoutMutation(options);
   const { signOut } = IS_CLERK_AUTH ? useClerk() : { signOut: async () => {} };
 
-  const clerkSignOut = async () => {
+  const clerkSignOut =  () => {
     if (IS_CLERK_AUTH) {
       try {
-        await signOut();
+         signOut();
       } catch (err) {
         console.error("Clerk signOut failed:", err);
       }
