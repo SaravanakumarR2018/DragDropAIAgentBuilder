@@ -81,4 +81,4 @@ jobs:
           repository: forwardemailforaifirstdesk/langflow
           keep-last: 2
           username: forwardemailforaifirstdesk
-          password: ${{ secrets.DOCKERHUB_TOKEN }}           
+          password: ${{ secrets.DOCKER_HUB_TOKEN }}            
