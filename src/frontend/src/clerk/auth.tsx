@@ -7,7 +7,6 @@ import { ClerkProvider, useAuth, useClerk, useUser } from "@clerk/clerk-react";
 import { Users } from "@/types/api";
 import { LANGFLOW_ACCESS_TOKEN, LANGFLOW_REFRESH_TOKEN } from "@/constants/constants";
 import { Cookies } from "react-cookie";
-import CustomApp from "../customization/custom-App";
 
 export const IS_CLERK_AUTH =
   String(import.meta.env.VITE_CLERK_AUTH_ENABLED).toLowerCase() === "true";
@@ -195,15 +194,16 @@ export function useLogout(options?: Parameters<typeof useLogoutMutation>[0]) {
   return { mutate: wrappedMutate, mutateAsync: wrappedMutateAsync, clerkSignOut, ...rest };
 }
 
+// App wrapper that conditionally enables Clerk
+const LazyApp = lazy(() => import("../customization/custom-App"));
 
 export function AppWithProvider() {
-  const app = <CustomApp />;
   return IS_CLERK_AUTH ? (
     <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
-      {app}
+      <LazyApp />
     </ClerkProvider>
   ) : (
-      app
+      <LazyApp />
   );
   
 }
