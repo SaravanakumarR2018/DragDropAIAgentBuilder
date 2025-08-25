@@ -125,5 +125,4 @@ jobs:
               --image forwardemailforaifirstdesk/langflow:1.4.2 \
               --domain ${{ github.event.inputs.domain }} \
               --email ${{ github.event.inputs.email }} \
-              --env-file /root/.env-file
-              
+              --env-file /root/.env-file              
