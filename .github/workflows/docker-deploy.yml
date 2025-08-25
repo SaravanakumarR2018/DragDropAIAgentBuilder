@@ -37,6 +37,58 @@ jobs:
           VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.CLERK_PUBLISHABLE_KEY }} \
           make docker_build
 
+      - name: Cleanup all Docker Hub tags
+        run: |
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          DOCKERHUB_USERNAME="forwardemailforaifirstdesk"
+          DOCKERHUB_PASSWORD="${{ secrets.DOCKERHUB_TOKEN }}"
+          REPOSITORY="forwardemailforaifirstdesk/langflow"
+
+          echo "=== Getting Docker Hub token ==="
+          TOKEN=$(curl -s -H "Content-Type: application/json" -X POST \
+            -d '{"username": "'$DOCKERHUB_USERNAME'", "password": "'$DOCKERHUB_PASSWORD'"}' \
+            https://hub.docker.com/v2/users/login/ | jq -r .token)
+
+          if [ -z "$TOKEN" ] || [ "$TOKEN" == "null" ]; then
+            echo "❌ Failed to authenticate"
+            exit 1
+          fi
+          echo "✅ Authentication successful"
+
+          echo "=== Fetching tags ==="
+          RESPONSE=$(curl -s -H "Authorization: JWT $TOKEN" \
+            "https://hub.docker.com/v2/repositories/$REPOSITORY/tags?page_size=100")
+
+          TAGS=$(echo "$RESPONSE" | jq -r '.results[] | .name')
+
+          if [ -z "$TAGS" ]; then
+            echo "ℹ️ No tags found in repository $REPOSITORY. Nothing to delete."
+            exit 0
+          fi
+
+          echo "Found tags: $TAGS"
+
+          for TAG in $TAGS; do
+            echo "Deleting tag: $TAG"
+            DELETE_RESPONSE=$(curl -s -w "HTTPSTATUS:%{http_code}" \
+              -X DELETE -H "Authorization: JWT $TOKEN" \
+              "https://hub.docker.com/v2/repositories/$REPOSITORY/tags/$TAG/")
+
+            HTTP_CODE=$(echo $DELETE_RESPONSE | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+
+            if [ "$HTTP_CODE" = "204" ]; then
+              echo "  ✅ Successfully deleted tag $TAG"
+            else
+              echo "  ❌ Failed to delete tag $TAG (HTTP: $HTTP_CODE)"
+            fi
+
+            sleep 1
+          done
+
+          echo "Note: Docker Hub will automatically clean up unreferenced images within 24-48 hours"    
+
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
