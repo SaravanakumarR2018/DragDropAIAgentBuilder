@@ -36,7 +36,6 @@ jobs:
           VITE_CLERK_AUTH_ENABLED=true \
           VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.CLERK_PUBLISHABLE_KEY }} \
           make docker_build
-
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -47,11 +46,33 @@ jobs:
         run: |
           docker tag langflow:1.4.2 forwardemailforaifirstdesk/langflow:1.4.2
           docker push forwardemailforaifirstdesk/langflow:1.4.2
+      - name: Upload script to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: staging.visualaiagentsbuilder.com
+          username: root
+          password: ${{ secrets.VM_PASSWORD }}
+          source: "./deploy/deploy.sh,./.env-file"
+          target: /root/
 
+      - name: Run script on VM
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: staging.visualaiagentsbuilder.com
+          username: root
+          password: ${{ secrets.VM_PASSWORD }}
+          script: |
+            chmod +x /root/deploy/deploy.sh
+            /root/deploy/deploy.sh \
+              --image forwardemailforaifirstdesk/langflow:1.4.2 \
+              --domain ${{ github.event.inputs.domain }} \
+              --email ${{ github.event.inputs.email }} \
+              --env-file /root/.env-file
+              
       - name: Clean up Docker Hub images (tagged + untagged)
         env:
           DOCKERHUB_USERNAME: forwardemailforaifirstdesk
-          DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
+          DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_TOKEN }}
           REPOSITORY: "forwardemailforaifirstdesk/langflow"
           KEEP_RECENT: 2
         run: |
@@ -103,26 +124,3 @@ jobs:
           else
             echo "No untagged images found"
           fi
-
-      - name: Upload script to VM
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: staging.visualaiagentsbuilder.com
-          username: root
-          password: ${{ secrets.VM_PASSWORD }}
-          source: "./deploy/deploy.sh,./.env-file"
-          target: /root/
-
-      - name: Run script on VM
-        uses: appleboy/ssh-action@v1.1.0
-        with:
-          host: staging.visualaiagentsbuilder.com
-          username: root
-          password: ${{ secrets.VM_PASSWORD }}
-          script: |
-            chmod +x /root/deploy/deploy.sh
-            /root/deploy/deploy.sh \
-              --image forwardemailforaifirstdesk/langflow:1.4.2 \
-              --domain ${{ github.event.inputs.domain }} \
-              --email ${{ github.event.inputs.email }} \
-              --env-file /root/.env-file              
