@@ -126,3 +126,4 @@ jobs:
               --domain ${{ github.event.inputs.domain }} \
               --email ${{ github.event.inputs.email }} \
               --env-file /root/.env-file
+              
