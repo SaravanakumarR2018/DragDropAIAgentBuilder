@@ -8,6 +8,7 @@ from pathlib import Path
 import anyio
 import sqlalchemy as sa
 from sqlmodel import SQLModel
+from sqlalchemy.ext.asyncio import create_async_engine
 
 from langflow.logging.logger import logger
 from langflow.services.auth.clerk_utils import auth_header_ctx
@@ -57,13 +58,24 @@ class OrganizationService:
     @staticmethod
     def _build_database_url_for_org(base_url: str, org_id: str) -> str:
         """Return a database URL for the given organisation."""
+
         if base_url.startswith("sqlite"):
-            if "/" in base_url:
-                prefix = base_url.rsplit("/", 1)[0]
-                new_url = f"{prefix}/{org_id}.db"
+            # Use aiosqlite for async DB access
+            driver_prefix = "sqlite+aiosqlite"
+
+            if "///" in base_url:
+                # Handles sqlite:///absolute/path/to/langflow.db
+                db_path = base_url.split("///", 1)[1]
+                db_dir = str(Path(db_path).parent)
+                org_db_path = Path(db_dir) / f"{org_id}.db"
+                new_url = f"{driver_prefix}:///{org_db_path.as_posix()}"
             else:
-                new_url = f"{org_id}.db"
+                # fallback for relative paths
+                org_db_path = Path(f"{org_id}.db")
+                new_url = f"{driver_prefix}:///{org_db_path.as_posix()}"
+
         else:
+            # For Postgres/MySQL or other URLs → just replace dbname with org_id
             match = re.match(
                 r"^(?P<prefix>.+/)(?P<dbname>[^/?]+)(?P<suffix>.*)$",
                 base_url,
@@ -73,60 +85,83 @@ class OrganizationService:
             else:
                 logger.warning("Could not construct organisation DB url; using base url")
                 new_url = base_url
+
         logger.debug(f"Derived organisation database URL: {new_url}")
         return new_url
 
     async def create_database_and_tables_other_initializations_with_org(self) -> None:
-        """Create and initialise a database for the organisation from auth context."""
+        logger.info("[OrgInit] Starting organization DB initialization process")
         settings_service = get_settings_service()
+
+        # Check Clerk auth
         if not settings_service.auth_settings.CLERK_AUTH_ENABLED:
-            msg = "Clerk authentication disabled"
-            raise RuntimeError(msg)
+            raise RuntimeError("Clerk authentication disabled")
 
         payload: dict | None = auth_header_ctx.get()
         if not payload:
-            msg = "Missing Clerk payload"
-            raise RuntimeError(msg)
+            raise RuntimeError("Missing Clerk payload")
+
         org_id = payload.get("org_id")
         if not org_id:
-            msg = "Missing organisation id"
-            raise RuntimeError(msg)
+            raise RuntimeError("Missing organisation id")
 
+        # If already cached → skip
         if org_id in self._db_service_cache:
-            logger.debug("Organisation database already initialised (cached)")
+            logger.info(f"[OrgInit] Organisation database already cached for org_id={org_id}")
             self._remember_org(org_id, self._db_service_cache[org_id])
             return
 
+        # Build per-org DB URL
         base_url = settings_service.settings.database_url
         new_url = self._build_database_url_for_org(base_url, org_id)
+        logger.info(f"[OrgInit] Using DB URL for org_id={org_id}: {new_url}")
 
+        # --- Ensure SQLite file exists BEFORE creating DatabaseService ---
+        if new_url.startswith("sqlite+aiosqlite:///"):
+            db_path = Path(new_url.split("///", 1)[1])
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+
+            if not db_path.exists():
+                logger.info(f"[OrgInit] Creating database for org_id={org_id}")
+                async_engine = create_async_engine(new_url, connect_args={"check_same_thread": False})
+                async with async_engine.begin() as conn:
+                    await conn.run_sync(SQLModel.metadata.create_all)
+                await async_engine.dispose()
+
+        # Create a dedicated DatabaseService for this org
         new_settings = settings_service.settings.model_copy()
         new_settings.database_url = new_url
         new_settings_service = SettingsService(new_settings, settings_service.auth_settings)
-
         new_db_service = DatabaseService(new_settings_service)
+
         try:
+            # If tables already exist → reuse DB
             if await self._organisation_db_exists(new_db_service):
-                logger.debug("Organisation database already initialised")
+                logger.info(f"[OrgInit] DB already initialized for org_id={org_id}")
                 self._remember_org(org_id, new_db_service)
                 return
+
+            logger.info(f"[OrgInit] Running first-time DB init for org_id={org_id}")
             if new_db_service.settings_service.settings.database_connection_retry:
                 await new_db_service.create_db_and_tables_with_retry()
             else:
                 await new_db_service.create_db_and_tables()
 
-            await new_db_service.check_schema_health()
+            logger.info(f"[OrgInit] Running migrations for org_id={org_id}")
             await new_db_service.run_migrations()
 
+            logger.info(f"[OrgInit] Setting up superuser for org_id={org_id}")
             async with new_db_service.with_session() as session:
                 await setup_superuser(new_settings_service, session)
+
             self._remember_org(org_id, new_db_service)
+            logger.info(f"[OrgInit] Organisation DB initialization complete for org_id={org_id}")
+
         except Exception as exc:
-            logger.exception("Failed to initialise organisation database")
+            logger.exception(f"[OrgInit] Failed to initialise DB for org_id: {org_id}")
             await self._cleanup_failed_initialization(org_id, new_db_service, new_url)
             await new_db_service.teardown()
-            msg = "Failed to initialise organisation database"
-            raise RuntimeError(msg) from exc
+            raise RuntimeError("Failed to initialise organisation database") from exc
 
     @classmethod
     async def _cleanup_failed_initialization(cls, org_id: str, db_service: DatabaseService, database_url: str) -> None:
@@ -154,19 +189,23 @@ class OrganizationService:
         """Return True if the organisation database already has required tables."""
         try:
             async with db_service.with_session() as session, session.bind.connect() as conn:
-                inspector = sa.inspect(conn)
-                required_tables = [
-                    "flow",
-                    "user",
-                    "apikey",
-                    "folder",
-                    "message",
-                    "variable",
-                    "transaction",
-                    "vertex_build",
-                ]
-                table_names = inspector.get_table_names()
-                return all(table in table_names for table in required_tables)
+                def check_tables(sync_conn):
+                    inspector = sa.inspect(sync_conn)
+                    required_tables = [
+                        "flow",
+                        "user",
+                        "apikey",
+                        "folder",
+                        "message",
+                        "variable",
+                        "transaction",
+                        "vertex_build",
+                    ]
+                    table_names = inspector.get_table_names()
+                    return all(table in table_names for table in required_tables)
+
+                return await conn.run_sync(check_tables)
         except Exception:  # noqa: BLE001
             logger.exception("Error checking organisation database existence")
             return False
+
