@@ -111,10 +111,11 @@ export function ClerkAuthAdapter() {
   const isAtRoot = currentPath === "/";
   const isAtLogin = currentPath === "/login";
   const isAtOrg = currentPath === "/organization";
+
   console.log("[ClerkAuthAdapter] Render", {
     isSignedIn,
     isOrgSelected,
-    currentPath
+    currentPath,
   });
 
   // ✅ Redirect to /organization if signed in but org not selected
@@ -132,41 +133,32 @@ export function ClerkAuthAdapter() {
     }
   }, [isSignedIn, isOrgLoaded, organization?.id, currentPath]);
 
+  // ✅ Token listener: sync backend login if token changes
+  useEffect(() => {
+    const unsubscribe = clerk.addListener(async ({ session }) => {
+      console.debug("[ClerkAuthAdapter] Clerk session event received");
 
-  // ✅ Clerk token listener: backend sync ONLY after org is selected
-useEffect(() => {
-  const unsubscribe = clerk.addListener(async ({ session }) => {
-    console.debug("[ClerkAuthAdapter] Clerk session event received");
+      const token = await session?.getToken();
+      if (prevTokenRef.current === null) {
+        // Ignore the initial event triggered on sign-in.
+        prevTokenRef.current = token ?? null;
+        return;
+      }
 
-    const token = await session?.getToken();
-    const currentSessionId = session?.id;
-    const prevSessionId = prevTokenRef.current;
+      const current = cookie.get(LANGFLOW_ACCESS_TOKEN);
+      console.debug("[ClerkAuthAdapter] Is Token Same:", token === current);
 
-    // Only reset if the session itself changes, not just the token refresh
-    if (currentSessionId && currentSessionId !== prevSessionId) {
-      console.log("[ClerkAuthAdapter] Clerk session changed → resetting auth state");
+      if (token && token !== current) {
+        prevTokenRef.current = token;
+        const refreshToken = cookie.get(LANGFLOW_REFRESH_TOKEN);
+        login(token, "login", refreshToken);
+      }
+    });
 
-      // 1️⃣ Reset Zustand + sessionStorage to avoid stale org state
-      authStore.getState().logout();
-      sessionStorage.removeItem("isOrgSelected");
+    return () => unsubscribe?.();
+  }, [clerk, navigate]);
 
-      // 2️⃣ Store new session ID reference
-      prevTokenRef.current = currentSessionId;
-
-      // 3️⃣ Force redirect to organization selection page
-      navigate("/organization", { replace: true });
-    }
-
-    // Always keep the latest token updated for API requests
-    if (token) {
-      prevTokenRef.current = currentSessionId || prevTokenRef.current;
-    }
-  });
-
-  return () => unsubscribe?.();
-}, [clerk, navigate]);
-
-  // ✅ Render organization page only when needed
+  // ✅ Show organization selector page if needed
   if (isAtOrg && !isOrgSelected) {
     return <OrganizationPage />;
   }
