@@ -136,27 +136,29 @@ export function ClerkAuthAdapter() {
   // ✅ Token listener: sync backend login if token changes
   useEffect(() => {
     const unsubscribe = clerk.addListener(async ({ session }) => {
-      console.debug("[ClerkAuthAdapter] Clerk session event received");
-
+      console.debug("[ClerkAuthAdapter] Token update event received");
       const token = await session?.getToken();
+      if (!token) return;
+      const current = cookie.get(LANGFLOW_ACCESS_TOKEN);
       if (prevTokenRef.current === null) {
         // Ignore the initial event triggered on sign-in.
-        prevTokenRef.current = token ?? null;
+        prevTokenRef.current = token;
         return;
       }
-
-      const current = cookie.get(LANGFLOW_ACCESS_TOKEN);
       console.debug("[ClerkAuthAdapter] Is Token Same:", token === current);
-
-      if (token && token !== current) {
+      if (token !== prevTokenRef.current) {
         prevTokenRef.current = token;
-        const refreshToken = cookie.get(LANGFLOW_REFRESH_TOKEN);
-        login(token, "login", refreshToken);
+        const current = cookie.get(LANGFLOW_ACCESS_TOKEN);
+        if (token !== current) {
+          const currentRefreshToken = cookie.get(LANGFLOW_REFRESH_TOKEN);
+          login(token,"login",currentRefreshToken)
+        }
       }
     });
-
-    return () => unsubscribe?.();
-  }, [clerk, navigate]);
+    return () => {
+      unsubscribe?.();
+    };
+  }, [clerk]);
 
   // ✅ Show organization selector page if needed
   if (isAtOrg && !isOrgSelected) {
