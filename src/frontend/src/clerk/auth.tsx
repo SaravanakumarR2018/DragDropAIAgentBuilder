@@ -33,9 +33,9 @@ export async function createOrganisation(token: string) {
     return null;
   }
   await api.post(
-    `http://127.0.0.1:7860/api/v1/create_organisation`,
+    getURL("CREATE_ORGANISATION"),
     {},
-    { headers: { Authorization: `Bearer ${token}` } },
+    { headers: { Authorization: `Bearer ${orgToken}` } },
   );
   console.log("[createOrganisation] Organization created via API");
 }
@@ -111,11 +111,10 @@ export function ClerkAuthAdapter() {
   const isAtRoot = currentPath === "/";
   const isAtLogin = currentPath === "/login";
   const isAtOrg = currentPath === "/organization";
-
   console.log("[ClerkAuthAdapter] Render", {
     isSignedIn,
     isOrgSelected,
-    currentPath,
+    currentPath
   });
 
   // ✅ Redirect to /organization if signed in but org not selected
@@ -133,34 +132,39 @@ export function ClerkAuthAdapter() {
     }
   }, [isSignedIn, isOrgLoaded, organization?.id, currentPath]);
 
-  // ✅ Token listener: sync backend login if token changes
+
+  // ✅ Clerk token listener: backend sync ONLY after org is selected
   useEffect(() => {
     const unsubscribe = clerk.addListener(async ({ session }) => {
       console.debug("[ClerkAuthAdapter] Token update event received");
       const token = await session?.getToken();
-      if (!token) return;
-      const current = cookie.get(LANGFLOW_ACCESS_TOKEN);
-      if (prevTokenRef.current === null) {
-        // Ignore the initial event triggered on sign-in.
-        prevTokenRef.current = token;
+      const orgSelected = sessionStorage.getItem("isOrgSelected") === "true";
+
+      if (!orgSelected) {
+        console.debug("[ClerkAuthAdapter] Skipping backend sync (org not selected)");
+        prevTokenRef.current = token ?? null;
         return;
       }
-      console.debug("[ClerkAuthAdapter] Is Token Same:", token === current);
-      if (token !== prevTokenRef.current) {
+
+      const prevToken = prevTokenRef.current;
+      const currentRefreshToken = cookie.get(LANGFLOW_REFRESH_TOKEN);
+
+      if (prevToken === null) {
+        prevTokenRef.current = token ?? null;
+        return;
+      }
+
+      if (token && token !== prevToken) {
+        console.log("[ClerkAuthAdapter] Detected token change, syncing with backend");
         prevTokenRef.current = token;
-        const current = cookie.get(LANGFLOW_ACCESS_TOKEN);
-        if (token !== current) {
-          const currentRefreshToken = cookie.get(LANGFLOW_REFRESH_TOKEN);
-          login(token,"login",currentRefreshToken)
-        }
+        login(token, "login", currentRefreshToken);
       }
     });
-    return () => {
-      unsubscribe?.();
-    };
+
+    return () => unsubscribe?.();
   }, [clerk]);
 
-  // ✅ Show organization selector page if needed
+  // ✅ Render organization page only when needed
   if (isAtOrg && !isOrgSelected) {
     return <OrganizationPage />;
   }
