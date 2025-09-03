@@ -13,7 +13,7 @@ export function CustomAccountMenu() {
       <UserButton appearance={{ elements: { avatarBox: "h-6 w-6", userButtonPopoverActionButton__signOut: "hidden" } }}>
         <UserButton.MenuItems>
           <UserButton.Action
-            label="logout"
+            label="Sign out"
             labelIcon={<LogOut className="w-4 h-4" />}
             onClick={ async () => {
               await logout();
