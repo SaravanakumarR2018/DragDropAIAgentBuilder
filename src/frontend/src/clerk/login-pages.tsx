@@ -1,78 +1,48 @@
-import { useCustomNavigate } from "@/customization/hooks/use-custom-navigate";
-import {
-  SignIn,
-  SignUp as ClerkSignUp,
-  useAuth,
-  useUser,
-  useClerk,
-  SignedOut,
-  SignedIn
-} from "@clerk/clerk-react";
+import { SignIn, SignUp as ClerkSignUp, useAuth, useUser , useClerk, SignedOut} from "@clerk/clerk-react";
 import { lazy, useEffect, useState } from "react";
-import { useLogout } from "./auth";
+import { ensureLangflowUser, useLogout } from "./auth";
 import { IS_CLERK_AUTH } from "@/clerk/auth";
-
 // Clerk login page component
 export function ClerkLoginPage() {
   return (
-    <>
-      <SignedOut>
-        <div style={centeredStyle}>
-          <SignIn
-            path="/login"
-            routing="path"
-            afterSignInUrl="/organization"
-            redirectUrl="/organization"
-          />
-        </div>
-      </SignedOut>
-      <SignedIn>
-        {/* Prevent mounting AppInitPage by staying on /organization after login */}
-        <div style={centeredStyle}>
-          <p>Redirecting to /organization...</p>
-        </div>
-      </SignedIn>
-    </>
+    <SignedOut>
+      <div style={centeredStyle}>
+        <SignIn/>
+      </div>
+    </SignedOut>
   );
 }
 
 // Clerk sign-up page component
 export function ClerkSignUpPage() {
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, getToken } = useAuth();
   const { user } = useUser();
   const navigate = useCustomNavigate();
   const [processed, setProcessed] = useState(false);
+  const { mutateAsync: logout } = useLogout();
+  const { signOut } = useClerk();
 
   useEffect(() => {
-  async function handleSignup() {
-    if (isSignedIn && user && !processed) {
-      console.debug("[ClerkSignUpPage] User is signed in after signup. Redirecting to /organization...");
-      setProcessed(true);
-      navigate("/organization");
+    async function handleSignup() {
+      if (isSignedIn && user && !processed) {
+        console.debug("[ClerkSignUpPage] User is signed in after signup. Redirecting to /organization...");
+        setProcessed(true);
+        navigate("/organization");
+      }
     }
-  }
-  handleSignup();
-}, [isSignedIn, user, navigate, processed]);
+    handleSignup();
+  }, [isSignedIn, user, navigate, processed]);
 
   return (
-    <>
-      <SignedOut>
-        <div style={centeredStyle}>
-          <ClerkSignUp
-            path="/sign-up"
-            routing="path"
-            afterSignUpUrl="/organization"
-            redirectUrl="/organization"
-          />
-        </div>
-      </SignedOut>
-      <SignedIn>
-        {/* Prevent backend sync. Sign out and redirect to login handled in useEffect. */}
-        <div style={centeredStyle}>
-          <p>Processing your sign-up. Please wait...</p>
-        </div>
-      </SignedIn>
-    </>
+    <SignedOut>
+      <div style={centeredStyle}>
+        <ClerkSignUp
+          path="/sign-up"
+          routing="path"
+          afterSignUpUrl="/login"
+        />
+      </div>
+    </SignedOut>
   );
 }
 
@@ -91,3 +61,4 @@ const centeredStyle: React.CSSProperties = {
   alignItems: "center",
   minHeight: "100vh",
 };
+

@@ -24,6 +24,7 @@ export enum HttpStatusCode {
   INTERNAL_SERVER_ERROR = 500
 }
 
+
 export async function createOrganisation(token: string) {
   console.log("[createOrganisation] Called with token:", token);
   try {
@@ -40,21 +41,21 @@ export async function createOrganisation(token: string) {
   console.log("[createOrganisation] Organization created via API");
 }
 
+// Backend synchronization helpers
 export async function ensureLangflowUser(token: string, username: string): Promise<{
   justCreated: boolean;
   user: Users | null;
 }> {
-  console.log(`[ensureLangflowUser] Called with username: ${username}, token: ${token}`);
   try {
     const whoAmIRes = await api.get<Users>(`${getURL("USERS")}/whoami`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const user = whoAmIRes.data;
-    console.debug(`[ensureLangflowUser] user exists: ${username}`, user);
+    console.debug(`[ensureLangflowUser] user exists: ${username}`);
     return { justCreated: false, user };
   } catch (err: any) {
     const status = err?.response?.status;
-    console.warn(`[ensureLangflowUser] whoami failed (${status})`, err);
+    console.warn(`[ensureLangflowUser] whoami failed (${status})`);
     if (status === HttpStatusCode.UNAUTHORIZED) {
       console.debug("[ensureLangflowUser] trying to create user...");
       const createRes = await api.post(
@@ -62,16 +63,13 @@ export async function ensureLangflowUser(token: string, username: string): Promi
         { username, password: CLERK_DUMMY_PASSWORD },
         { headers: { Authorization: `Bearer ${token}` } },
       );
-      console.log(`[ensureLangflowUser] User created for username: ${username}`, createRes.data);
       return { justCreated: true, user: null };
     }
-    console.error(`[ensureLangflowUser] Error:`, err);
     throw err;
   }
 }
 
-export async function backendLogin(username: string, token: string) {
-  console.log(`[backendLogin] Attempting backend login for username: ${username}, token: ${token}`);
+export async function backendLogin(username: string,token:string) {
   const res = await api.post(
     `${getURL("LOGIN")}`,
     new URLSearchParams({
@@ -153,7 +151,7 @@ export function ClerkAuthAdapter() {
         prevTokenRef.current = token ?? null;
         return;
       }
-
+      console.debug("[ClerkAuthAdapter] Is Token Same:", token === currentRefreshToken);
       if (token && token !== prevToken) {
         console.log("[ClerkAuthAdapter] Detected token change, syncing with backend");
         prevTokenRef.current = token;
@@ -174,7 +172,6 @@ export function ClerkAuthAdapter() {
 
 // Provider that wraps the app with Clerk when enabled
 export function ClerkAuthProvider({ children }: { children: ReactNode }) {
-  console.log("[ClerkAuthProvider] Rendering ClerkProvider");
   return (
     <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
       {children}
@@ -198,7 +195,13 @@ export function useLogout(options?: Parameters<typeof useLogoutMutation>[0]) {
   };
 
   const wrappedMutate: typeof mutate = (...args) => {
-    clerkSignOut().finally(() => mutate(...args));
+    try {
+      clerkSignOut();
+    } catch (err) {
+      console.error("Error occurred during mutation:", err);
+    } finally {
+      mutate(...args);
+    }
   };
 
   const wrappedMutateAsync: typeof mutateAsync = async (...args) => {
@@ -210,16 +213,15 @@ export function useLogout(options?: Parameters<typeof useLogoutMutation>[0]) {
 }
 
 // App wrapper that conditionally enables Clerk
-const LazyApp = lazy(() => import("../customization/custom-App"));
+//const LazyApp = lazy(() => import("../customization/custom-App"));
 
-export function AppWithProvider() {
-  console.log("[AppWithProvider] Rendering AppWithProvider, IS_CLERK_AUTH:", IS_CLERK_AUTH);
+export default function AppWithProvider({ children }: { children: ReactNode })  {
   return IS_CLERK_AUTH ? (
     <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
-      <LazyApp />
+      {children}
     </ClerkProvider>
   ) : (
-      <LazyApp />
+      <>{children}</>
   );
   
 }
@@ -238,5 +240,3 @@ export const mockClerkMutation = {
   data: undefined,
   error: null,
 } as any;
-
-export default AppWithProvider;
