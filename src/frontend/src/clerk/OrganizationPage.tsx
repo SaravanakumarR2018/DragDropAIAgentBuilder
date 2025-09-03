@@ -22,51 +22,70 @@ export default function OrganizationSwitcherPage() {
 useEffect(() => {
   if (!organization?.id || !isOrgSelectedManually || bootstrapped.current) return;
 
-  bootstrapped.current = true;
+    bootstrapped.current = true;
 
-  (async () => {
-    const orgToken = await getToken();
-    if (!orgToken) throw new Error("Missing org token");
+    (async () => {
+      console.log("[OrgSwitcherPage] Starting bootstrap flow...");
 
-    const username =
-      user?.username ||
-      user?.primaryEmailAddress?.emailAddress ||
-      user?.id ||
-      "clerk_user";
+      const orgToken = await getToken();
+      if (!orgToken) throw new Error("Missing Clerk org token");
 
-    // Step 1: Backend organization setup
-    await createOrganisation(orgToken);
+      const username =
+        user?.username ||
+        user?.primaryEmailAddress?.emailAddress ||
+        user?.id ||
+        "clerk_user";
 
-    // Step 2: Ensure user exists in Langflow backend
-    const { justCreated } = await ensureLangflowUser(orgToken, username);
+      // Step 1: Create backend organization (DB provisioning or linking)
+      console.debug("[OrgSwitcherPage] Calling createOrganisation()");
+      await createOrganisation(orgToken);
+      console.debug("[OrgSwitcherPage] createOrganisation() completed");
 
-    // Step 3: Mark org as selected (store + session)
-    authStore.getState().setIsOrgSelected(true);
-    sessionStorage.setItem("isOrgSelected", "true");
+      // Step 2: Ensure Langflow user exists via /whoami or /users
+      console.debug("[OrgSwitcherPage] Calling ensureLangflowUser()");
+      const { justCreated } = await ensureLangflowUser(orgToken, username);
 
-    if (justCreated) {
-      // Step 4a: If newly created, sign out and force login again
-      await logout();
-      navigate("/login", { replace: true });
-    } else {
-      // ✅ Step 4b: Log into backend using dummy password
+      if (justCreated) {
+        console.warn(
+          "[OrgSwitcherPage] User just created, forcing logout to trigger backend login via Clerk"
+        );
+        // ⚠️ Important: don't mark org selected yet
+        await logout();
+        navigate("/login", { replace: true });
+        return;
+      }
+
+      // Step 3: Backend login using dummy password flow
+      console.debug("[OrgSwitcherPage] Calling backendLogin()");
       const tokens = await backendLogin(username, orgToken);
+      console.debug("[OrgSwitcherPage] backendLogin() succeeded");
 
-      // ✅ Step 5: Save Langflow tokens via AuthContext login
+      // Step 4: Save access & refresh tokens into store and cookies
       login(orgToken, "login", tokens.refresh_token);
 
-      // Step 6: Proceed to flows
-      navigate("/flows", { replace: true });
-    }
-  })().catch((err) => {
-    console.error("[OrgSwitcherPage] Bootstrap failed", err);
-    bootstrapped.current = false;
-  });
-}, [organization?.id, isOrgSelectedManually, getToken, user, navigate]);
+      // Step 5: Only now mark org as selected
+      authStore.getState().setIsOrgSelected(true);
+      sessionStorage.setItem("isOrgSelected", "true");
+      console.debug("[OrgSwitcherPage] Org selection state marked");
 
+      // Step 6: Navigate to /flows
+      console.debug("[OrgSwitcherPage] Redirecting to /flows");
+      navigate("/flows", { replace: true });
+    })().catch((err) => {
+      console.error("[OrgSwitcherPage] Bootstrap failed", err);
+      bootstrapped.current = false;
+    });
+  }, [organization?.id, isOrgSelectedManually, getToken, user, navigate]);
 
   return (
-    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh" }}>
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        minHeight: "100vh",
+      }}
+    >
       <OrganizationList
         hidePersonal
         afterCreateOrganizationUrl="/organization?selected=true"

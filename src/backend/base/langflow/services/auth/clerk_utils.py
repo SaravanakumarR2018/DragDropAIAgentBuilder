@@ -71,10 +71,14 @@ async def verify_clerk_token(token: str) -> dict[str, Any]:
         payload["uuid"] = str(uuid.uuid5(uuid.NAMESPACE_DNS, str(clerk_id)))
 
         org = payload.get("o")
-        if not org or "id" not in org:
-            raise JWTError("Missing organization info in Clerk token payload")
-
-        payload["org_id"] = org["id"]
+        if isinstance(org, dict) and "id" in org:
+            payload["org_id"] = org["id"]
+        elif "org_id" in payload:
+            # Some Clerk tokens expose the organisation id directly
+            payload["org_id"] = payload["org_id"]
+        else:
+            msg = "Missing organization info in Clerk token payload"
+            raise JWTError(msg)
         logger.info(f"[ClerkAuthAdapter] Verified Clerk token for org_id: {payload}")
     except JWTError as exc:
         msg = "Invalid token"

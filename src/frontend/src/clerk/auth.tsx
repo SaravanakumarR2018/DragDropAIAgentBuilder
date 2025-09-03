@@ -35,7 +35,7 @@ export async function createOrganisation(token: string) {
   await api.post(
     getURL("CREATE_ORGANISATION"),
     {},
-    { headers: { Authorization: `Bearer ${orgToken}` } },
+    { headers: { Authorization: `Bearer ${token}` } },
   );
   console.log("[createOrganisation] Organization created via API");
 }
