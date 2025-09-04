@@ -1,10 +1,11 @@
 import { IS_CLERK_AUTH, useLogout } from "@/clerk/auth";
 import { AccountMenu } from "@/components/core/appHeaderComponent/components/AccountMenu";
-import { UserButton} from "@clerk/clerk-react";
+import { UserButton, useClerk} from "@clerk/clerk-react";
 import { LogOut } from "lucide-react";
 
 export function CustomAccountMenu() {
   const { mutateAsync: logout } = useLogout();
+  const { signOut } = useClerk();
 
   if (!IS_CLERK_AUTH) return <AccountMenu />;
 
@@ -14,10 +15,10 @@ export function CustomAccountMenu() {
         appearance={{ elements: { avatarBox: "h-6 w-6" } }}
         userMenuItems={{
           signOut: {
-            // override Clerk's sign out
             onClick: async () => {
               try {
-                await logout(); // ✅ your logout logic
+                await logout();
+                await signOut();
               } catch (err) {
                 console.error("Logout failed:", err);
               }
