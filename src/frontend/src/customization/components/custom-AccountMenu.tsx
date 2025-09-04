@@ -1,11 +1,15 @@
-import { UserButton, useClerk } from "@clerk/clerk-react";
+import { UserButton } from "@clerk/clerk-react";
 import { IS_CLERK_AUTH, useLogout } from "@/clerk/auth";
 import { LogOut } from "lucide-react";
 import { AccountMenu } from "@/components/core/appHeaderComponent/components/AccountMenu";
 
 export function CustomAccountMenu() {
-  const { signOut } = useClerk();
-  const { mutate: logout } = useLogout();
+  const { mutate: mutationLogout } = useLogout();
+
+  const handleLogout = () => {
+      mutationLogout();
+  };
+
   return IS_CLERK_AUTH ? (
     <UserButton
       appearance={{
@@ -19,10 +23,7 @@ export function CustomAccountMenu() {
         <UserButton.Action
           label="Sign out"
           labelIcon={<LogOut className="h-4 w-4" />}
-          onClick={async () => {
-            await signOut();
-            logout();
-          }}
+          onClick={handleLogout}
         />
       </UserButton.MenuItems>
     </UserButton>
