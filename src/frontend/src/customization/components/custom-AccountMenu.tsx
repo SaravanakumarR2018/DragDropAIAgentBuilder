@@ -15,7 +15,13 @@ export function CustomAccountMenu() {
           <UserButton.Action
             label="Sign out"
             labelIcon={<LogOut className="w-4 h-4" />}
-            onClick={logout}
+            onClick={async () => {
+            try {
+              await logout();
+              } catch (err) {
+              console.error("Logout failed:", err);
+              }
+            }}
           />
         </UserButton.MenuItems>
       </UserButton>
