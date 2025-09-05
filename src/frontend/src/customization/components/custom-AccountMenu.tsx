@@ -11,7 +11,7 @@ export function CustomAccountMenu() {
   };
 
   return IS_CLERK_AUTH ? (
-    <>
+    <div className="flex items-center gap-x-3">
     <UserButton
       appearance={{
         elements: {
@@ -28,7 +28,7 @@ export function CustomAccountMenu() {
       </UserButton.MenuItems>
     </UserButton>
     <AccountMenu />
-    </>
+    </div>
   ) : (
     <AccountMenu />
   );
