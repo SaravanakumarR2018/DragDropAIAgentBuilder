@@ -11,14 +11,14 @@ export function CustomAccountMenu() {
   };
 
   return IS_CLERK_AUTH ? (
+    <>
     <UserButton
       appearance={{
         elements: {
           avatarBox: "h-6 w-6",
           userButtonPopoverActionButton__signOut: "hidden",
         },
-      }}
-    >
+      }}>
       <UserButton.MenuItems>
         <UserButton.Action
           label="Sign out"
@@ -27,6 +27,8 @@ export function CustomAccountMenu() {
         />
       </UserButton.MenuItems>
     </UserButton>
+    <AccountMenu />
+    </>
   ) : (
     <AccountMenu />
   );
