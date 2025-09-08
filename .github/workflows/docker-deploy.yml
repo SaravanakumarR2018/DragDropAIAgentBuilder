@@ -144,22 +144,7 @@ jobs:
               --domain staging.visualaiagentsbuilder.com \
               --email ${{ github.event.inputs.email }} \
               --env-file /root/.env-file
-
-      - name: If env is staging Run script on VM is staging
-        if: ${{ github.event.inputs.environment == 'staging' }}
-        uses: appleboy/ssh-action@v1.1.0
-        with:
-          host: visualaiagentsbuilder.com
-          username: root
-          password: ${{ secrets.PROD_VM_PASSWORD }}
-          script: |
-            chmod +x /root/deploy/deploy.sh
-            /root/deploy/deploy.sh \
-              --image forwardemailforaifirstdesk/langflow:staging \
-              --domain staging.visualaiagentsbuilder.com \
-              --email ${{ github.event.inputs.email }} \
-              --env-file /root/.env-file  
-
+              
       - name: If env is prod Run script on VM is prod
         if: ${{ github.event.inputs.environment == 'prod' }}
         uses: appleboy/ssh-action@v1.1.0
