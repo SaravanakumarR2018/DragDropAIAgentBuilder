@@ -97,7 +97,7 @@ jobs:
           VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.CLERK_PUBLISHABLE_KEY }} \
           make docker_build TAG=langflow:staging
           
-          docker tag langflow:1.4.2 forwardemailforaifirstdesk/langflow:staging
+          docker tag langflow:staging forwardemailforaifirstdesk/langflow:staging
           docker push forwardemailforaifirstdesk/langflow:staging
 
           echo "=== Building Prod Image ==="
@@ -107,7 +107,7 @@ jobs:
           VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.PROD_CLERK_PUBLISHABLE_KEY }} \
           make docker_build TAG=langflow:prod
           
-          docker tag langflow:1.4.2 forwardemailforaifirstdesk/langflow:prod
+          docker tag langflow:prod forwardemailforaifirstdesk/langflow:prod
           docker push forwardemailforaifirstdesk/langflow:prod 
 
       - name: If env is staging Move script to VM
