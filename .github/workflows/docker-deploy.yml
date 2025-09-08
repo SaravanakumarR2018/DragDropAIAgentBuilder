@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       branch:
-        description: "Select a branch for staging deployment or skip branch selection for production."
-        required: false
+        description: "Select a Branch to deploy"
+        required: true
         default: "main"
       environment:
         description: "Select environment to deploy (staging or prod)"
@@ -20,23 +20,16 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
 
-    env:
-      VM_HOST: ${{ github.event.inputs.environment == 'staging' && 'staging.visualaiagentsbuilder.com' || 'visualaiagentsbuilder.com' }}
-      VM_PASSWORD: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
-
     steps:
       - name: Checkout selected branch
-        if: ${{ github.event.inputs.environment == 'staging' }}
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.branch }}
 
       - name: Set up Docker Buildx
-        if: ${{ github.event.inputs.environment == 'staging' }}
         uses: docker/setup-buildx-action@v3
 
       - name: Cleanup all Docker Hub tags
-        if: ${{ github.event.inputs.environment == 'staging' }}
         run: |
           #!/usr/bin/env bash
           set -euo pipefail
@@ -87,13 +80,12 @@ jobs:
           done
 
           echo "Note: Docker Hub will automatically clean up unreferenced images within 24-48 hours"    
-      
+
       - name: Log in to Docker Hub
-        if: ${{ github.event.inputs.environment == 'staging' }}
         uses: docker/login-action@v3
         with:
           username: forwardemailforaifirstdesk
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}    
 
       - name: Build and Push Docker Images (staging + prod)
         if: ${{ github.event.inputs.environment == 'staging' }}
@@ -118,27 +110,67 @@ jobs:
           docker tag langflow:1.4.2 forwardemailforaifirstdesk/langflow:prod
           docker push forwardemailforaifirstdesk/langflow:prod 
 
-      - name: Move script to VM
+      - name: If env is staging Move script to VM
+        if: ${{ github.event.inputs.environment == 'staging' }}
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ env.VM_HOST }}
+          host: staging.visualaiagentsbuilder.com
           username: root
-          password: ${{ env.VM_PASSWORD }}
+          password: ${{ secrets.VM_PASSWORD }}
           source: "./deploy/deploy.sh,./.env-file"
           target: /root/
 
-      - name: Run script on VM
+      - name: If env is prod Move script to VM
+        if: ${{ github.event.inputs.environment == 'prod' }}
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: visualaiagentsbuilder.com
+          username: root
+          password: ${{ secrets.PROD_VM_PASSWORD }}
+          source: "./deploy/deploy-prod.sh,./.env-file"
+          target: /root/    
+
+      - name: If env is staging Run script on VM is staging
+        if: ${{ github.event.inputs.environment == 'staging' }}
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: staging.visualaiagentsbuilder.com
+          username: root
+          password: ${{ secrets.VM_PASSWORD }}
+          script: |
+            chmod +x /root/deploy/deploy.sh
+            /root/deploy/deploy.sh \
+              --image forwardemailforaifirstdesk/langflow:staging \
+              --domain staging.visualaiagentsbuilder.com \
+              --email ${{ github.event.inputs.email }} \
+              --env-file /root/.env-file
+
+      - name: If env is staging Run script on VM is staging
+        if: ${{ github.event.inputs.environment == 'staging' }}
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: visualaiagentsbuilder.com
+          username: root
+          password: ${{ secrets.PROD_VM_PASSWORD }}
+          script: |
+            chmod +x /root/deploy/deploy.sh
+            /root/deploy/deploy.sh \
+              --image forwardemailforaifirstdesk/langflow:staging \
+              --domain staging.visualaiagentsbuilder.com \
+              --email ${{ github.event.inputs.email }} \
+              --env-file /root/.env-file  
+
+      - name: If env is prod Run script on VM is prod
+        if: ${{ github.event.inputs.environment == 'prod' }}
         uses: appleboy/ssh-action@v1.1.0
         with:
           host: ${{ env.VM_HOST }}
           username: root
-          password: ${{ env.VM_PASSWORD }}
+          password: ${{ secrets.PROD_VM_PASSWORD }}
           script: |
-            chmod +x /root/deploy/deploy.sh
-            /root/deploy/deploy.sh \
-              --image forwardemailforaifirstdesk/langflow:${{ github.event.inputs.environment }}\
-              --domain ${{ env.VM_HOST }} \
+            chmod +x /root/deploy/deploy-prod.sh
+            /root/deploy/deploy-prod.sh \
+              --image forwardemailforaifirstdesk/langflow:prod \
+              --domain visualaiagentsbuilder.com \
               --email ${{ github.event.inputs.email }} \
               --env-file /root/.env-file
-              --environment ${{ github.event.inputs.environment }}
-
