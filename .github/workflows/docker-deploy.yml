@@ -7,10 +7,10 @@ on:
         description: "Select a Branch to deploy"
         required: true
         default: "main"
-      domain:
-        description: "Domain name for deployment"
+      environment:
+        description: "Select environment to deploy (staging or prod)"
         required: true
-        default: "staging.visualaiagentsbuilder.com"
+        default: "staging"
       email:
         description: "Admin email for deployment"
         required: true
@@ -29,13 +29,36 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: forwardemailforaifirstdesk
+          password: ${{ secrets.DOCKERHUB_TOKEN }}  
+
       - name: Build Docker Image
         run: |
-          DOCKER_BUILDKIT=1 \
-          VITE_AUTO_LOGIN=false \
-          VITE_CLERK_AUTH_ENABLED=true \
-          VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.CLERK_PUBLISHABLE_KEY }} \
-          make docker_build
+          if [ "${{ github.event.inputs.environment }}" = "staging" ]; then
+            echo "=== Building Staging Image ==="
+            DOCKER_BUILDKIT=1 \
+            VITE_AUTO_LOGIN=false \
+            VITE_CLERK_AUTH_ENABLED=true \
+            VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.CLERK_PUBLISHABLE_KEY }} \
+            make docker_build TAG=langflow:staging
+
+            docker tag langflow:staging forwardemailforaifirstdesk/langflow:staging
+            docker push forwardemailforaifirstdesk/langflow:staging
+
+            echo "=== Building Prod Image ==="
+            DOCKER_BUILDKIT=1 \
+            VITE_AUTO_LOGIN=false \
+            VITE_CLERK_AUTH_ENABLED=true \
+            VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.PROD_CLERK_PUBLISHABLE_KEY }} \
+            make docker_build TAG=langflow:prod
+          
+            docker tag langflow:prod forwardemailforaifirstdesk/langflow:prod
+            docker push forwardemailforaifirstdesk/langflow:prod
+          else
+            echo "=== Skipping Docker image build ==="
 
       - name: Cleanup all Docker Hub tags
         run: |
@@ -89,18 +112,8 @@ jobs:
 
           echo "Note: Docker Hub will automatically clean up unreferenced images within 24-48 hours"    
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: forwardemailforaifirstdesk
-          password: ${{ secrets.DOCKERHUB_TOKEN }}    
-
-      - name: Tag and Push Docker Image
-        run: |
-          docker tag langflow:1.4.2 forwardemailforaifirstdesk/langflow:1.4.2
-          docker push forwardemailforaifirstdesk/langflow:1.4.2
-
-      - name: Upload script to VM
+      - name: If env is staging Upload script to VM
+        if: ${{ github.event.inputs.environment == 'staging' }}
         uses: appleboy/scp-action@v0.1.7
         with:
           host: staging.visualaiagentsbuilder.com
@@ -109,7 +122,18 @@ jobs:
           source: "./deploy/deploy.sh,./.env-file"
           target: /root/
 
-      - name: Run script on VM
+      - name: If env is prod Upload script to VM
+        if: ${{ github.event.inputs.environment == 'prod' }}
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: visualaiagentsbuilder.com
+          username: root
+          password: ${{ secrets.PROD_VM_PASSWORD }}
+          source: "./deploy/deploy-prod.sh,./.env-file"
+          target: /root/    
+
+      - name: If env is staging Run script on VM
+        if: ${{ github.event.inputs.environment == 'staging' }}
         uses: appleboy/ssh-action@v1.1.0
         with:
           host: staging.visualaiagentsbuilder.com
@@ -118,8 +142,22 @@ jobs:
           script: |
             chmod +x /root/deploy/deploy.sh
             /root/deploy/deploy.sh \
-              --image forwardemailforaifirstdesk/langflow:1.4.2 \
-              --domain ${{ github.event.inputs.domain }} \
+              --image forwardemailforaifirstdesk/langflow:staging \
+              --domain staging.visualaiagentsbuilder.com \
               --email ${{ github.event.inputs.email }} \
               --env-file /root/.env-file
 
+      - name: If env is prod Run script on VM
+        if: ${{ github.event.inputs.environment == 'prod' }}
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: visualaiagentsbuilder.com
+          username: root
+          password: ${{ secrets.PROD_VM_PASSWORD }}
+          script: |
+            chmod +x /root/deploy/deploy-prod.sh
+            /root/deploy/deploy-prod.sh \
+              --image forwardemailforaifirstdesk/langflow:prod \
+              --domain visualaiagentsbuilder.com \
+              --email ${{ github.event.inputs.email }} \
+              --env-file /root/.env-file        
