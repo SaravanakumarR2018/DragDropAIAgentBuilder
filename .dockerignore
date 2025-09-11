@@ -1,0 +1,21 @@
+# Ignore Git repository and GitHub metadata
+.git
+.github
+.gitattributes
+.gitignore
+
+# Development and environment files
+.vscode
+.devcontainer
+.venv
+node_modules
+
+# Local configuration files
+.env
+.env.*
+.env-file
+
+# Documentation, examples, and test artifacts
+docs/
+docker_example/
+test-results/
