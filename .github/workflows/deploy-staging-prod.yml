@@ -230,19 +230,20 @@ jobs:
               --email ${{ github.event.inputs.email }} \
               --env-file /root/.env-file        
       
-      - name: Mark Deployment Finished
+      - name: Fetch Deployment Status
+        if: always()
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
+          username: root
+          password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
+          source: "/root/deploy_status.env"
+          target: "./"
+
+      - name: Update GitHub Deployment Status with Docker info
         if: always()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          STATE=${{ job.status }}
-          if [ "$STATE" == "success" ]; then
-            STATUS="success"
-          else
-            STATUS="failure"
-          fi
-          echo "📊 Updating deployment $DEPLOYMENT_ID with state=$STATUS"
-
-          gh api repos/${{ github.repository }}/deployments/${{ env.DEPLOYMENT_ID }}/statuses \
-            -F state=$STATUS \
-            -F description="Deployment finished with status $STATUS"
+          source ./deploy_status.env
+          gh api repos/${{ github.repository }}/deployments/${{ env.DEPLOYMENT_ID }}/statuses -F state=$FINAL_STATUS -F description="$FINAL_DESCRIPTION"
