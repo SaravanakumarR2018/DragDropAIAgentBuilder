@@ -94,6 +94,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}  
 
       - name: Build Docker Image
+        if: ${{ github.event.inputs.environment == 'staging' }}
         run: |
           COMMIT_ID=${{ steps.commit.outputs.commit_id }}
           BRANCH_NAME=${{ steps.branch.outputs.branch_name }}
