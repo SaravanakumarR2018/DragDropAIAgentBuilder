@@ -614,6 +614,29 @@ cleanup_on_failure() {
   ok "Failure cleanup completed"
 }
 
+# ---------- Final reporting ----------
+report_status() {
+  local status desc running
+  running=$(docker ps --filter "name=${APP_NAME}_" --format "{{.Names}} {{.Image}}" | head -n1 || true)
+
+  if [[ "$DEPLOY_SUCCESS" -eq 1 ]]; then
+    status="success"
+    desc="Deployment succeeded. Running=$running"
+  elif [[ "$STOPPED_ACTIVE" -eq 1 && "$HAD_ACTIVE" -eq 1 ]]; then
+    status="failure"
+    desc="Deployment failed, rolled back. Still running=$running"
+  elif [[ -n "$running" ]]; then
+    status="failure"
+    desc="Deployment failed. Website live with older container: $running"
+  else
+    status="failure"
+    desc="Deployment failed. No container running."
+  fi
+
+  echo "FINAL_STATUS=$status" >> /root/deploy_status.env
+  echo "FINAL_DESCRIPTION=$desc" >> /root/deploy_status.env
+}
+
 # ---------- Execute flow (STOP-FIRST) ----------
 ensure_nginx
 issue_cert_if_needed
@@ -634,3 +657,6 @@ verify_domain
 ok "Deployment successful: ${TARGET_COLOR} is live"
 cleanup_old_container
 DEPLOY_SUCCESS=1
+
+# 5) Final status report
+report_status
