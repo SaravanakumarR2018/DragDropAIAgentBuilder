@@ -44,12 +44,11 @@ HEALTH_TIMEOUT="300"      # seconds
 RETRY_MAX="5"
 RETRY_SLEEP="5"
 KEEP_OLD="1"              # keep old color container for quick rollback (1=yes, 0=no)
-ENVIRONMENT=""
 
 # ---------- Parse args ----------
 usage() {
   cat <<USAGE
-Usage: $0 [--environment <staging|prod>] [--config <file>] [--image <repo:tag>] [--domain <domain>]
+Usage: $0 [--config <file>] [--image <repo:tag>] [--domain <domain>]
           [--docker-username <user>] [--docker-token <token>]
           [--env-file <path>] [--container-port <port>]
           [--blue-port <port>] [--green-port <port>]
@@ -61,7 +60,6 @@ USAGE
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --environment)      ENVIRONMENT="${2:-}"; shift 2;;
     --config)           CONFIG_FILE="${2:-}"; shift 2;;
     --image)            DOCKER_IMAGE="${2:-}"; shift 2;;
     --domain)           DOMAIN="${2:-}"; shift 2;;
@@ -80,24 +78,6 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# ---------- Environment mapping ----------
-if [[ -n "${ENVIRONMENT}" ]]; then
-  case "${ENVIRONMENT}" in
-    staging)
-      DOCKER_IMAGE="forwardemailforaifirstdesk/langflow:staging"
-      DOMAIN="staging.visualaiagentsbuilder.com"
-      ;;
-    prod)
-      DOCKER_IMAGE="forwardemailforaifirstdesk/langflow:prod"
-      DOMAIN="visualaiagentsbuilder.com"
-      ;;
-    *)
-      err "Invalid environment: ${ENVIRONMENT}. Must be 'staging' or 'prod'"
-      exit 1
-      ;;
-  esac
-fi
-
 # ---------- Load script config .env (optional) ----------
 # Allows: DOCKER_IMAGE=..., DOMAIN=..., DOCKERHUB_USERNAME=..., DOCKERHUB_TOKEN=..., CONTAINER_ENV_FILE=..., etc.
 if [[ -n "${CONFIG_FILE}" ]]; then
@@ -112,8 +92,8 @@ if [[ -n "${CONFIG_FILE}" ]]; then
 fi
 
 # ---------- Validate required inputs ----------
-[[ -z "${DOCKER_IMAGE}" ]] && { err "--image or --environment is required"; usage; }
-[[ -z "${DOMAIN}" ]] && { err "--domain or --environment is required"; usage; }
+[[ -z "${DOCKER_IMAGE}" ]] && { err "--image (DOCKER_IMAGE) is required"; usage; }
+[[ -z "${DOMAIN}" ]] && { err "--domain (DOMAIN) is required"; usage; }
 [[ -z "${EMAIL}" ]] && EMAIL="admin@${DOMAIN#www.}"
 
 # ---------- Root check ----------
