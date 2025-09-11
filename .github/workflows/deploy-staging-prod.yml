@@ -93,7 +93,7 @@ jobs:
           username: forwardemailforaifirstdesk
           password: ${{ secrets.DOCKERHUB_TOKEN }}  
 
-      - name: Build Docker Image
+      - name: Build Docker Image (for staging)
         if: ${{ github.event.inputs.environment == 'staging' }}
         run: |
           COMMIT_ID=${{ steps.commit.outputs.commit_id }}
