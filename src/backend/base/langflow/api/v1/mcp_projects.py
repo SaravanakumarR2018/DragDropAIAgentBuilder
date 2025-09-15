@@ -35,6 +35,7 @@ from langflow.helpers.flow import json_schema_from_flow
 from langflow.schema.message import Message
 from langflow.services.auth.utils import get_current_active_user
 from langflow.services.database.models import Flow, Folder, User
+from langflow.services.database.organisation import OrganizationService
 from langflow.services.deps import get_settings_service, get_storage_service, session_scope
 from langflow.services.storage.utils import build_content_type_from_extension
 
@@ -761,3 +762,23 @@ async def init_mcp_servers():
     except Exception as e:
         msg = f"Failed to initialize MCP servers: {e}"
         logger.exception(msg)
+
+
+async def init_mcp_servers_for_org(org_id: str) -> None:
+    """Initialize MCP servers for all projects in a single organisation."""
+    db_service = OrganizationService.get_db_service_for_org(org_id)
+    async with db_service.with_session() as session:
+        projects = (await session.exec(select(Folder))).all()
+        for project in projects:
+            try:
+                get_project_sse(project.id)
+                get_project_mcp_server(project.id)
+            except Exception as e:
+                msg = f"Failed to initialize MCP server for project {project.id}: {e}"
+                logger.exception(msg)
+
+
+async def init_mcp_servers_for_all_orgs(org_ids: list[str]) -> None:
+    """Initialize MCP servers for all projects across multiple organisations."""
+    for org_id in org_ids:
+        await init_mcp_servers_for_org(org_id)
