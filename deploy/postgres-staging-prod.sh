@@ -146,25 +146,49 @@ prepare_langflow_env() {
   [[ -n "$DB_USER" && -n "$DB_PASSWORD" && -n "$DB_NAME" ]] || {
     err "--db-user, --db-password and --db-name are required"; exit 1;
   }
+
   [[ -f "$CONTAINER_ENV_FILE" ]] || { err "Env file not found: $CONTAINER_ENV_FILE"; exit 1; }
   sed -i '/^LANGFLOW_DATABASE_URL=/d' "$CONTAINER_ENV_FILE"
   if [[ -s "$CONTAINER_ENV_FILE" && $(tail -c1 "$CONTAINER_ENV_FILE") != "" ]]; then
     echo "" >> "$CONTAINER_ENV_FILE"
   fi
+
+  [[ -f "$CONTAINER_ENV_FILE" ]] || { err "Env file not found: $CONTAINER_ENV_FILE"; exit 1; }
+
+  sed -i '/^LANGFLOW_DATABASE_URL=/d' "$CONTAINER_ENV_FILE"
+
   echo "LANGFLOW_DATABASE_URL=postgresql://$DB_USER:$DB_PASSWORD@postgres:5432/$DB_NAME" >> "$CONTAINER_ENV_FILE"
 }
 
 # ---------- Docker cleanup (keep last 2 images only) ----------
 cleanup_old_images() {
+
   step "Cleaning up old Docker images (keeping last 2)"
   local images
   images=$(docker images --format '{{.Repository}}:{{.Tag}} {{.ID}} {{.CreatedAt}}' \
     | grep -v '^postgres:' \
+=======
+  step "Cleaning up PostgreSQL container"
+  if docker_exists "postgres"; then
+    docker rm -f postgres >/dev/null 2>&1 || true
+    ok "Removed old PostgreSQL container"
+  else
+    ok "No old PostgreSQL container found"
+  fi
+
+  step "Cleaning up old Docker images (keeping last 2)"
+  local images
+  images=$(docker images --format '{{.Repository}}:{{.Tag}} {{.ID}} {{.CreatedAt}}' \
+
     | sort -k3 -r \
     | awk 'NR>2 {print $2}')
 
   if [[ -n "$images" ]]; then
+
     echo "$images" | xargs -r docker rmi -f >/dev/null 2>&1 || true
+    # Ignore failures if an image is still in use
+    echo "$images" | xargs -r docker rmi -f || true
+
     ok "Old images removed (except in-use ones)"
   else
     ok "No old images to remove"
