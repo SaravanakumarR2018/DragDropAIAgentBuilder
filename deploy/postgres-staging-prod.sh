@@ -167,7 +167,6 @@ cleanup_old_images() {
   local images
   images=$(docker images --format '{{.Repository}}:{{.Tag}} {{.ID}} {{.CreatedAt}}' \
     | grep -v '^postgres:' \
-=======
   step "Cleaning up PostgreSQL container"
   if docker_exists "postgres"; then
     docker rm -f postgres >/dev/null 2>&1 || true
