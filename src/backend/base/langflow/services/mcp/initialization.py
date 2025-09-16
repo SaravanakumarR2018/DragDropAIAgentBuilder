@@ -9,6 +9,7 @@ from sqlmodel import select
 from langflow.api.v1.mcp_projects import get_project_mcp_server, get_project_sse
 from langflow.services.database.models import Folder
 from langflow.services.database.organisation import OrganizationService
+from langflow.services.deps import get_settings_service
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,10 @@ async def init_mcp_servers_for_org(org_id: str) -> None:
 
 async def init_mcp_servers_for_all_orgs() -> None:
     """Discover organisation databases and prepare MCP servers for each of them."""
+    settings_service = get_settings_service()
+    if not settings_service.auth_settings.CLERK_AUTH_ENABLED:
+        return
+
     org_ids = await OrganizationService.list_existing_org_ids()
     if not org_ids:
         return

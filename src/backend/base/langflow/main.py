@@ -41,7 +41,6 @@ from langflow.services.deps import (
     get_settings_service,
     get_telemetry_service,
 )
-from langflow.services.mcp import init_mcp_servers_for_all_orgs
 from langflow.services.utils import initialize_services, teardown_services
 
 if TYPE_CHECKING:
@@ -176,7 +175,6 @@ def get_lifespan(*, fix_migration=False, version=None):
             current_time = asyncio.get_event_loop().time()
             logger.debug("Loading mcp servers for projects")
             await init_mcp_servers()
-            await init_mcp_servers_for_all_orgs()
             logger.debug(f"mcp servers loaded in {asyncio.get_event_loop().time() - current_time:.2f}s")
 
             total_time = asyncio.get_event_loop().time() - start_time
