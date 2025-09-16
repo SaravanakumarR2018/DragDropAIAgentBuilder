@@ -23,7 +23,7 @@ from pydantic_core import PydanticSerializationError
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 from langflow.api import health_check_router, log_router, router
-from langflow.api.v1.mcp_projects import init_mcp_servers, init_mcp_servers_for_all_orgs
+from langflow.api.v1.mcp_projects import init_mcp_servers
 from langflow.initial_setup.setup import (
     create_or_update_starter_projects,
     initialize_super_user_if_needed,
@@ -36,12 +36,12 @@ from langflow.interface.utils import setup_llm_caching
 from langflow.logging.logger import configure
 from langflow.middleware import ContentSizeLimitMiddleware
 from langflow.services.auth.clerk_utils import clerk_token_middleware
-from langflow.services.database.organisation import OrganizationService
 from langflow.services.deps import (
     get_queue_service,
     get_settings_service,
     get_telemetry_service,
 )
+from langflow.services.mcp import init_mcp_servers_for_all_orgs
 from langflow.services.utils import initialize_services, teardown_services
 
 if TYPE_CHECKING:
@@ -176,9 +176,7 @@ def get_lifespan(*, fix_migration=False, version=None):
             current_time = asyncio.get_event_loop().time()
             logger.debug("Loading mcp servers for projects")
             await init_mcp_servers()
-            org_ids = await OrganizationService.list_existing_org_ids()
-            if org_ids:
-                await init_mcp_servers_for_all_orgs(org_ids)
+            await init_mcp_servers_for_all_orgs()
             logger.debug(f"mcp servers loaded in {asyncio.get_event_loop().time() - current_time:.2f}s")
 
             total_time = asyncio.get_event_loop().time() - start_time
