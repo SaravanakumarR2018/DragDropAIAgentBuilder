@@ -6,6 +6,9 @@ DOCKERFILE=docker/build_and_push.Dockerfile
 DOCKERFILE_BACKEND=docker/build_and_push_backend.Dockerfile
 DOCKERFILE_FRONTEND=docker/frontend/build_and_push_frontend.Dockerfile
 DOCKER_COMPOSE=docker_example/docker-compose.yml
+
+VITE_CLERK_AUTH_ENABLED ?= false
+VITE_CLERK_PUBLISHABLE_KEY ?=
 PYTHON_REQUIRED=$(shell grep '^requires-python[[:space:]]*=' pyproject.toml | sed -n 's/.*"\([^"]*\)".*/\1/p')
 RED=\033[0;31m
 NC=\033[0m # No Color
@@ -13,7 +16,7 @@ GREEN=\033[0;32m
 
 log_level ?= debug
 host ?= 0.0.0.0
-port ?= 7860
+port ?= 7860335
 env ?= .env
 open_browser ?= true
 path = src/backend/base/langflow/frontend
@@ -333,7 +336,10 @@ dockerfile_build:
 	@echo 'BUILDING DOCKER IMAGE: ${DOCKERFILE}'
 	@docker build --rm \
 		-f ${DOCKERFILE} \
-		-t langflow:${VERSION} .
+		--build-arg VITE_CLERK_AUTH_ENABLED=${VITE_CLERK_AUTH_ENABLED} \
+		--build-arg VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY} \
+		--build-arg VITE_AUTO_LOGIN=$(VITE_AUTO_LOGIN) \
+		-t $(TAG) .
 
 dockerfile_build_be: dockerfile_build
 	@echo 'BUILDING DOCKER IMAGE BACKEND: ${DOCKERFILE_BACKEND}'

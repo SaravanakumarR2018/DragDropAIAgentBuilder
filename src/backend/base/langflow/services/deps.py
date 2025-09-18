@@ -159,7 +159,7 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 @asynccontextmanager
-async def session_scope() -> AsyncGenerator[AsyncSession, None]:
+async def session_scope(*, use_organisation: bool = True) -> AsyncGenerator[AsyncSession, None]:
     """Context manager for managing an async session scope.
 
     This context manager is used to manage an async session scope for database operations.
@@ -173,7 +173,7 @@ async def session_scope() -> AsyncGenerator[AsyncSession, None]:
         Exception: If an error occurs during the session scope.
 
     """
-    db_service = get_db_service()
+    db_service = get_db_service(use_organisation=use_organisation)
     async with db_service.with_session() as session:
         try:
             yield session

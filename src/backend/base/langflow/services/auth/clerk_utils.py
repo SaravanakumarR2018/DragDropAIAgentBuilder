@@ -61,6 +61,7 @@ async def verify_clerk_token(token: str) -> dict[str, Any]:
             algorithms=[unverified_header.get("alg", "RS256")],
             audience=unverified_claims.get("aud"),
             issuer=issuer,
+            # options={"verify_signature": False, "verify_aud": False, "verify_exp": False},
         )
         # ✅ Add deterministic UUID to the payload
         clerk_id = payload.get("sub")
@@ -69,6 +70,15 @@ async def verify_clerk_token(token: str) -> dict[str, Any]:
             raise JWTError(msg)
         payload["uuid"] = str(uuid.uuid5(uuid.NAMESPACE_DNS, str(clerk_id)))
 
+        org = payload.get("o")
+        if isinstance(org, dict) and "id" in org:
+            payload["org_id"] = org["id"]
+        elif "org_id" in payload:
+            # Some Clerk tokens expose the organisation id directly
+            payload["org_id"] = payload["org_id"]
+        else:
+            msg = "Missing organization info in Clerk token payload"
+            raise JWTError(msg)
     except JWTError as exc:
         msg = "Invalid token"
         raise ValueError(msg) from exc
