@@ -208,6 +208,18 @@ class OrganizationService:
         new_db_service = DatabaseService(new_settings_service)
         new_db_service.reload_engine()
 
+        # Check whether the organisation database already contains Langflow tables.
+        # This happens when the Clerk organisation exists but its database was already
+        # initialised previously (for example before a backend restart). In that case we
+        # simply remember the DatabaseService and skip the heavy initialisation logic.
+        if await self._organisation_db_exists(new_db_service):
+            logger.info(
+                "[OrgInit] Organisation database already initialised for org_id=%s; reusing existing schema",
+                org_id,
+            )
+            self._remember_org(org_id, new_db_service)
+            return
+
         try:
             logger.warning("🔥 [DEBUG] Org DB Init STARTED")
             # Create tables
