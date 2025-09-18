@@ -67,7 +67,7 @@ async def list_project_tools(
     """List all tools in a project that are enabled for MCP."""
     tools: list[MCPSettings] = []
     try:
-        async with session_scope() as session:
+        async with session_scope(use_organisation=False) as session:
             # Fetch the project first to verify it exists and belongs to the current user
             project = (
                 await session.exec(
@@ -138,7 +138,7 @@ async def handle_project_sse(
 ):
     """Handle SSE connections for a specific project."""
     # Verify project exists and user has access
-    async with session_scope() as session:
+    async with session_scope(use_organisation=False) as session:
         project = (
             await session.exec(select(Folder).where(Folder.id == project_id, Folder.user_id == current_user.id))
         ).first()
@@ -744,9 +744,9 @@ def get_project_mcp_server(project_id: UUID) -> ProjectMCPServer:
 
 
 async def init_mcp_servers():
-    """Initialize MCP servers for all projects."""
+    """Initialize MCP servers for the default database and organisation databases."""
     try:
-        async with session_scope() as session:
+        async with session_scope(use_organisation=False) as session:
             projects = (await session.exec(select(Folder))).all()
 
             for project in projects:
@@ -760,4 +760,12 @@ async def init_mcp_servers():
 
     except Exception as e:
         msg = f"Failed to initialize MCP servers: {e}"
+        logger.exception(msg)
+
+    try:
+        from langflow.services.mcp import init_mcp_servers_for_all_orgs
+
+        await init_mcp_servers_for_all_orgs()
+    except Exception as e:
+        msg = f"Failed to initialize organisation MCP servers: {e}"
         logger.exception(msg)
