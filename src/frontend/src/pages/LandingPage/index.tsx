@@ -1,6 +1,8 @@
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import type { JSX, SVGProps } from "react";
 import VisualWorkflow from "../../assets/VisualWorkflow.png";
+import { useState } from "react";
+
 
 function CheckIcon(props: SVGProps<SVGSVGElement>) {
   return (
@@ -22,6 +24,7 @@ function PlayIcon(props: SVGProps<SVGSVGElement>) {
 }
 
 export default function Landing(): JSX.Element {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   return (
     <div className="h-screen overflow-y-auto bg-[#0f1217] text-white">
       {/* Background accents */}
@@ -33,14 +36,22 @@ export default function Landing(): JSX.Element {
       {/* Navbar */}
       <header className="sticky top-0 z-40 backdrop-blur supports-[backdrop-filter]:bg-neutral-900/60">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
+          {/* Logo and responsive title */}
           <div className="flex items-center gap-2">
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-teal-500 font-bold">
               VA
             </span>
-            <span className="text-sm font-semibold tracking-wide text-white/90">
-              VisualAiAgentsBuilder
+            {/* Short title for mobile view with no-wrap */}
+            <span className="whitespace-nowrap text-sm font-semibold tracking-wide text-white/90 md:hidden">
+              Visual AI Agents Builder
+            </span>
+            {/* Full title for desktop view */}
+            <span className="hidden whitespace-nowrap text-sm font-semibold tracking-wide text-white/90 md:inline">
+              Visual AI Agents Builder
             </span>
           </div>
+
+          {/* Desktop Nav (no changes needed) */}
           <nav className="hidden items-center gap-8 md:flex">
             <a className="text-white/70 hover:text-white" href="#features">
               Features
@@ -55,22 +66,86 @@ export default function Landing(): JSX.Element {
               Pricing
             </a>
           </nav>
-          <div className="flex items-center gap-2">
-            <a
-              href="/login"
-              className="hidden rounded-lg px-3 py-2 text-sm text-white/80 hover:text-white md:block"
+
+          {/* Right side buttons */}
+          <div className="flex items-center gap-3">
+            {/* Mobile Menu Button */}
+            <button
+              className="md:hidden p-2 rounded-lg hover:bg-white/10"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
             >
-              Log in
-            </a>
+              <div className="space-y-1">
+                <span className="block h-0.5 w-6 bg-white"></span>
+                <span className="block h-0.5 w-6 bg-white"></span>
+                <span className="block h-0.5 w-6 bg-white"></span>
+              </div>
+            </button>
+
+            {/* Log in (always visible with no-wrap) */}
             <a
               href="#demo"
-              className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:opacity-90"
+              className="hidden md:inline-block rounded-xl bg-white px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:opacity-90"
             >
               Book a Demo
+            </a>
+            <a
+              href="/login"
+              className="whitespace-nowrap rounded-xl bg-white px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:opacity-90"
+            >
+              Log in
             </a>
           </div>
         </div>
       </header>
+
+      <AnimatePresence>
+        {isMenuOpen && (
+        <motion.div
+          initial={{ opacity: 0, x: "100%" }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: "100%" }}
+          transition={{ duration: 0.3 }}
+          className="fixed inset-0 z-50 flex flex-col items-center justify-start bg-gradient-to-b from-[#0f1217] via-50% via-[#0f1217] to-transparent px-6 pt-24 backdrop-blur-md"
+        >
+        <button
+          className="absolute top-4 right-4 p-2 rounded-lg hover:bg-white/10"
+          onClick={() => setIsMenuOpen(false)}
+        >
+          ✕
+        </button>
+        <nav className="space-y-6 text-center text-x">
+          <a 
+            className="block text-white/90 hover:text-white" 
+            href="#features"
+            onClick={() => setIsMenuOpen(false)}
+          >
+            Features
+          </a>
+          <a 
+            className="block text-white/90 hover:text-white" 
+            href="#how"
+            onClick={() => setIsMenuOpen(false)}
+          >
+            How it Works
+          </a>
+          <a 
+            className="block text-white/90 hover:text-white" 
+            href="#enterprise"
+            onClick={() => setIsMenuOpen(false)}
+          >
+            Enterprise
+          </a>
+          <a 
+            className="block text-white/90 hover:text-white" 
+            href="#pricing"
+            onClick={() => setIsMenuOpen(false)}
+          >
+            Pricing
+          </a>
+        </nav>
+        </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Hero */}
       <section className="relative mx-auto max-w-7xl px-4 pb-12 pt-20 sm:pt-28">
