@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import type { JSX, SVGProps } from "react";
+import VisualWorkflow from "../../assets/VisualWorkflow.png";
 
 function CheckIcon(props: SVGProps<SVGSVGElement>) {
   return (
@@ -118,7 +119,7 @@ export default function Landing(): JSX.Element {
           <div className="relative">
             {/* Placeholder for graphic/image of agent flow in visual builder */}
             <img
-              src="/src/assets/VisualWorkflow.png"
+              src={VisualWorkflow}
               alt="Visual workflow builder screenshot"
               className="w-full h-auto rounded-2xl border border-black/5 object-cover"
             />
