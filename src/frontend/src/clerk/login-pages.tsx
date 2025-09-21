@@ -1,18 +1,24 @@
-import { SignIn, SignUp as ClerkSignUp, useAuth, useUser , useClerk, SignedOut} from "@clerk/clerk-react";
+import { SignIn, SignUp as ClerkSignUp, useAuth, useUser , useClerk, SignedOut, SignedIn} from "@clerk/clerk-react";
 import { lazy, useEffect, useState } from "react";
 import { useLogout } from "./auth";
+import { CustomNavigate } from "@/customization/components/custom-navigate";
 import { IS_CLERK_AUTH } from "@/clerk/auth";
 // Clerk login page component
 export function ClerkLoginPage() {
   return (
-    <SignedOut>
-      <div style={centeredStyle}>
-        <SignIn
-          afterSignInUrl="/organization"
-          redirectUrl="/organization"
-        />
-      </div>
-    </SignedOut>
+    <>
+      <SignedIn>
+        <CustomNavigate replace to="/organization" />
+      </SignedIn>
+      <SignedOut>
+        <div style={centeredStyle}>
+          <SignIn
+            afterSignInUrl="/organization"
+            redirectUrl="/organization"
+          />
+        </div>
+      </SignedOut>
+    </>
   );
 }
 
