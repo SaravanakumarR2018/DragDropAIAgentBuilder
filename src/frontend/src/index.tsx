@@ -10,16 +10,11 @@ import "./style/applies.css";
 
 // @ts-ignore
 
-import AppWithProvider from "./clerk/auth";
-import CustomApp from "./customization/custom-App";
+import App from "./clerk/auth";
 
 const root = ReactDOM.createRoot(
   document.getElementById("root") as HTMLElement,
 );
 
-root.render(
-  <AppWithProvider>
-    <CustomApp />
-  </AppWithProvider>,
-);
+root.render(<App />);
 reportWebVitals();
