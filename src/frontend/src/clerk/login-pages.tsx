@@ -48,8 +48,8 @@ export function ClerkSignUpPage() {
 }
 
 // Original pages
-import OriginalLoginPage from "../pages/LoginPage";
-import OriginalSignUp from "../pages/SignUpPage";
+const OriginalLoginPage = lazy(() => import("../pages/LoginPage"));
+const OriginalSignUp = lazy(() => import("../pages/SignUpPage"));
 import { useCustomNavigate } from "@/customization/hooks/use-custom-navigate";
 const OriginalLoginAdminPage = lazy(() => import("../pages/AdminPage/LoginPage"));
 

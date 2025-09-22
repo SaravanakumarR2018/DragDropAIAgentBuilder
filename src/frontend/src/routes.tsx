@@ -21,7 +21,7 @@ import { CustomRoutesStore } from "./customization/utils/custom-routes-store";
 import { CustomRoutesStorePages } from "./customization/utils/custom-routes-store-pages";
 import { AppAuthenticatedPage } from "./pages/AppAuthenticatedPage";
 import { AppInitPage } from "./pages/AppInitPage";
-import { AppWrapperPage } from "./pages/AppWrapperPage";
+
 import FlowPage from "./pages/FlowPage";
 import FilesPage from "./pages/MainPage/pages/filesPage";
 import HomePage from "./pages/MainPage/pages/homePage";
@@ -34,12 +34,19 @@ import MessagesPage from "./pages/SettingsPage/pages/messagesPage";
 import ShortcutsPage from "./pages/SettingsPage/pages/ShortcutsPage";
 import ViewPage from "./pages/ViewPage";
 import { LoginPage, SignUp, LoginAdminPage } from "./clerk/login-pages";
-import OrganizationPage from "./clerk/OrganizationPage";
+
 import { IS_CLERK_AUTH } from "./clerk/auth";
 
 const AdminPage = lazy(() => import("./pages/AdminPage"));
 const DeleteAccountPage = lazy(() => import("./pages/DeleteAccountPage"));
 const PlaygroundPage = lazy(() => import("./pages/Playground"));
+const OrganizationPage = lazy(() => import("./clerk/OrganizationPage"));
+
+const AppWrapperPage = lazy(() =>
+  import("./pages/AppWrapperPage").then((module) => ({
+    default: module.AppWrapperPage,
+  })),
+);
 
 const router = createBrowserRouter(
   createRoutesFromElements([
