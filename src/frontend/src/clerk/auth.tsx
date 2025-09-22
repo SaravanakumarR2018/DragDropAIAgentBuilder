@@ -200,15 +200,15 @@ export function useLogout(options?: Parameters<typeof useLogoutMutation>[0]) {
 }
 
 // App wrapper that conditionally enables Clerk
-const LazyApp = lazy(() => import("../customization/custom-App"));
+//const LazyApp = lazy(() => import("../customization/custom-App"));
 
-export function AppWithProvider()  {
+export default function AppWithProvider({ children }: { children: ReactNode })  {
   return IS_CLERK_AUTH ? (
     <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
-      <LazyApp />
+      {children}
     </ClerkProvider>
   ) : (
-    <LazyApp />
+      <>{children}</>
   );
   
 }
@@ -227,5 +227,3 @@ export const mockClerkMutation = {
   data: undefined,
   error: null,
 } as any;
-
-export default AppWithProvider;
