@@ -1,4 +1,8 @@
-import { OrganizationProfile, UserButton } from "@clerk/clerk-react";
+import {
+  OrganizationProfile,
+  UserButton,
+  useOrganization,
+} from "@clerk/clerk-react";
 import { IS_CLERK_AUTH, useLogout } from "@/clerk/auth";
 import useAuthStore from "@/stores/authStore";
 import { LogOut, Users } from "lucide-react";
@@ -10,12 +14,16 @@ export function ClerkAccountMenu() {
   const { mutate: mutationLogout } = useLogout();
   const [isOrganizationProfileOpen, setIsOrganizationProfileOpen] = useState(false);
   const isAdmin = useAuthStore((state) => state.isAdmin);
+  const organizationContext = IS_CLERK_AUTH ? useOrganization() : undefined;
+  const membership = organizationContext?.membership;
+  const canViewMembers =
+    isAdmin || ["admin", "owner"].includes(membership?.role ?? "");
 
   useEffect(() => {
-    if (!isAdmin) {
+    if (!canViewMembers) {
       setIsOrganizationProfileOpen(false);
     }
-  }, [isAdmin]);
+  }, [canViewMembers]);
 
   const handleLogout = () => {
     mutationLogout();
@@ -37,7 +45,7 @@ export function ClerkAccountMenu() {
       >
         <UserButton.MenuItems>
           <UserButton.Action label="manageAccount" />
-          {isAdmin && (
+          {canViewMembers && (
             <UserButton.Action
               label="Members"
               labelIcon={<Users className="h-4 w-4" />}
@@ -52,7 +60,7 @@ export function ClerkAccountMenu() {
         </UserButton.MenuItems>
       </UserButton>
       <AccountMenu />
-      {isAdmin && (
+      {canViewMembers && (
         <Dialog
           open={isOrganizationProfileOpen}
           onOpenChange={setIsOrganizationProfileOpen}
