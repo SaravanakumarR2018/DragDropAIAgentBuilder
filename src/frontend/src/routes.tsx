@@ -20,6 +20,7 @@ import { CustomRoutesStore } from "./customization/utils/custom-routes-store";
 import { CustomRoutesStorePages } from "./customization/utils/custom-routes-store-pages";
 import { IS_CLERK_AUTH } from "./clerk/auth";
 import { LoadingPage } from "./pages/LoadingPage";
+import { PublicLandingRoute, PublicShell } from "./pages/PublicShell";
 
 const AppWrapperPage = lazy(() =>
   import("./pages/AppWrapperPage").then((module) => ({
@@ -81,6 +82,58 @@ const PlaygroundPage = lazy(() => import("./pages/Playground"));
 
 const router = createBrowserRouter(
   createRoutesFromElements([
+    <Route element={<PublicShell />}>
+      <Route
+        path="/"
+        element={
+          <Suspense fallback={<LoadingPage />}>
+            <PublicLandingRoute />
+          </Suspense>
+        }
+      />
+      <Route
+        path={ENABLE_CUSTOM_PARAM ? "/:customParam?/login" : "/login"}
+        element={
+          <Suspense fallback={<LoadingPage />}>
+            <ProtectedLoginRoute>
+              <LoginPage />
+            </ProtectedLoginRoute>
+          </Suspense>
+        }
+      />
+      <Route
+        path={ENABLE_CUSTOM_PARAM ? "/:customParam?/organization" : "/organization"}
+        element={
+          <Suspense fallback={<LoadingPage />}>
+            <ProtectedLoginRoute>
+              <OrganizationPage />
+            </ProtectedLoginRoute>
+          </Suspense>
+        }
+      />
+      <Route
+        path={ENABLE_CUSTOM_PARAM ? "/:customParam?/signup" : "/signup"}
+        element={
+          <Suspense fallback={<LoadingPage />}>
+            <ProtectedLoginRoute>
+              <SignUp />
+            </ProtectedLoginRoute>
+          </Suspense>
+        }
+      />
+      <Route
+        path={
+          ENABLE_CUSTOM_PARAM ? "/:customParam?/login/admin" : "/login/admin"
+        }
+        element={
+          <Suspense fallback={<LoadingPage />}>
+            <ProtectedLoginRoute>
+              <LoginAdminPage />
+            </ProtectedLoginRoute>
+          </Suspense>
+        }
+      />
+    </Route>,
     <Route path="/playground/:id/">
       <Route
         path=""
@@ -335,46 +388,6 @@ const router = createBrowserRouter(
             </Route>
           </Route>
         </Route>
-        <Route
-          path="login"
-          element={
-            <Suspense fallback={<LoadingPage />}>
-              <ProtectedLoginRoute>
-                <LoginPage />
-              </ProtectedLoginRoute>
-            </Suspense>
-          }
-        />
-        <Route
-          path="organization"
-          element={
-            <Suspense fallback={<LoadingPage />}>
-              <ProtectedLoginRoute>
-                <OrganizationPage />
-              </ProtectedLoginRoute>
-            </Suspense>
-          }
-        />
-        <Route
-          path="signup"
-          element={
-            <Suspense fallback={<LoadingPage />}>
-              <ProtectedLoginRoute>
-                <SignUp />
-              </ProtectedLoginRoute>
-            </Suspense>
-          }
-        />
-        <Route
-          path="login/admin"
-          element={
-            <Suspense fallback={<LoadingPage />}>
-              <ProtectedLoginRoute>
-                <LoginAdminPage />
-              </ProtectedLoginRoute>
-            </Suspense>
-          }
-        />
       </Route>
       <Route path="*" element={<CustomNavigate replace to="/" />} />
     </Route>,
