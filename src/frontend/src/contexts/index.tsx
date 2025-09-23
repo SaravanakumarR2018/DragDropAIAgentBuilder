@@ -6,7 +6,8 @@ import { ReactNode } from "react";
 import { TooltipProvider } from "../components/ui/tooltip";
 import { ApiInterceptor } from "../controllers/API/api";
 import { AuthProvider } from "./authContext";
-import { ClerkAuthAdapter, IS_CLERK_AUTH } from "@/clerk/auth";
+import { ClerkAuthAdapter } from "@/clerk/auth";
+import { IS_CLERK_AUTH } from "@/clerk/config";
 
 export default function ContextWrapper({ children }: { children: ReactNode }) {
   const queryClient = new QueryClient();

@@ -1,4 +1,5 @@
 // authStore.js
+import { IS_CLERK_AUTH } from "@/clerk/config";
 import { LANGFLOW_ACCESS_TOKEN } from "@/constants/constants";
 import { AuthStoreType } from "@/types/zustand/auth";
 import { Cookies } from "react-cookie";
@@ -13,16 +14,7 @@ const useAuthStore = create<AuthStoreType>((set, get) => ({
   autoLogin: null,
   apiKey: cookies.get("apikey_tkn_lflw"),
   authenticationErrorCount: 0,
-  isOrgSelected: (() => {
-    try {
-      // Dynamically import IS_CLERK_AUTH to avoid circular deps
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { IS_CLERK_AUTH } = require("@/clerk/auth");
-      return IS_CLERK_AUTH ? false : undefined;
-    } catch {
-      return undefined;
-    }
-  })(),
+  isOrgSelected: IS_CLERK_AUTH ? false : undefined,
 
   setIsAdmin: (isAdmin) => set({ isAdmin }),
   setIsAuthenticated: (isAuthenticated) => set({ isAuthenticated }),

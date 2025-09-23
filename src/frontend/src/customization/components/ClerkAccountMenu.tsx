@@ -1,5 +1,6 @@
 import { UserButton } from "@clerk/clerk-react";
-import { IS_CLERK_AUTH, useLogout } from "@/clerk/auth";
+import { IS_CLERK_AUTH } from "@/clerk/config";
+import { useLogout } from "@/clerk/auth";
 import { LogOut } from "lucide-react";
 import { AccountMenu } from "@/components/core/appHeaderComponent/components/AccountMenu";
 
