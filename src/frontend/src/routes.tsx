@@ -2,14 +2,14 @@ import { Suspense, lazy } from "react";
 import {
   createBrowserRouter,
   createRoutesFromElements,
-  Outlet,
   Route,
 } from "react-router-dom";
 import { ProtectedAdminRoute } from "./components/authorization/authAdminGuard";
 import { ProtectedRoute } from "./components/authorization/authGuard";
 import { ProtectedLoginRoute } from "./components/authorization/authLoginGuard";
 import { AuthSettingsGuard } from "./components/authorization/authSettingsGuard";
-import ContextWrapper from "./contexts";
+import PublicShell from "./components/shells/PublicShell";
+import ProtectedShell from "./components/shells/ProtectedShell";
 import { CustomNavigate } from "./customization/components/custom-navigate";
 import { BASENAME } from "./customization/config-constants";
 import {
@@ -81,25 +81,66 @@ const PlaygroundPage = lazy(() => import("./pages/Playground"));
 
 const router = createBrowserRouter(
   createRoutesFromElements([
-    <Route path="/playground/:id/">
+    <Route path="/playground/:id/" element={<ProtectedShell />}>
       <Route
         path=""
         element={
-          <ContextWrapper key={1}>
-            <Suspense fallback={<LoadingPage />}>
-              <PlaygroundPage />
-            </Suspense>
-          </ContextWrapper>
+          <Suspense fallback={<LoadingPage />}>
+            <PlaygroundPage />
+          </Suspense>
         }
       />
     </Route>,
     <Route
       path={ENABLE_CUSTOM_PARAM ? "/:customParam?" : "/"}
-      element={
-        <ContextWrapper key={2}>
-          <Outlet />
-        </ContextWrapper>
-      }
+      element={<PublicShell />}
+    >
+      <Route
+        path="login"
+        element={
+          <Suspense fallback={<LoadingPage />}>
+            <ProtectedLoginRoute>
+              <LoginPage />
+            </ProtectedLoginRoute>
+          </Suspense>
+        }
+      />
+      <Route
+        path="organization"
+        element={
+          <Suspense fallback={<LoadingPage />}>
+            <ProtectedLoginRoute>
+              <OrganizationPage />
+            </ProtectedLoginRoute>
+          </Suspense>
+        }
+      />
+      <Route
+        path="signup"
+        element={
+          <Suspense fallback={<LoadingPage />}>
+            <ProtectedLoginRoute>
+              <SignUp />
+            </ProtectedLoginRoute>
+          </Suspense>
+        }
+      />
+      <Route
+        path="login/admin"
+        element={
+          <Suspense fallback={<LoadingPage />}>
+            <ProtectedLoginRoute>
+              <LoginAdminPage />
+            </ProtectedLoginRoute>
+          </Suspense>
+        }
+      />
+
+      <Route path="*" element={<CustomNavigate replace to="/flows" />} />
+    </Route>,
+    <Route
+      path={ENABLE_CUSTOM_PARAM ? "/:customParam?/flows" : "/flows"}
+      element={<ProtectedShell />}
     >
       <Route
         path=""
@@ -335,48 +376,7 @@ const router = createBrowserRouter(
             </Route>
           </Route>
         </Route>
-        <Route
-          path="login"
-          element={
-            <Suspense fallback={<LoadingPage />}>
-              <ProtectedLoginRoute>
-                <LoginPage />
-              </ProtectedLoginRoute>
-            </Suspense>
-          }
-        />
-        <Route
-          path="organization"
-          element={
-            <Suspense fallback={<LoadingPage />}>
-              <ProtectedLoginRoute>
-                <OrganizationPage />
-              </ProtectedLoginRoute>
-            </Suspense>
-          }
-        />
-        <Route
-          path="signup"
-          element={
-            <Suspense fallback={<LoadingPage />}>
-              <ProtectedLoginRoute>
-                <SignUp />
-              </ProtectedLoginRoute>
-            </Suspense>
-          }
-        />
-        <Route
-          path="login/admin"
-          element={
-            <Suspense fallback={<LoadingPage />}>
-              <ProtectedLoginRoute>
-                <LoginAdminPage />
-              </ProtectedLoginRoute>
-            </Suspense>
-          }
-        />
       </Route>
-      <Route path="*" element={<CustomNavigate replace to="/" />} />
     </Route>,
   ]),
   { basename: BASENAME || undefined },
