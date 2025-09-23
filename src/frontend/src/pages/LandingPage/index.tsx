@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import type { JSX, SVGProps } from "react";
-import FinalLandingpage100kb from "../../assets/FinalLandingpage100kb.png";
+import VisualWorkflow from "../../assets/VisualWorkflow.png";
 import { useState } from "react";
 
 
@@ -194,11 +194,10 @@ export default function Landing(): JSX.Element {
           <div className="relative">
             {/* Placeholder for graphic/image of agent flow in visual builder */}
             <img
-              src={FinalLandingpage100kb}
+              src={VisualWorkflow}
               alt="Visual workflow builder screenshot"
               className="w-full h-auto rounded-2xl border border-black/5 object-cover"
             />
-            {console.log(FinalLandingpage100kb, 'img')}
             <div className="absolute -bottom-4 -right-4 hidden h-40 w-40 rounded-full bg-teal-500/20 blur-2xl md:block" />
           </div>
         </div>
