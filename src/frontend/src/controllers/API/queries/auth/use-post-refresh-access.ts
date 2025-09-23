@@ -1,4 +1,5 @@
-import { mockClerkMutation ,IS_CLERK_AUTH } from "@/clerk/auth";
+import { mockClerkMutation } from "@/clerk/auth";
+import { IS_CLERK_AUTH } from "@/clerk/config";
 import { IS_AUTO_LOGIN, LANGFLOW_REFRESH_TOKEN } from "@/constants/constants";
 import useAuthStore from "@/stores/authStore";
 import { useMutationFunctionType } from "@/types/api";

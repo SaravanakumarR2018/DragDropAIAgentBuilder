@@ -9,7 +9,7 @@ import { CustomLoadingPage } from "@/customization/components/custom-loading-pag
 import { useCustomPrimaryLoading } from "@/customization/hooks/use-custom-primary-loading";
 import { useDarkStore } from "@/stores/darkStore";
 import useFlowsManagerStore from "@/stores/flowsManagerStore";
-import { IS_CLERK_AUTH } from "@/clerk/auth";
+import { IS_CLERK_AUTH } from "@/clerk/config";
 import { useOrganization } from "@clerk/clerk-react";
 import useAuthStore from "@/stores/authStore";
 
