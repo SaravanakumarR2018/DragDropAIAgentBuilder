@@ -1,8 +1,10 @@
 import { motion, AnimatePresence } from "framer-motion";
 import type { JSX, SVGProps } from "react";
 import VisualWorkflow from "../../assets/VisualWorkflow.png";
-import { useState } from "react";
-
+import { useEffect, useState } from "react";
+import { useCustomNavigate } from "@/customization/hooks/use-custom-navigate";
+import useAuthStore from "@/stores/authStore";
+import { IS_CLERK_AUTH } from "@/clerk/auth";
 
 function CheckIcon(props: SVGProps<SVGSVGElement>) {
   return (
@@ -25,6 +27,14 @@ function PlayIcon(props: SVGProps<SVGSVGElement>) {
 
 export default function Landing(): JSX.Element {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const navigate = useCustomNavigate();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate(IS_CLERK_AUTH ? "/organization" : "/flows", { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
   return (
     <div className="h-screen overflow-y-auto bg-[#0f1217] text-white">
       {/* Background accents */}
