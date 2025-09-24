@@ -746,7 +746,7 @@ def get_project_mcp_server(project_id: UUID) -> ProjectMCPServer:
 async def init_mcp_servers():
     """Initialize MCP servers for the default database and organisation databases."""
     try:
-        async with session_scope() as session:
+        async with session_scope(use_organisation=False) as session:
             projects = (await session.exec(select(Folder))).all()
 
             for project in projects:
