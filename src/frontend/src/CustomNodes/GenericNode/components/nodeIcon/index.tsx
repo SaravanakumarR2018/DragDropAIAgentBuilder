@@ -39,10 +39,7 @@ export function NodeIcon({
     return (
       <div className="flex h-4 w-4 items-center justify-center">
         {isLucideIcon ? (
-          // Lucide icons will now lazy-load only when needed
-          <Suspense fallback={<span className="text-lg">?</span>}>
-            <IconComponent strokeWidth={ICON_STROKE_WIDTH} name={iconName} />
-          </Suspense>
+          <IconComponent strokeWidth={ICON_STROKE_WIDTH} name={iconName} />
         ) : (
           <IconComponent name={iconName} iconColor={iconColor} />
         )}

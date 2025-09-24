@@ -48,8 +48,6 @@ export default defineConfig(({ mode }) => {
             reactflow: ["reactflow"],
             reactquery: ["@tanstack/react-query"],
             clerk: ["@clerk/clerk-react"],
-            // optional: group big ui libs/icons
-            lucide: ["lucide-react"],
           },
         },
       },
