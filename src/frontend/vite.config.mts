@@ -41,6 +41,18 @@ export default defineConfig(({ mode }) => {
     base: BASENAME || "",
     build: {
       outDir: "build",
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            // force-split heavy deps
+            reactflow: ["reactflow"],
+            reactquery: ["@tanstack/react-query"],
+            clerk: ["@clerk/clerk-react"],
+            // optional: group big ui libs/icons
+            lucide: ["lucide-react"],
+          },
+        },
+      },
     },
     define: {
       "process.env.BACKEND_URL": JSON.stringify(
