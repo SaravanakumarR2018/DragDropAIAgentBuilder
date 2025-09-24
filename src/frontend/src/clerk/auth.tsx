@@ -4,11 +4,10 @@ import { AuthContext } from "@/contexts/authContext";
 import { api } from "@/controllers/API/api";
 import { getURL } from "@/controllers/API/helpers/constants";
 import { useLogout as useLogoutMutation } from "@/controllers/API/queries/auth";
-import { ClerkProvider, useAuth, useClerk, useOrganization, useUser, SignedOut } from "@clerk/clerk-react";
+import { ClerkProvider, useAuth, useClerk, useOrganization} from "@clerk/clerk-react";
 import { Users } from "@/types/api";
-import { LANGFLOW_ACCESS_TOKEN, LANGFLOW_REFRESH_TOKEN } from "@/constants/constants";
+import { LANGFLOW_REFRESH_TOKEN } from "@/constants/constants";
 import { Cookies } from "react-cookie";
-import OrganizationPage from "./OrganizationPage";
 import authStore from "@/stores/authStore";
 
 export const IS_CLERK_AUTH =
