@@ -1,6 +1,5 @@
 import LangflowLogo from "@/assets/LangflowLogo.svg?react";
 import InputComponent from "@/components/core/parameterRenderComponent/components/inputComponent";
-import { useAddUser } from "@/controllers/API/queries/auth";
 import { CustomLink } from "@/customization/components/custom-link";
 import { useCustomNavigate } from "@/customization/hooks/use-custom-navigate";
 import { track } from "@/customization/utils/analytics";
@@ -19,6 +18,8 @@ import {
   inputHandlerEventType,
   signUpInputStateType,
 } from "../../types/components";
+import { api } from "@/controllers/API/api";
+import { getURL } from "@/controllers/API/helpers/constants";
 
 export default function SignUp(): JSX.Element {
   const [inputState, setInputState] =
@@ -30,8 +31,6 @@ export default function SignUp(): JSX.Element {
   const setSuccessData = useAlertStore((state) => state.setSuccessData);
   const setErrorData = useAlertStore((state) => state.setErrorData);
   const navigate = useCustomNavigate();
-
-  const { mutate: mutateAddUser } = useAddUser();
 
   function handleInput({
     target: { name, value },
@@ -53,26 +52,22 @@ export default function SignUp(): JSX.Element {
       password: password.trim(),
     };
 
-    mutateAddUser(newUser, {
-      onSuccess: (user) => {
-        track("User Signed Up", user);
+    api
+      .post(`${getURL("USERS")}/`, newUser)
+      .then((response) => {
+        track("User Signed Up", response.data);
         setSuccessData({
           title: SIGN_UP_SUCCESS,
         });
         navigate("/login");
-      },
-      onError: (error) => {
-        const {
-          response: {
-            data: { detail },
-          },
-        } = error;
+      })
+      .catch((error) => {
+        const detail = error?.response?.data?.detail ?? "Unable to sign up.";
         setErrorData({
           title: SIGNUP_ERROR_ALERT,
           list: [detail],
         });
-      },
-    });
+      });
   }
 
   return (

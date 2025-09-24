@@ -1,28 +1,39 @@
 import LangflowLogo from "@/assets/LangflowLogo.svg?react";
-import { useLoginUser } from "@/controllers/API/queries/auth";
 import { CustomLink } from "@/customization/components/custom-link";
 import * as Form from "@radix-ui/react-form";
-import { useContext, useState } from "react";
+import { useState, useCallback } from "react";
 import InputComponent from "../../components/core/parameterRenderComponent/components/inputComponent";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { SIGNIN_ERROR_ALERT } from "../../constants/alerts_constants";
 import { CONTROL_LOGIN_STATE } from "../../constants/constants";
-import { AuthContext } from "../../contexts/authContext";
 import useAlertStore from "../../stores/alertStore";
 import { LoginType } from "../../types/api";
 import {
   inputHandlerEventType,
   loginInputStateType,
 } from "../../types/components";
+import { api } from "@/controllers/API/api";
+import { getURL } from "@/controllers/API/helpers/constants";
+import { Cookies } from "react-cookie";
+import {
+  LANGFLOW_ACCESS_TOKEN,
+  LANGFLOW_AUTO_LOGIN_OPTION,
+  LANGFLOW_REFRESH_TOKEN,
+} from "@/constants/constants";
+import { setLocalStorage } from "@/utils/local-storage-util";
+import useAuthStore from "@/stores/authStore";
 
 export default function LoginPage(): JSX.Element {
   const [inputState, setInputState] =
     useState<loginInputStateType>(CONTROL_LOGIN_STATE);
 
   const { password, username } = inputState;
-  const { login } = useContext(AuthContext);
   const setErrorData = useAlertStore((state) => state.setErrorData);
+  const setIsAuthenticated = useAuthStore((state) => state.setIsAuthenticated);
+  const setAccessToken = useAuthStore((state) => state.setAccessToken);
+  const setAutoLogin = useAuthStore((state) => state.setAutoLogin);
+  const cookies = new Cookies();
 
   function handleInput({
     target: { name, value },
@@ -30,26 +41,50 @@ export default function LoginPage(): JSX.Element {
     setInputState((prev) => ({ ...prev, [name]: value }));
   }
 
-  const { mutate } = useLoginUser();
-
-  function signIn() {
+  const signIn = useCallback(async () => {
     const user: LoginType = {
       username: username.trim(),
       password: password.trim(),
     };
 
-    mutate(user, {
-      onSuccess: (data) => {
-        login(data.access_token, "login", data.refresh_token);
-      },
-      onError: (error) => {
-        setErrorData({
-          title: SIGNIN_ERROR_ALERT,
-          list: [error["response"]["data"]["detail"]],
+    try {
+      const response = await api.post(
+        `${getURL("LOGIN")}`,
+        new URLSearchParams({
+          username: user.username,
+          password: user.password,
+        }).toString(),
+        {
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+          },
+        },
+      );
+
+      const data = response.data;
+      cookies.set(LANGFLOW_ACCESS_TOKEN, data.access_token, { path: "/" });
+      cookies.set(LANGFLOW_AUTO_LOGIN_OPTION, "login", { path: "/" });
+
+      setLocalStorage(LANGFLOW_ACCESS_TOKEN, data.access_token);
+
+      if (data.refresh_token) {
+        cookies.set(LANGFLOW_REFRESH_TOKEN, data.refresh_token, {
+          path: "/",
         });
-      },
-    });
-  }
+      }
+
+      setAccessToken(data.access_token);
+      setIsAuthenticated(true);
+      setAutoLogin(false);
+    } catch (error: any) {
+      const detail =
+        error?.response?.data?.detail || "Failed to sign in. Please try again.";
+      setErrorData({
+        title: SIGNIN_ERROR_ALERT,
+        list: [detail],
+      });
+    }
+  }, [username, password, cookies, setErrorData, setAccessToken, setIsAuthenticated, setAutoLogin]);
 
   return (
     <Form.Root

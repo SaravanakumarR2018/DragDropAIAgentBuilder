@@ -10,6 +10,7 @@ import { ProtectedRoute } from "./components/authorization/authGuard";
 import { ProtectedLoginRoute } from "./components/authorization/authLoginGuard";
 import { AuthSettingsGuard } from "./components/authorization/authSettingsGuard";
 import ContextWrapper from "./contexts";
+import PublicLayout from "./contexts/PublicLayout";
 import { CustomNavigate } from "./customization/components/custom-navigate";
 import { BASENAME } from "./customization/config-constants";
 import {
@@ -74,6 +75,11 @@ const LoginAdminPage = lazy(() =>
     default: module.LoginAdminPage,
   })),
 );
+const PublicLandingPage = lazy(() =>
+  import("./pages/PublicLandingPage").then((module) => ({
+    default: module.PublicLandingPage,
+  })),
+);
 
 const AdminPage = lazy(() => import("./pages/AdminPage"));
 const DeleteAccountPage = lazy(() => import("./pages/DeleteAccountPage"));
@@ -90,6 +96,46 @@ const router = createBrowserRouter(
               <PlaygroundPage />
             </Suspense>
           </ContextWrapper>
+        }
+      />
+    </Route>,
+    <Route element={<PublicLayout />}>
+      <Route
+        path="/"
+        element={
+          <Suspense fallback={<LoadingPage />}>
+            <PublicLandingPage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/login"
+        element={
+          <Suspense fallback={<LoadingPage />}>
+            <ProtectedLoginRoute>
+              <LoginPage />
+            </ProtectedLoginRoute>
+          </Suspense>
+        }
+      />
+      <Route
+        path="/signup"
+        element={
+          <Suspense fallback={<LoadingPage />}>
+            <ProtectedLoginRoute>
+              <SignUp />
+            </ProtectedLoginRoute>
+          </Suspense>
+        }
+      />
+      <Route
+        path="/login/admin"
+        element={
+          <Suspense fallback={<LoadingPage />}>
+            <ProtectedLoginRoute>
+              <LoginAdminPage />
+            </ProtectedLoginRoute>
+          </Suspense>
         }
       />
     </Route>,
@@ -336,41 +382,11 @@ const router = createBrowserRouter(
           </Route>
         </Route>
         <Route
-          path="login"
-          element={
-            <Suspense fallback={<LoadingPage />}>
-              <ProtectedLoginRoute>
-                <LoginPage />
-              </ProtectedLoginRoute>
-            </Suspense>
-          }
-        />
-        <Route
           path="organization"
           element={
             <Suspense fallback={<LoadingPage />}>
               <ProtectedLoginRoute>
                 <OrganizationPage />
-              </ProtectedLoginRoute>
-            </Suspense>
-          }
-        />
-        <Route
-          path="signup"
-          element={
-            <Suspense fallback={<LoadingPage />}>
-              <ProtectedLoginRoute>
-                <SignUp />
-              </ProtectedLoginRoute>
-            </Suspense>
-          }
-        />
-        <Route
-          path="login/admin"
-          element={
-            <Suspense fallback={<LoadingPage />}>
-              <ProtectedLoginRoute>
-                <LoginAdminPage />
               </ProtectedLoginRoute>
             </Suspense>
           }
