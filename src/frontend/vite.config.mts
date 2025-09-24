@@ -44,9 +44,7 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks: {
-            // force-split heavy deps
-            reactflow: ["reactflow"],
-            reactquery: ["@tanstack/react-query"],
+            react: ["react", "react-dom"],
             clerk: ["@clerk/clerk-react"],
           },
         },
