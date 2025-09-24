@@ -10,7 +10,7 @@ import "./style/applies.css";
 
 // @ts-ignore
 
-import AppWithProvider from "./clerk/auth";
+import AppWithProvider from "./clerk/entryauth";
 import CustomApp from "./customization/custom-App";
 
 const root = ReactDOM.createRoot(
