@@ -14,7 +14,7 @@ import { LoadingPage } from "./pages/LoadingPage";
 import { BASENAME } from "./customization/config-constants";
 import { CustomNavigate } from "./customization/components/custom-navigate";
 import ContextWrapper from "./contexts";
-import { IS_CLERK_AUTH } from "./clerk/auth";
+import { IS_CLERK_AUTH } from "./clerk/entryauth";
 
 // ✅ Lightweight shell for public routes (no ContextWrapper, no heavy deps)
 function PublicShell() {
