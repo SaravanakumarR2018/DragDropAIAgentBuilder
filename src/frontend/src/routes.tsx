@@ -21,6 +21,13 @@ import { CustomRoutesStorePages } from "./customization/utils/custom-routes-stor
 import { IS_CLERK_AUTH } from "./clerk/auth";
 import { LoadingPage } from "./pages/LoadingPage";
 
+// Public Shell for lightweight public pages
+const PublicShell = () => (
+  <Suspense fallback={<LoadingPage />}>
+    <Outlet />
+  </Suspense>
+);
+
 const AppWrapperPage = lazy(() =>
   import("./pages/AppWrapperPage").then((module) => ({
     default: module.AppWrapperPage,
@@ -80,67 +87,72 @@ const DeleteAccountPage = lazy(() => import("./pages/DeleteAccountPage"));
 const PlaygroundPage = lazy(() => import("./pages/Playground"));
 
 const router = createBrowserRouter(
-  createRoutesFromElements([
-    <Route path="/playground/:id/">
+  createRoutesFromElements(
+    <Route>
+      {/* Public Routes */}
+      <Route element={<PublicShell />}>
+        <Route
+          path="/login"
+          element={
+            <ProtectedLoginRoute>
+              <LoginPage />
+            </ProtectedLoginRoute>
+          }
+        />
+        <Route
+          path="/signup"
+          element={
+            <ProtectedLoginRoute>
+              <SignUp />
+            </ProtectedLoginRoute>
+          }
+        />
+        <Route
+          path="/login/admin"
+          element={
+            <ProtectedLoginRoute>
+              <LoginAdminPage />
+            </ProtectedLoginRoute>
+          }
+        />
+        <Route path="/playground/:id/" element={<PlaygroundPage />} />
+      </Route>
+
+      {/* Authenticated Routes */}
       <Route
-        path=""
+        path={ENABLE_CUSTOM_PARAM ? "/:customParam?" : "/"}
         element={
-          <ContextWrapper key={1}>
+          <ContextWrapper>
             <Suspense fallback={<LoadingPage />}>
-              <PlaygroundPage />
+              <AppWrapperPage />
             </Suspense>
           </ContextWrapper>
-        }
-      />
-    </Route>,
-    <Route
-      path={ENABLE_CUSTOM_PARAM ? "/:customParam?" : "/"}
-      element={
-        <ContextWrapper key={2}>
-          <Outlet />
-        </ContextWrapper>
-      }
-    >
-      <Route
-        path=""
-        element={
-          <Suspense fallback={<LoadingPage />}>
-            <AppWrapperPage />
-          </Suspense>
         }
       >
         <Route
           path=""
           element={
-            <Suspense fallback={<LoadingPage />}>
-              <ProtectedRoute>
-                <AppInitPage />
-              </ProtectedRoute>
-            </Suspense>
+            <ProtectedRoute>
+              <AppInitPage />
+            </ProtectedRoute>
           }
         >
           <Route
             path=""
             element={
-              <Suspense fallback={<LoadingPage />}>
-                <AppAuthenticatedPage />
-              </Suspense>
+              <AppAuthenticatedPage />
             }
           >
             <Route
               path=""
               element={
-                <Suspense fallback={<LoadingPage />}>
-                  <CustomDashboardWrapperPage />
-                </Suspense>
+                <CustomDashboardWrapperPage />
               }
             >
               <Route
                 path=""
                 element={
-                  <Suspense fallback={<LoadingPage />}>
-                    <CollectionPage />
-                  </Suspense>
+                  <CollectionPage />
                 }
               >
                 <Route
@@ -157,68 +169,52 @@ const router = createBrowserRouter(
                   <Route
                     path="files"
                     element={
-                      <Suspense fallback={<LoadingPage />}>
-                        <FilesPage />
-                      </Suspense>
+                      <FilesPage />
                     }
                   />
                 )}
                 <Route
                   path="flows/"
                   element={
-                    <Suspense fallback={<LoadingPage />}>
-                      <HomePage key="flows" type="flows" />
-                    </Suspense>
+                    <HomePage key="flows" type="flows" />
                   }
                 />
                 <Route
                   path="components/"
                   element={
-                    <Suspense fallback={<LoadingPage />}>
-                      <HomePage key="components" type="components" />
-                    </Suspense>
+                    <HomePage key="components" type="components" />
                   }
                 >
                   <Route
                     path="folder/:folderId"
                     element={
-                      <Suspense fallback={<LoadingPage />}>
-                        <HomePage key="components" type="components" />
-                      </Suspense>
+                      <HomePage key="components" type="components" />
                     }
                   />
                 </Route>
                 <Route
                   path="all/"
                   element={
-                    <Suspense fallback={<LoadingPage />}>
-                      <HomePage key="flows" type="flows" />
-                    </Suspense>
+                    <HomePage key="flows" type="flows" />
                   }
                 >
                   <Route
                     path="folder/:folderId"
                     element={
-                      <Suspense fallback={<LoadingPage />}>
-                        <HomePage key="flows" type="flows" />
-                      </Suspense>
+                      <HomePage key="flows" type="flows" />
                     }
                   />
                 </Route>
                 <Route
                   path="mcp/"
                   element={
-                    <Suspense fallback={<LoadingPage />}>
-                      <HomePage key="mcp" type="mcp" />
-                    </Suspense>
+                    <HomePage key="mcp" type="mcp" />
                   }
                 >
                   <Route
                     path="folder/:folderId"
                     element={
-                      <Suspense fallback={<LoadingPage />}>
-                        <HomePage key="mcp" type="mcp" />
-                      </Suspense>
+                      <HomePage key="mcp" type="mcp" />
                     }
                   />
                 </Route>
@@ -226,52 +222,40 @@ const router = createBrowserRouter(
               <Route
                 path="settings"
                 element={
-                  <Suspense fallback={<LoadingPage />}>
-                    <SettingsPage />
-                  </Suspense>
+                  <SettingsPage />
                 }
               >
                 <Route index element={<CustomNavigate replace to="general" />} />
                 <Route
                   path="global-variables"
                   element={
-                    <Suspense fallback={<LoadingPage />}>
-                      <GlobalVariablesPage />
-                    </Suspense>
+                    <GlobalVariablesPage />
                   }
                 />
                 <Route
                   path="api-keys"
                   element={
-                    <Suspense fallback={<LoadingPage />}>
-                      <ApiKeysPage />
-                    </Suspense>
+                    <ApiKeysPage />
                   }
                 />
                 <Route
                   path="general/:scrollId?"
                   element={
-                    <Suspense fallback={<LoadingPage />}>
-                      <AuthSettingsGuard>
-                        <GeneralPage />
-                      </AuthSettingsGuard>
-                    </Suspense>
+                    <AuthSettingsGuard>
+                      <GeneralPage />
+                    </AuthSettingsGuard>
                   }
                 />
                 <Route
                   path="shortcuts"
                   element={
-                    <Suspense fallback={<LoadingPage />}>
-                      <ShortcutsPage />
-                    </Suspense>
+                    <ShortcutsPage />
                   }
                 />
                 <Route
                   path="messages"
                   element={
-                    <Suspense fallback={<LoadingPage />}>
-                      <MessagesPage />
-                    </Suspense>
+                    <MessagesPage />
                   }
                 />
                 {CustomRoutesStore()}
@@ -281,20 +265,16 @@ const router = createBrowserRouter(
                 <Route
                   path="delete"
                   element={
-                    <Suspense fallback={<LoadingPage />}>
-                      <DeleteAccountPage />
-                    </Suspense>
+                    <DeleteAccountPage />
                   }
                 />
               </Route>
               <Route
                 path="admin"
                 element={
-                  <Suspense fallback={<LoadingPage />}>
-                    <ProtectedAdminRoute>
-                      <AdminPage />
-                    </ProtectedAdminRoute>
-                  </Suspense>
+                  <ProtectedAdminRoute>
+                    <AdminPage />
+                  </ProtectedAdminRoute>
                 }
               />
             </Route>
@@ -302,83 +282,43 @@ const router = createBrowserRouter(
               <Route
                 path=""
                 element={
-                  <Suspense fallback={<LoadingPage />}>
-                    <CustomDashboardWrapperPage />
-                  </Suspense>
+                  <CustomDashboardWrapperPage />
                 }
               >
                 <Route
                   path="folder/:folderId/"
                   element={
-                    <Suspense fallback={<LoadingPage />}>
-                      <FlowPage />
-                    </Suspense>
+                    <FlowPage />
                   }
                 />
                 <Route
                   path=""
                   element={
-                    <Suspense fallback={<LoadingPage />}>
-                      <FlowPage />
-                    </Suspense>
+                    <FlowPage />
                   }
                 />
               </Route>
               <Route
                 path="view"
                 element={
-                  <Suspense fallback={<LoadingPage />}>
-                    <ViewPage />
-                  </Suspense>
+                  <ViewPage />
                 }
               />
             </Route>
           </Route>
         </Route>
         <Route
-          path="login"
-          element={
-            <Suspense fallback={<LoadingPage />}>
-              <ProtectedLoginRoute>
-                <LoginPage />
-              </ProtectedLoginRoute>
-            </Suspense>
-          }
-        />
-        <Route
           path="organization"
           element={
-            <Suspense fallback={<LoadingPage />}>
-              <ProtectedLoginRoute>
-                <OrganizationPage />
-              </ProtectedLoginRoute>
-            </Suspense>
-          }
-        />
-        <Route
-          path="signup"
-          element={
-            <Suspense fallback={<LoadingPage />}>
-              <ProtectedLoginRoute>
-                <SignUp />
-              </ProtectedLoginRoute>
-            </Suspense>
-          }
-        />
-        <Route
-          path="login/admin"
-          element={
-            <Suspense fallback={<LoadingPage />}>
-              <ProtectedLoginRoute>
-                <LoginAdminPage />
-              </ProtectedLoginRoute>
-            </Suspense>
+            <ProtectedLoginRoute>
+              <OrganizationPage />
+            </ProtectedLoginRoute>
           }
         />
       </Route>
       <Route path="*" element={<CustomNavigate replace to="/" />} />
-    </Route>,
-  ]),
+    </Route>
+  ),
   { basename: BASENAME || undefined },
 );
 
