@@ -1,7 +1,7 @@
 import { useTypesStore } from "@/stores/typesStore";
 import { iconExists, nodeColors } from "@/utils/styleUtils";
 import emojiRegex from "emoji-regex";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense, lazy } from "react";
 
 import { ICON_STROKE_WIDTH } from "@/constants/constants";
 import { checkLucideIcons } from "@/CustomNodes/helpers/check-lucide-icons";
@@ -39,7 +39,10 @@ export function NodeIcon({
     return (
       <div className="flex h-4 w-4 items-center justify-center">
         {isLucideIcon ? (
-          <IconComponent strokeWidth={ICON_STROKE_WIDTH} name={iconName} />
+          // Lucide icons will now lazy-load only when needed
+          <Suspense fallback={<span className="text-lg">?</span>}>
+            <IconComponent strokeWidth={ICON_STROKE_WIDTH} name={iconName} />
+          </Suspense>
         ) : (
           <IconComponent name={iconName} iconColor={iconColor} />
         )}
