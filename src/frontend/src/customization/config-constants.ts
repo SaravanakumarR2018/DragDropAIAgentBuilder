@@ -5,7 +5,6 @@ export const API_ROUTES = ["^/api/v1/", "^/api/v2/", "/health"];
 export const BASE_URL_API = "/api/v1/";
 export const BASE_URL_API_V2 = "/api/v2/";
 export const HEALTH_CHECK_URL = "/health_check";
-export const ENABLE_CLIENT_HEALTH_CHECK = false;
 export const DOCS_LINK = "https://docs.langflow.org";
 
 export default {
@@ -17,5 +16,4 @@ export default {
   BASE_URL_API,
   BASE_URL_API_V2,
   HEALTH_CHECK_URL,
-  ENABLE_CLIENT_HEALTH_CHECK,
 };
