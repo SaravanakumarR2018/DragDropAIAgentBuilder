@@ -2,7 +2,10 @@ import {
   REFETCH_SERVER_HEALTH_INTERVAL,
   SERVER_HEALTH_INTERVAL,
 } from "@/constants/constants";
-import { HEALTH_CHECK_URL } from "@/customization/config-constants";
+import {
+  ENABLE_CLIENT_HEALTH_CHECK,
+  HEALTH_CHECK_URL,
+} from "@/customization/config-constants";
 import { useUtilityStore } from "@/stores/utilityStore";
 import { createNewError503 } from "@/types/factory/axios-error-503";
 import { keepPreviousData } from "@tanstack/react-query";
@@ -40,6 +43,17 @@ export const useGetHealthQuery: useQueryFunctionType<
    * @returns {Promise<AxiosResponse<TransactionsResponse>>} A promise that resolves to an AxiosResponse containing the health status.
    */
   async function getHealthFn() {
+    if (!ENABLE_CLIENT_HEALTH_CHECK) {
+      setHealthCheckTimeout(null);
+      return {
+        status: "ok",
+        chat: "ok",
+        db: "ok",
+        folder: "ok",
+        variables: "ok",
+      } satisfies getHealthResponse;
+    }
+
     try {
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(createNewError503()), SERVER_HEALTH_INTERVAL),
