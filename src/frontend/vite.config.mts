@@ -41,14 +41,6 @@ export default defineConfig(({ mode }) => {
     base: BASENAME || "",
     build: {
       outDir: "build",
-      rollupOptions: {
-        output: {
-          manualChunks: {
-            react: ["react", "react-dom"],
-            clerk: ["@clerk/clerk-react"],
-          },
-        },
-      },
     },
     define: {
       "process.env.BACKEND_URL": JSON.stringify(
