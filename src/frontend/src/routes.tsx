@@ -1,4 +1,4 @@
-import { Suspense, lazy } from "react";
+import { lazy, Suspense } from "react";
 import {
   createBrowserRouter,
   createRoutesFromElements,
@@ -18,7 +18,6 @@ import {
 } from "./customization/feature-flags";
 import { CustomRoutesStore } from "./customization/utils/custom-routes-store";
 import { CustomRoutesStorePages } from "./customization/utils/custom-routes-store-pages";
-import { IS_CLERK_AUTH } from "./clerk/auth";
 import { LoadingPage } from "./pages/LoadingPage";
 
 const AppWrapperPage = lazy(() =>
@@ -47,7 +46,9 @@ const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const GlobalVariablesPage = lazy(
   () => import("./pages/SettingsPage/pages/GlobalVariablesPage"),
 );
-const ApiKeysPage = lazy(() => import("./pages/SettingsPage/pages/ApiKeysPage"));
+const ApiKeysPage = lazy(
+  () => import("./pages/SettingsPage/pages/ApiKeysPage"),
+);
 const GeneralPage = lazy(
   () => import("./pages/SettingsPage/pages/GeneralPage"),
 );
@@ -143,16 +144,7 @@ const router = createBrowserRouter(
                   </Suspense>
                 }
               >
-                <Route
-                  index
-                  element={
-                    IS_CLERK_AUTH ? (
-                      <CustomNavigate replace to="/organization" />
-                    ) : (
-                      <CustomNavigate replace to="flows" />
-                    )
-                  }
-                />
+                <Route index element={<CustomNavigate replace to="flows" />} />
                 {ENABLE_FILE_MANAGEMENT && (
                   <Route
                     path="files"
@@ -231,7 +223,10 @@ const router = createBrowserRouter(
                   </Suspense>
                 }
               >
-                <Route index element={<CustomNavigate replace to="general" />} />
+                <Route
+                  index
+                  element={<CustomNavigate replace to="general" />}
+                />
                 <Route
                   path="global-variables"
                   element={
