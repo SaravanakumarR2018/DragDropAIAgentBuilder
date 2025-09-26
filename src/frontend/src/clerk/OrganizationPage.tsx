@@ -27,9 +27,8 @@ export default function OrganizationSwitcherPage() {
   const [isBootstrapping, setIsBootstrapping] = useState(false);
 
   useEffect(() => {
-    if (!organization?.id || !isOrgSelectedManually || bootstrapped.current) {
+    if (!organization?.id || !isOrgSelectedManually || bootstrapped.current)
       return;
-    }
 
     bootstrapped.current = true;
     setIsBootstrapping(true);

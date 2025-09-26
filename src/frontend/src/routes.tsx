@@ -5,7 +5,6 @@ import {
   Outlet,
   Route,
 } from "react-router-dom";
-import { IS_CLERK_AUTH } from "./clerk/auth";
 import { ProtectedAdminRoute } from "./components/authorization/authAdminGuard";
 import { ProtectedRoute } from "./components/authorization/authGuard";
 import { ProtectedLoginRoute } from "./components/authorization/authLoginGuard";
@@ -20,7 +19,7 @@ import {
 import { CustomRoutesStore } from "./customization/utils/custom-routes-store";
 import { CustomRoutesStorePages } from "./customization/utils/custom-routes-store-pages";
 import { LoadingPage } from "./pages/LoadingPage";
-import authStore from "./stores/authStore";
+import { CollectionIndexRedirect } from "./routes/CollectionIndexRedirect";
 
 const AppWrapperPage = lazy(() =>
   import("./pages/AppWrapperPage").then((module) => ({
@@ -81,28 +80,6 @@ const LoginAdminPage = lazy(() =>
 const AdminPage = lazy(() => import("./pages/AdminPage"));
 const DeleteAccountPage = lazy(() => import("./pages/DeleteAccountPage"));
 const PlaygroundPage = lazy(() => import("./pages/Playground"));
-
-const isOrganizationSelected = () => {
-  if (authStore.getState().isOrgSelected) {
-    return true;
-  }
-
-  if (typeof window !== "undefined") {
-    return sessionStorage.getItem("isOrgSelected") === "true";
-  }
-
-  return false;
-};
-
-const CollectionIndexRedirect = () => {
-  const { isAuthenticated } = authStore.getState();
-
-  if (IS_CLERK_AUTH && isAuthenticated && !isOrganizationSelected()) {
-    return <CustomNavigate replace to="/organization" />;
-  }
-
-  return <CustomNavigate replace to="flows" />;
-};
 
 const router = createBrowserRouter(
   createRoutesFromElements([
