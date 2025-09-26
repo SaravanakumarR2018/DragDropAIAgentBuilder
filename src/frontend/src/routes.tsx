@@ -1,4 +1,4 @@
-import { Suspense, lazy } from "react";
+import { ReactElement,Suspense, lazy } from "react";
 import {
   createBrowserRouter,
   createRoutesFromElements,
@@ -18,8 +18,26 @@ import {
 } from "./customization/feature-flags";
 import { CustomRoutesStore } from "./customization/utils/custom-routes-store";
 import { CustomRoutesStorePages } from "./customization/utils/custom-routes-store-pages";
-import { IS_CLERK_AUTH } from "./clerk/auth";
+import { IS_CLERK_AUTH } from "./clerk/config";
 import { LoadingPage } from "./pages/LoadingPage";
+
+const ClerkRoot = lazy(() =>
+  import("./clerk/ClerkRoot").then((module) => ({
+    default: module.ClerkRoot,
+  })),
+);
+
+function withClerk(element: ReactElement) {
+  if (!IS_CLERK_AUTH) {
+    return element;
+  }
+
+  return (
+    <Suspense fallback={<LoadingPage />}>
+      <ClerkRoot>{element}</ClerkRoot>
+    </Suspense>
+  );
+}
 
 const AppWrapperPage = lazy(() =>
   import("./pages/AppWrapperPage").then((module) => ({
@@ -111,13 +129,13 @@ const router = createBrowserRouter(
       >
         <Route
           path=""
-          element={
+          element={withClerk(
             <Suspense fallback={<LoadingPage />}>
               <ProtectedRoute>
                 <AppInitPage />
               </ProtectedRoute>
-            </Suspense>
-          }
+            </Suspense>,
+      )}
         >
           <Route
             path=""
@@ -337,43 +355,43 @@ const router = createBrowserRouter(
         </Route>
         <Route
           path="login"
-          element={
+          element={withClerk(
             <Suspense fallback={<LoadingPage />}>
               <ProtectedLoginRoute>
                 <LoginPage />
               </ProtectedLoginRoute>
-            </Suspense>
-          }
+            </Suspense>,
+  )}
         />
         <Route
           path="organization"
-          element={
+          element={withClerk(
             <Suspense fallback={<LoadingPage />}>
               <ProtectedLoginRoute>
                 <OrganizationPage />
               </ProtectedLoginRoute>
-            </Suspense>
-          }
+            </Suspense>,
+  )}
         />
         <Route
           path="signup"
-          element={
+          element={withClerk(
             <Suspense fallback={<LoadingPage />}>
               <ProtectedLoginRoute>
                 <SignUp />
               </ProtectedLoginRoute>
-            </Suspense>
-          }
+            </Suspense>,
+          )}
         />
         <Route
           path="login/admin"
-          element={
+          element={withClerk( 
             <Suspense fallback={<LoadingPage />}>
               <ProtectedLoginRoute>
                 <LoginAdminPage />
               </ProtectedLoginRoute>
-            </Suspense>
-          }
+            </Suspense>,
+          )}
         />
       </Route>
       <Route path="*" element={<CustomNavigate replace to="/" />} />

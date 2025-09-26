@@ -2,7 +2,8 @@ import {
   REFETCH_SERVER_HEALTH_INTERVAL,
   SERVER_HEALTH_INTERVAL,
 } from "@/constants/constants";
-import { IS_CLERK_AUTH, getClerkHealthResponse } from "@/clerk/auth";
+import { getClerkHealthResponse } from "@/clerk/auth";
+import { IS_CLERK_AUTH } from "@/clerk/config";
 import { HEALTH_CHECK_URL } from "@/customization/config-constants";
 import { useUtilityStore } from "@/stores/utilityStore";
 import { createNewError503 } from "@/types/factory/axios-error-503";

@@ -1,21 +1,18 @@
-import { lazy, ReactNode, useContext, useEffect, useRef } from "react";
+import { useContext, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AuthContext } from "@/contexts/authContext";
 import { api } from "@/controllers/API/api";
 import { getURL } from "@/controllers/API/helpers/constants";
 import { useLogout as useLogoutMutation } from "@/controllers/API/queries/auth";
-import { ClerkProvider, useAuth, useClerk, useOrganization, useUser, SignedOut } from "@clerk/clerk-react";
+import { useAuth, useClerk, useOrganization } from "@clerk/clerk-react";
 import { Users } from "@/types/api";
 import { LANGFLOW_ACCESS_TOKEN, LANGFLOW_REFRESH_TOKEN } from "@/constants/constants";
 import { Cookies } from "react-cookie";
-import OrganizationPage from "./OrganizationPage";
+
 import authStore from "@/stores/authStore";
+import { CLERK_DUMMY_PASSWORD, IS_CLERK_AUTH } from "./config"
 
-export const IS_CLERK_AUTH =
-  String(import.meta.env.VITE_CLERK_AUTH_ENABLED).toLowerCase() === "true";
 
-export const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || "";
-export const CLERK_DUMMY_PASSWORD = "clerk_dummy_password";
 
 export function getClerkHealthResponse(
   setHealthCheckTimeout: (timeout: string | null) => void,
@@ -170,14 +167,7 @@ export function ClerkAuthAdapter() {
   return null;
 }
 
-// Provider that wraps the app with Clerk when enabled
-export function ClerkAuthProvider({ children }: { children: ReactNode }) {
-  return (
-    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
-      {children}
-    </ClerkProvider>
-  );
-}
+
 
 // Logout hook that also signs out from Clerk
 export function useLogout(options?: Parameters<typeof useLogoutMutation>[0]) {
@@ -212,19 +202,7 @@ export function useLogout(options?: Parameters<typeof useLogoutMutation>[0]) {
   return { mutate: wrappedMutate, mutateAsync: wrappedMutateAsync, clerkSignOut, ...rest };
 }
 
-// App wrapper that conditionally enables Clerk
-//const LazyApp = lazy(() => import("../customization/custom-App"));
 
-export default function AppWithProvider({ children }: { children: ReactNode })  {
-  return IS_CLERK_AUTH ? (
-    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
-      {children}
-    </ClerkProvider>
-  ) : (
-      <>{children}</>
-  );
-  
-}
 
 // Mock mutation used when Clerk auth is enabled
 export const mockClerkMutation = {

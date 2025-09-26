@@ -1,7 +1,7 @@
 import { SignIn, SignUp as ClerkSignUp, useAuth, useUser , useClerk, SignedOut} from "@clerk/clerk-react";
 import { lazy, useEffect, useState } from "react";
 import { useLogout } from "./auth";
-import { IS_CLERK_AUTH } from "@/clerk/auth";
+import { IS_CLERK_AUTH } from "@/clerk/config";
 // Clerk login page component
 export function ClerkLoginPage() {
   const { isSignedIn } = useAuth();

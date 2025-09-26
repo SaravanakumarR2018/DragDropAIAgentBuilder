@@ -17,7 +17,7 @@ const useAuthStore = create<AuthStoreType>((set, get) => ({
     try {
       // Dynamically import IS_CLERK_AUTH to avoid circular deps
       // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { IS_CLERK_AUTH } = require("@/clerk/auth");
+      const { IS_CLERK_AUTH } = require("@/clerk/config");
       return IS_CLERK_AUTH ? false : undefined;
     } catch {
       return undefined;

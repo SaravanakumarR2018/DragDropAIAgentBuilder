@@ -1,7 +1,7 @@
 import { CustomNavigate } from "@/customization/components/custom-navigate";
 import useAuthStore from "@/stores/authStore";
 import { useOrganization } from "@clerk/clerk-react";
-import { IS_CLERK_AUTH } from "@/clerk/auth";
+import { IS_CLERK_AUTH } from "@/clerk/config";
 import { useLocation } from "react-router-dom";
 
 export const ProtectedLoginRoute = ({ children }) => {
