@@ -2,22 +2,21 @@ import { IS_CLERK_AUTH } from "@/clerk/auth";
 import { CustomNavigate } from "@/customization/components/custom-navigate";
 import authStore from "@/stores/authStore";
 
-const isOrganizationSelected = () => {
-  if (authStore.getState().isOrgSelected) {
-    return true;
-  }
-
-  if (typeof window !== "undefined") {
-    return sessionStorage.getItem("isOrgSelected") === "true";
-  }
-
-  return false;
-};
+const hasSelectedOrganization = () =>
+  typeof window !== "undefined" &&
+  sessionStorage.getItem("isOrgSelected") === "true";
 
 export function CollectionIndexRedirect() {
-  const { isAuthenticated } = authStore.getState();
+  const { isAuthenticated, isOrgSelected } = authStore((state) => ({
+    isAuthenticated: state.isAuthenticated,
+    isOrgSelected: state.isOrgSelected,
+  }));
 
-  if (IS_CLERK_AUTH && isAuthenticated && !isOrganizationSelected()) {
+  const organizationChosen =
+    Boolean(isOrgSelected) ||
+    (IS_CLERK_AUTH && hasSelectedOrganization());
+
+  if (IS_CLERK_AUTH && isAuthenticated && !organizationChosen) {
     return <CustomNavigate replace to="/organization" />;
   }
 

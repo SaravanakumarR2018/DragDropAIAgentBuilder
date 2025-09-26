@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { Suspense, lazy } from "react";
 import {
   createBrowserRouter,
   createRoutesFromElements,
@@ -47,9 +47,7 @@ const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const GlobalVariablesPage = lazy(
   () => import("./pages/SettingsPage/pages/GlobalVariablesPage"),
 );
-const ApiKeysPage = lazy(
-  () => import("./pages/SettingsPage/pages/ApiKeysPage"),
-);
+const ApiKeysPage = lazy(() => import("./pages/SettingsPage/pages/ApiKeysPage"));
 const GeneralPage = lazy(
   () => import("./pages/SettingsPage/pages/GeneralPage"),
 );
@@ -224,10 +222,7 @@ const router = createBrowserRouter(
                   </Suspense>
                 }
               >
-                <Route
-                  index
-                  element={<CustomNavigate replace to="general" />}
-                />
+                <Route index element={<CustomNavigate replace to="general" />} />
                 <Route
                   path="global-variables"
                   element={
