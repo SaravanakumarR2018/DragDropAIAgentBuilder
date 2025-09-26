@@ -1,10 +1,11 @@
-import { Suspense, lazy } from "react";
+import { lazy, Suspense } from "react";
 import {
   createBrowserRouter,
   createRoutesFromElements,
   Outlet,
   Route,
 } from "react-router-dom";
+import { IS_CLERK_AUTH } from "./clerk/auth";
 import { ProtectedAdminRoute } from "./components/authorization/authAdminGuard";
 import { ProtectedRoute } from "./components/authorization/authGuard";
 import { ProtectedLoginRoute } from "./components/authorization/authLoginGuard";
@@ -18,8 +19,8 @@ import {
 } from "./customization/feature-flags";
 import { CustomRoutesStore } from "./customization/utils/custom-routes-store";
 import { CustomRoutesStorePages } from "./customization/utils/custom-routes-store-pages";
-import { IS_CLERK_AUTH } from "./clerk/auth";
 import { LoadingPage } from "./pages/LoadingPage";
+import authStore from "./stores/authStore";
 
 const AppWrapperPage = lazy(() =>
   import("./pages/AppWrapperPage").then((module) => ({
@@ -47,7 +48,9 @@ const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const GlobalVariablesPage = lazy(
   () => import("./pages/SettingsPage/pages/GlobalVariablesPage"),
 );
-const ApiKeysPage = lazy(() => import("./pages/SettingsPage/pages/ApiKeysPage"));
+const ApiKeysPage = lazy(
+  () => import("./pages/SettingsPage/pages/ApiKeysPage"),
+);
 const GeneralPage = lazy(
   () => import("./pages/SettingsPage/pages/GeneralPage"),
 );
@@ -78,6 +81,28 @@ const LoginAdminPage = lazy(() =>
 const AdminPage = lazy(() => import("./pages/AdminPage"));
 const DeleteAccountPage = lazy(() => import("./pages/DeleteAccountPage"));
 const PlaygroundPage = lazy(() => import("./pages/Playground"));
+
+const isOrganizationSelected = () => {
+  if (authStore.getState().isOrgSelected) {
+    return true;
+  }
+
+  if (typeof window !== "undefined") {
+    return sessionStorage.getItem("isOrgSelected") === "true";
+  }
+
+  return false;
+};
+
+const CollectionIndexRedirect = () => {
+  const { isAuthenticated } = authStore.getState();
+
+  if (IS_CLERK_AUTH && isAuthenticated && !isOrganizationSelected()) {
+    return <CustomNavigate replace to="/organization" />;
+  }
+
+  return <CustomNavigate replace to="flows" />;
+};
 
 const router = createBrowserRouter(
   createRoutesFromElements([
@@ -143,16 +168,7 @@ const router = createBrowserRouter(
                   </Suspense>
                 }
               >
-                <Route
-                  index
-                  element={
-                    IS_CLERK_AUTH ? (
-                      <CustomNavigate replace to="/organization" />
-                    ) : (
-                      <CustomNavigate replace to="flows" />
-                    )
-                  }
-                />
+                <Route index element={<CollectionIndexRedirect />} />
                 {ENABLE_FILE_MANAGEMENT && (
                   <Route
                     path="files"
@@ -231,7 +247,10 @@ const router = createBrowserRouter(
                   </Suspense>
                 }
               >
-                <Route index element={<CustomNavigate replace to="general" />} />
+                <Route
+                  index
+                  element={<CustomNavigate replace to="general" />}
+                />
                 <Route
                   path="global-variables"
                   element={
