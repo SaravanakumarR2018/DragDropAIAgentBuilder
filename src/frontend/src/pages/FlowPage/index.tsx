@@ -8,12 +8,18 @@ import { SaveChangesModal } from "@/modals/saveChangesModal";
 import useAlertStore from "@/stores/alertStore";
 import { useTypesStore } from "@/stores/typesStore";
 import { customStringify } from "@/utils/reactflowUtils";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { useBlocker, useParams } from "react-router-dom";
 import useFlowStore from "../../stores/flowStore";
 import useFlowsManagerStore from "../../stores/flowsManagerStore";
-import Page from "./components/PageComponent";
-import { FlowSidebarComponent } from "./components/flowSidebarComponent";
+import { LoadingPage } from "@/pages/LoadingPage";
+
+const Page = lazy(() => import("./components/PageComponent"));
+
+const FlowSidebarComponent = lazy(async () => {
+  const module = await import("./components/flowSidebarComponent");
+  return { default: module.FlowSidebarComponent };
+});
 
 export default function FlowPage({ view }: { view?: boolean }): JSX.Element {
   const types = useTypesStore((state) => state.types);
@@ -158,16 +164,18 @@ export default function FlowPage({ view }: { view?: boolean }): JSX.Element {
     <>
       <div className="flow-page-positioning">
         {currentFlow && (
-          <div className="flex h-full overflow-hidden">
-            <SidebarProvider width="17.5rem" defaultOpen={!isMobile}>
-              {!view && <FlowSidebarComponent isLoading={isLoading} />}
-              <main className="flex w-full overflow-hidden">
-                <div className="h-full w-full">
-                  <Page setIsLoading={setIsLoading} />
-                </div>
-              </main>
-            </SidebarProvider>
-          </div>
+          <Suspense fallback={<LoadingPage />}>
+            <div className="flex h-full overflow-hidden">
+              <SidebarProvider width="17.5rem" defaultOpen={!isMobile}>
+                {!view && <FlowSidebarComponent isLoading={isLoading} />}
+                <main className="flex w-full overflow-hidden">
+                  <div className="h-full w-full">
+                    <Page setIsLoading={setIsLoading} />
+                  </div>
+                </main>
+              </SidebarProvider>
+            </div>
+          </Suspense>
         )}
       </div>
       {blocker.state === "blocked" && (
