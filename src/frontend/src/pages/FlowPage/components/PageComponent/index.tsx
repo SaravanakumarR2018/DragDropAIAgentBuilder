@@ -1,3 +1,6 @@
+// Pull in the react-flow stylesheet here so it is only loaded when the FlowPage
+// is rendered. This prevents the landing page from loading unnecessary CSS.
+import "@xyflow/react/dist/style.css";
 import { DefaultEdge } from "@/CustomEdges";
 import NoteNode from "@/CustomNodes/NoteNode";
 import FlowToolbar from "@/components/core/flowToolbarComponent";
