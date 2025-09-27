@@ -3,11 +3,12 @@ import ReactDOM from "react-dom/client";
 
 import reportWebVitals from "./reportWebVitals";
 
+// Import only the minimal styles needed for the landing page.  We avoid
+// importing App.css here because it brings in Tailwind base/components for
+// the flow builder and other authenticated pages.  These styles are now
+// loaded in App.tsx, so they aren't included in the landing-page bundle.
 import "./style/classes.css";
-// @ts-ignore
 import "./style/index.css";
-// @ts-ignore
-import "./App.css";
 import "./style/applies.css";
 
 // @ts-ignore

@@ -1,4 +1,8 @@
-import "@xyflow/react/dist/style.css";
+// React-Flow styles are imported in FlowPage instead of globally, so that
+// they aren't included in the landing bundle.
+
+// Import application-wide styles (Tailwind base/components/utilities).
+import "./App.css";
 import { Suspense, useEffect } from "react";
 import { RouterProvider } from "react-router-dom";
 import { LoadingPage } from "./pages/LoadingPage";

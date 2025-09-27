@@ -1,3 +1,7 @@
+// Import React-Flow styles here so they're loaded only when the flow
+// builder is rendered.
+import "@xyflow/react/dist/style.css";
+
 import { DefaultEdge } from "@/CustomEdges";
 import NoteNode from "@/CustomNodes/NoteNode";
 import FlowToolbar from "@/components/core/flowToolbarComponent";
