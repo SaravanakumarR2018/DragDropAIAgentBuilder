@@ -41,6 +41,27 @@ export default defineConfig(({ mode }) => {
     base: BASENAME || "",
     build: {
       outDir: "build",
+      // Disable modulePreload so that Vite does not prefetch lazily imported
+      // chunks.  Without this, heavy modules (react-flow, ace, ag-grid, etc.)
+      // are downloaded on the landing page.
+      modulePreload: false,
+      rollupOptions: {
+        output: {
+          // Split heavy libraries used only on the flow or admin pages into
+          // their own chunk.  These chunks will load only when those pages
+          // are visited.
+          manualChunks(id) {
+            if (
+              id.includes("@xyflow") ||
+              id.includes("ace-builds") ||
+              id.includes("ag-grid-react") ||
+              id.includes("react-pdf")
+            ) {
+              return "flow-libs";
+            }
+          },
+        },
+      },
     },
     define: {
       "process.env.BACKEND_URL": JSON.stringify(
