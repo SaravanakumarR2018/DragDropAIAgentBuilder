@@ -35,7 +35,7 @@ from langflow.interface.components import get_and_cache_all_types_dict
 from langflow.interface.utils import setup_llm_caching
 from langflow.logging.logger import configure
 from langflow.middleware import ContentSizeLimitMiddleware
-from langflow.services.auth.clerk_utils import clerk_token_middleware
+from langflow.services.auth.clerk_utils import ClerkTokenMiddleware
 from langflow.services.deps import (
     get_queue_service,
     get_settings_service,
@@ -277,7 +277,7 @@ def create_app():
 
         return await call_next(request)
 
-    app.middleware("http")(clerk_token_middleware)
+    app.add_middleware(ClerkTokenMiddleware)
 
     settings = get_settings_service().settings
     if prome_port_str := os.environ.get("LANGFLOW_PROMETHEUS_PORT"):

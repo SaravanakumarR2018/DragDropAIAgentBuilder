@@ -1,6 +1,7 @@
+from types import MethodType
 import uuid
 from contextvars import ContextVar, Token
-from typing import Any
+from typing import Any, Awaitable, Callable
 from uuid import UUID
 
 import httpx
@@ -14,6 +15,11 @@ from langflow.logging.logger import logger
 from langflow.services.database.models.user import User
 from langflow.services.database.models.user.crud import get_user_by_id
 from langflow.services.deps import get_settings_service
+from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
+from starlette.requests import Request
+from fastapi.responses import JSONResponse
+from typing import Optional
 
 # Context variable to store decoded clerk claims per request
 auth_header_ctx: ContextVar[dict | None] = ContextVar("auth_header_ctx", default=None)
@@ -137,65 +143,61 @@ async def get_user_from_clerk_payload(db: AsyncSession) -> User:
 
     return user
 
+class ClerkTokenMiddleware:
+    def __init__(self, app: ASGIApp):
+        self.app = app
 
-async def clerk_token_middleware(request: Request, call_next):
-    """Middleware to handle Clerk JWT tokens and Langflow API keys."""
+    async def __call__(self, scope: Scope, receive: Receive, send: Send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
 
-    settings = get_settings_service()
-    if not settings.auth_settings.CLERK_AUTH_ENABLED:
-        return await call_next(request)
+        request = Request(scope, receive=receive)
+        settings = get_settings_service()
+        if not settings.auth_settings.CLERK_AUTH_ENABLED:
+            await self.app(scope, receive, send)
+            return
 
-    logger.info(
-        f"[ClerkMiddleware] Incoming request: {request.method} {request.url.path} "
-        f"Query: {dict(request.query_params)}"
-    )
+        ctx_token: Optional[Token] = None
+        try:
+            auth_header = request.headers.get("Authorization")
+            if auth_header and auth_header.startswith("Bearer "):
+                token = auth_header[len("Bearer "):]
+                try:
+                    payload = await verify_clerk_token(token)
+                    ctx_token = auth_header_ctx.set(payload)
+                except Exception as exc:
+                    logger.warning(f"[ClerkMiddleware] Invalid Clerk token: {exc}")
+                    response = JSONResponse(
+                        status_code=401,
+                        content={"detail": "Invalid Clerk token"},
+                    )
+                    await response(scope, receive, send)
+                    return
 
-    ctx_token: Token | None = None
-    response = None
+            elif (api_key_header := request.headers.get("x-api-key")):
+                from langflow.services.auth.api_key_codec import decode_api_key
+                decoded = decode_api_key(api_key_header)
+                if not decoded.is_encoded or not decoded.organization_id:
+                    logger.warning("[ClerkMiddleware] Invalid or unscoped API key")
+                    response = JSONResponse(
+                        status_code=401,
+                        content={"detail": "Invalid or unscoped API key"},
+                    )
+                    await response(scope, receive, send)
+                    return
 
-    try:
-        # 1️⃣ Clerk JWT
-        auth_header = request.headers.get("Authorization")
-        if auth_header and auth_header.startswith("Bearer "):
-            token = auth_header[len("Bearer ") :]
-            try:
-                payload = await verify_clerk_token(token)
-                ctx_token = auth_header_ctx.set(payload)
-                response = await call_next(request)
-            except Exception as exc:
-                logger.warning(f"[ClerkMiddleware] Failed to verify Clerk token: {exc}")
-                response = JSONResponse(
-                    status_code=HTTP_401_UNAUTHORIZED,
-                    content={"detail": "Invalid Clerk token"},
-                )
-
-        # 2️⃣ API Key
-        elif (api_key_header := request.headers.get("x-api-key")):
-
-            from langflow.services.auth.api_key_codec import decode_api_key
-            
-            decoded = decode_api_key(api_key_header)
-            if not decoded.is_encoded or not decoded.organization_id:
-                logger.warning(f"[ClerkMiddleware] Invalid or unscoped API key: {api_key_header}")
-                response = JSONResponse(
-                    status_code=HTTP_401_UNAUTHORIZED,
-                    content={"detail": "Invalid or unscoped API key"},
-                )
-            else:
                 context_payload = {
                     "org_id": decoded.organization_id,
                     "uuid": decoded.user_id,
                 }
                 ctx_token = auth_header_ctx.set(context_payload)
-                response = await call_next(request)
 
-        # 3️⃣ No auth header → pass through
-        else:
-            response = await call_next(request)
+            # 🔁 Continue down the stack
+            await self.app(scope, receive, send)
 
-    finally:
-        if ctx_token is not None:
-            auth_header_ctx.reset(ctx_token)
-        else:
-            auth_header_ctx.set(None)
-    return response
+        finally:
+            if ctx_token is not None:
+                auth_header_ctx.reset(ctx_token)
+            else:
+                auth_header_ctx.set(None)
