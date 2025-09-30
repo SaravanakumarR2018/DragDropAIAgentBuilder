@@ -9,7 +9,6 @@ import useAuthStore from "@/stores/authStore";
 import useFlowsManagerStore from "@/stores/flowsManagerStore";
 import useFlowStore from "@/stores/flowStore";
 import { isEndpointNameValid } from "@/utils/utils";
-
 import { cloneDeep } from "lodash";
 import { ChangeEvent, ReactNode, useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";

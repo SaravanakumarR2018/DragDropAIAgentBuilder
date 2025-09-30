@@ -31,14 +31,18 @@ export const getLayoutedNodes = async (
         .filter((e) => e.source === n.id)
         .map((e) => ({
           id: e.sourceHandle,
-          properties: { side: "EAST" },
+          properties: {
+            side: "EAST",
+          },
         }));
 
       const sourcePorts = edges
         .filter((e) => e.target === n.id)
         .map((e) => ({
           id: e.targetHandle,
-          properties: { side: "WEST" },
+          properties: {
+            side: "WEST",
+          },
         }));
       return {
         id: n.id,
