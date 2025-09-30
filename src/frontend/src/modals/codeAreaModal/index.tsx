@@ -1,12 +1,7 @@
 import { usePostValidateCode } from "@/controllers/API/queries/nodes/use-post-validate-code";
 import { usePostValidateComponentCode } from "@/controllers/API/queries/nodes/use-post-validate-component-code";
 import useFlowStore from "@/stores/flowStore";
-import "ace-builds/src-noconflict/ace";
-import "ace-builds/src-noconflict/ext-language_tools";
-import "ace-builds/src-noconflict/ext-searchbox";
-import "ace-builds/src-noconflict/mode-python";
-import "ace-builds/src-noconflict/theme-github";
-import "ace-builds/src-noconflict/theme-twilight";
+
 import { useEffect, useRef, useState } from "react";
 import AceEditor from "react-ace";
 import ReactAce from "react-ace/lib/ace";
@@ -60,6 +55,20 @@ export default function CodeAreaModal({
   } | null>(null);
 
   const { mutate: validateComponentCode } = usePostValidateComponentCode();
+
+  useEffect(() => {
+  if (open) {
+    (async () => {
+      await Promise.all([
+        import("ace-builds/src-noconflict/ace"),
+        import("ace-builds/src-noconflict/ext-language_tools"),
+        import("ace-builds/src-noconflict/mode-python"),
+        import("ace-builds/src-noconflict/theme-github"),
+        import("ace-builds/src-noconflict/theme-twilight"),
+      ]);
+    })();
+  }
+}, [open]);
 
   useEffect(() => {
     // if nodeClass.template has more fields other than code and dynamic is true
