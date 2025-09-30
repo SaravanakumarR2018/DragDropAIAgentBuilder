@@ -140,15 +140,9 @@ async def get_user_from_clerk_payload(db: AsyncSession) -> User:
 
 async def clerk_token_middleware(request: Request, call_next):
     """Middleware to handle Clerk JWT tokens and Langflow API keys."""
-
     settings = get_settings_service()
     if not settings.auth_settings.CLERK_AUTH_ENABLED:
         return await call_next(request)
-
-    logger.info(
-        f"[ClerkMiddleware] Incoming request: {request.method} {request.url.path} "
-        f"Query: {dict(request.query_params)}"
-    )
 
     ctx_token: Token | None = None
     response = None
@@ -162,7 +156,8 @@ async def clerk_token_middleware(request: Request, call_next):
                 payload = await verify_clerk_token(token)
                 ctx_token = auth_header_ctx.set(payload)
                 response = await call_next(request)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001
+
                 logger.warning(f"[ClerkMiddleware] Failed to verify Clerk token: {exc}")
                 response = JSONResponse(
                     status_code=HTTP_401_UNAUTHORIZED,
@@ -173,7 +168,7 @@ async def clerk_token_middleware(request: Request, call_next):
         elif (api_key_header := request.headers.get("x-api-key")):
 
             from langflow.services.auth.api_key_codec import decode_api_key
-            
+
             decoded = decode_api_key(api_key_header)
             if not decoded.is_encoded or not decoded.organization_id:
                 logger.warning(f"[ClerkMiddleware] Invalid or unscoped API key: {api_key_header}")
