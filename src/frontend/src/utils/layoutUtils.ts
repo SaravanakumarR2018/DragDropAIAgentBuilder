@@ -62,6 +62,7 @@ export const getLayoutedNodes = async (
       targets: [e.targetHandle || e.target],
     })),
   };
+
   const layoutedGraph = await elk.layout(graph);
 
   return nodes.map((node) => {

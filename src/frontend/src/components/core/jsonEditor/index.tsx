@@ -1,6 +1,6 @@
 import { jsonquery } from "@jsonquerylang/jsonquery";
 import { KeyboardEvent, useEffect, useRef, useState } from "react";
-import type {
+import type{
   Content,
   createJSONEditor,
   JsonEditor as VanillaJsonEditor,
@@ -319,9 +319,6 @@ const JsonEditor = ({
 
   useEffect(() => {
     if (!containerRef.current) return;
-    
-    const loadEditor = async () => {
-      const { createJSONEditor, JsonEditor: VEditor } = await import("vanilla-jsoneditor");
 
     let initialContent = data;
     if (initialFilter?.trim()) {
@@ -358,11 +355,8 @@ const JsonEditor = ({
 
     setTimeout(() => editor.focus(), 100);
 
-    newRef.current = editor as unknown as VEditor;
+    newRef.current = editor;
     setOriginalData(data);
-  };
-
-  loadEditor();
 
     return () => {
       if (newRef.current) {
