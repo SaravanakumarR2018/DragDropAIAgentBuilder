@@ -24,8 +24,6 @@ export default function TextModal({
       lazyLoadAce();
     }
   }, [open]);
-
-
   const handleEscapeKeyDown = (event: KeyboardEvent) => {
     setOpen(false);
     event.stopPropagation();
