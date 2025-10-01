@@ -15,7 +15,7 @@ const layoutOptions = {
   "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
 };
 
-// Lazily load elkjs when needed
+// uses elkjs to give each node a layouted position
 export const getLayoutedNodes = async (
   nodes: AllNodeType[],
   edges: EdgeType[],
