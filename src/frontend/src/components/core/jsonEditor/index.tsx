@@ -1,6 +1,6 @@
 import { jsonquery } from "@jsonquerylang/jsonquery";
 import { KeyboardEvent, useEffect, useRef, useState } from "react";
-import type {
+import {
   Content,
   createJSONEditor,
   JsonEditor as VanillaJsonEditor,
@@ -409,4 +409,5 @@ const JsonEditor = ({
     </div>
   );
 };
+
 export default JsonEditor;
