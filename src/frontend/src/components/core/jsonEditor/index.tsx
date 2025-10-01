@@ -75,7 +75,6 @@ const JsonEditor = ({
       setShowSuccess(false);
     }, 5000);
   };
-
   const handleTransform = (isInitial = false) => {
     if (!newRef.current) return;
 
