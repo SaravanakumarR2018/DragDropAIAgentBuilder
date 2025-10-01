@@ -409,5 +409,4 @@ const JsonEditor = ({
     </div>
   );
 };
-
 export default JsonEditor;
