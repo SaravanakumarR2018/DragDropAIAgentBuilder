@@ -22,7 +22,6 @@ export const getLayoutedNodes = async (
 ): Promise<AllNodeType[]> => {
   const { default: ELK } = await import("elkjs/lib/elk.bundled.js");
   const elk = new ELK();
-
   const graph = {
     id: "root",
     layoutOptions,
@@ -62,13 +61,13 @@ export const getLayoutedNodes = async (
       targets: [e.targetHandle || e.target],
     })),
   };
-
   const layoutedGraph = await elk.layout(graph);
 
   return nodes.map((node) => {
     const layoutedNode = layoutedGraph.children?.find(
       (lgNode) => lgNode.id === node.id,
     );
+
     return {
       ...node,
       position: {
