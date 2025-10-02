@@ -56,11 +56,7 @@ export default function CodeAreaModal({
 
   const { mutate: validateComponentCode } = usePostValidateComponentCode();
 
-  useEffect(() => {
-    if (open) {
-      lazyLoadAce();
-    }
-  }, [open]);
+  useEffect(() => { if (open) {lazyLoadAce();}}, [open]);
   useEffect(() => {
     // if nodeClass.template has more fields other than code and dynamic is true
     // do not run handleClick
