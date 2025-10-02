@@ -92,12 +92,21 @@
   },
   "scripts": {
     "dev:docker": "vite --host 0.0.0.0",
-    "start": "vite",
-    "build": "vite build",
+    "start": "npm run start:flows",
+    "build": "npm run build:flows",
     "serve": "vite preview",
     "format": "npx prettier --write \"{tests,src}/**/*.{js,jsx,ts,tsx,json,md}\" --ignore-path .prettierignore",
     "check-format": "npx prettier --check \"{tests,src}/**/*.{js,jsx,ts,tsx,json,md}\" --ignore-path .prettierignore",
-    "type-check": "tsc --noEmit --pretty --project tsconfig.json && vite"
+    "type-check": "tsc --noEmit --pretty --project tsconfig.json && vite",
+    "start:flows": "vite",
+    "start:landing": "vite --config vite.config.landing.mts",
+    "dev:flows": "vite --config vite.config.mts --host 0.0.0.0",
+    "dev:landing": "vite --config vite.config.landing.mts --host 0.0.0.0",
+    "build:flows": "vite build --config vite.config.mts",
+    "build:landing": "vite build --config vite.config.landing.mts",
+    "build:all": "npm run build:landing && npm run build:flows",
+    "preview:landing": "vite preview --config vite.config.landing.mts",
+    "preview:flows": "vite preview --config vite.config.mts"
   },
   "eslintConfig": {
     "extends": [

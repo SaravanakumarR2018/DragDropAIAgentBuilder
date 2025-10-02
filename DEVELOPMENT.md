@@ -160,6 +160,16 @@ You will get output similar to:
 
 At this point, you can navigate to http://localhost:3000/ in a browser and access the Langflow User Interface.
 
+If you only need to work on the lean landing/authentication experience, a dedicated Vite server is available:
+
+```bash
+cd src/frontend
+npm run start:landing
+```
+
+This entry point serves the marketing, login, sign-up, and organization-selection flows without loading the heavier flow builder bundles. Use `npm run start:flows` (the default `npm start`) for the full flow builder UI.
+
+
 ### Build and Display Documentation
 
 If you are contributing changes to documentation (always welcome!), these are built (using [Docusaurus](https://docusaurus.io/)) and served separately, also using Node.js.
