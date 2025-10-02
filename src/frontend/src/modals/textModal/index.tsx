@@ -19,11 +19,7 @@ export default function TextModal({
   const [open, setOpen] = useState(false);
   const [internalValue, setInternalValue] = useState(value);
 
-  useEffect(() => {
-    if (open) {
-      lazyLoadAce();
-    }
-  }, [open]);
+  useEffect(() => {if (open) {lazyLoadAce();}}, [open]);
   const handleEscapeKeyDown = (event: KeyboardEvent) => {
     setOpen(false);
     event.stopPropagation();
