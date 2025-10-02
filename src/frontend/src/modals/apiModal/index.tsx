@@ -51,11 +51,7 @@ export default function ApiModal({
   const [endpointName, setEndpointName] = useState(flowEndpointName ?? "");
   const [validEndpointName, setValidEndpointName] = useState(true);
 
-  useEffect(() => {
-    if (open) {
-      lazyLoadAce();
-    }
-  }, [open]);
+  useEffect(() => {if (open) { lazyLoadAce(); }}, [open]);
   const handleEndpointNameChange = (event: ChangeEvent<HTMLInputElement>) => {
     const { value } = event.target;
     // Validate the endpoint name
