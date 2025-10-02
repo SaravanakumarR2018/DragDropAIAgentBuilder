@@ -1,6 +1,7 @@
 import { NODE_HEIGHT, NODE_WIDTH } from "@/constants/constants";
 import { AllNodeType, EdgeType } from "@/types/flow";
 import { cloneDeep } from "lodash";
+import type { ElkNode } from "elkjs";
 
 const layoutOptions = {
   "elk.algorithm": "layered",
@@ -54,7 +55,7 @@ export const getLayoutedNodes = async (
         // we are also passing the id, so we can also handle edges without a sourceHandle or targetHandle option
         ports: [{ id: n.id }, ...targetPorts, ...sourcePorts],
       };
-    }),
+    }) as ElkNode[],
     edges: edges.map((e) => ({
       id: e.id,
       sources: [e.sourceHandle || e.source],
