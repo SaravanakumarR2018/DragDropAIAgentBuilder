@@ -63,7 +63,7 @@ export const getLayoutedNodes = async (
   };
   const layoutedGraph = await elk.layout(graph);
 
-  return nodes.map((node) => {
+  const layoutedNodes = nodes.map((node) => {
     const layoutedNode = layoutedGraph.children?.find(
       (lgNode) => lgNode.id === node.id,
     );
@@ -76,4 +76,5 @@ export const getLayoutedNodes = async (
       },
     };
   });
+  return layoutedNodes;
 };
