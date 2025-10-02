@@ -15,7 +15,7 @@ import useAuthStore from "@/stores/authStore";
 
 import { useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
-import { LoadingPage } from "../LoadingPage";
+import { AppBootstrapLoader } from "./AppBootstrapLoader";
 
 export function AppInitPage() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -77,9 +77,16 @@ export function AppInitPage() {
     //need parent component with width and height
     <>
       {isLoaded ? (
-        (isLoading || (!isFetched && !shouldSkip) || (!isExamplesFetched && !shouldSkip)) && (
-          <LoadingPage overlay />
-        )
+        <AppBootstrapLoader
+          active={
+            isLoading ||
+            (!shouldSkip && !isFetched) ||
+            (!shouldSkip && !isExamplesFetched)
+          }
+          isAuthComplete={isFetched || shouldSkip}
+          isPreferencesComplete={isConfigFetched || shouldSkip}
+          isExamplesComplete={isExamplesFetched || shouldSkip}
+        />
       ) : (
         <CustomLoadingPage />
       )}
