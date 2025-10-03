@@ -9,6 +9,7 @@ import useAuthStore from "@/stores/authStore";
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useOrganization, useAuth as useClerkAuth } from "@clerk/clerk-react";
+import { useSyncClerkOrgState } from "@/clerk/syncOrgState";
 
 export const ProtectedRoute = ({ children }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
@@ -24,7 +25,7 @@ export const ProtectedRoute = ({ children }) => {
   const { isSignedIn } = useClerkAuth();
   const orgId = organization?.id;
 
-  
+  useSyncClerkOrgState({ isSignedIn, isOrgLoaded, orgId, isOrgSelected });
   // Get current path
   const location = useLocation();
   const currentPath = location.pathname;
