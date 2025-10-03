@@ -118,10 +118,33 @@ export function ClerkAuthAdapter() {
   console.log("[ClerkAuthAdapter] Render", {
     isSignedIn,
     isOrgSelected,
-    currentPath
+    currentPath,
+    organizationId: organization?.id
   });
 
+  // ✅ Sync Clerk organization state with our local state
+  // If Clerk has loaded an organization (from previous session), mark it as selected
+  useEffect(() => {
+    if (
+      IS_CLERK_AUTH &&
+      isSignedIn &&
+      isOrgLoaded &&
+      organization?.id &&
+      !isOrgSelected
+    ) {
+      console.log("[ClerkAuthAdapter] Clerk organization already loaded, syncing to local state");
+      authStore.getState().setIsOrgSelected(true);
+      sessionStorage.setItem("isOrgSelected", "true");
+    }
+  }, [isSignedIn, isOrgLoaded, organization?.id, isOrgSelected]);
+
   // ✅ Redirect to /organization if signed in but org not selected
+  // Only redirect if:
+  // 1. User is signed in
+  // 2. Organization context is loaded
+  // 3. No organization is selected in sessionStorage/store
+  // 4. Clerk doesn't have an active organization (meaning user never picked one)
+  // 5. User is at root or login page
   useEffect(() => {
     if (
       IS_CLERK_AUTH &&
@@ -134,7 +157,7 @@ export function ClerkAuthAdapter() {
       console.log("[ClerkAuthAdapter] Redirecting to /organization (no org selected)");
       navigate("/organization", { replace: true });
     }
-  }, [isSignedIn, isOrgLoaded, organization?.id, currentPath]);
+  }, [isSignedIn, isOrgLoaded, organization?.id, currentPath, isOrgSelected]);
 
 
   // ✅ Clerk token listener: backend sync ONLY after org is selected
