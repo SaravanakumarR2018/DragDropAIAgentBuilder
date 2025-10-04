@@ -16,6 +16,36 @@ export const IS_CLERK_AUTH =
 
 export const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || "";
 export const CLERK_DUMMY_PASSWORD = "clerk_dummy_password";
+export const ACTIVE_ORG_STORAGE_KEY = "lf-active-org";
+
+function getStoredActiveOrgId(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    return localStorage.getItem(ACTIVE_ORG_STORAGE_KEY);
+  } catch (error) {
+    console.warn("[ClerkAuthAdapter] Unable to read active org from storage", error);
+    return null;
+  }
+}
+
+export function setStoredActiveOrgId(orgId: string | null) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    if (orgId) {
+      localStorage.setItem(ACTIVE_ORG_STORAGE_KEY, orgId);
+    } else {
+      localStorage.removeItem(ACTIVE_ORG_STORAGE_KEY);
+    }
+  } catch (error) {
+    console.warn("[ClerkAuthAdapter] Unable to persist active org", error);
+  }
+}
 
 export function getClerkHealthResponse(
   setHealthCheckTimeout: (timeout: string | null) => void,
@@ -115,11 +145,13 @@ export function ClerkAuthAdapter() {
 
   const isAtRoot = currentPath === "/";
   const isAtLogin = currentPath === "/login";
-  const isAtOrg = currentPath === "/organization";
+  const activeOrgId = getStoredActiveOrgId();
+
   console.log("[ClerkAuthAdapter] Render", {
     isSignedIn,
     isOrgSelected,
-    currentPath
+    currentPath,
+    activeOrgId,
   });
 
   // ✅ Redirect to /organization if signed in but org not selected
@@ -151,6 +183,13 @@ export function ClerkAuthAdapter() {
       return;
     }
 
+    const activeOrgId = getStoredActiveOrgId();
+
+    if (!activeOrgId || activeOrgId !== organization.id) {
+      return;
+    }
+
+    const targetOrgId = organization.id;
     autoJoinAttemptedRef.current = true;
 
     (async () => {
@@ -168,6 +207,7 @@ export function ClerkAuthAdapter() {
         login(token, "login", refreshToken);
         sessionStorage.setItem("isOrgSelected", "true");
         authStore.getState().setIsOrgSelected(true);
+        setStoredActiveOrgId(targetOrgId);
         console.debug("[ClerkAuthAdapter] Auto-joined organization", organization?.id);
       } catch (error) {
         console.error("[ClerkAuthAdapter] Auto-join failed", error);
@@ -186,6 +226,12 @@ export function ClerkAuthAdapter() {
       return;
     }
 
+    const activeOrgId = getStoredActiveOrgId();
+
+    if (!activeOrgId || activeOrgId !== organization?.id) {
+      return;
+    }
+
     const shouldRedirect =
       currentPath === "/" || currentPath === "/login" || currentPath === "/organization";
 
@@ -198,7 +244,14 @@ export function ClerkAuthAdapter() {
       currentPath,
     );
     navigate("/flows", { replace: true });
-  }, [currentPath, isSignedIn, isOrgLoaded, isOrgSelected, navigate]);
+  }, [
+    currentPath,
+    isSignedIn,
+    isOrgLoaded,
+    isOrgSelected,
+    organization?.id,
+    navigate,
+  ]);
 
 
   // ✅ Clerk token listener: backend sync ONLY after org is selected
