@@ -108,6 +108,7 @@ export function ClerkAuthAdapter() {
   const location = useLocation();
   const { organization, isLoaded: isOrgLoaded } = useOrganization();
   const prevTokenRef = useRef<string | null>(null);
+  const autoJoinAttemptedRef = useRef(false);
 
   const isOrgSelected = useIsOrgSelected();
   const currentPath = location.pathname;
@@ -134,7 +135,70 @@ export function ClerkAuthAdapter() {
       console.log("[ClerkAuthAdapter] Redirecting to /organization (no org selected)");
       navigate("/organization", { replace: true });
     }
-  }, [isSignedIn, isOrgLoaded, organization?.id, currentPath]);
+  }, [isSignedIn, isOrgLoaded, organization?.id, currentPath, navigate]);
+
+  // Auto-join the active Clerk organization in fresh tabs
+  useEffect(() => {
+    if (!IS_CLERK_AUTH) {
+      return;
+    }
+
+    if (autoJoinAttemptedRef.current) {
+      return;
+    }
+
+    if (!isSignedIn || !isOrgLoaded || isOrgSelected || !organization?.id) {
+      return;
+    }
+
+    autoJoinAttemptedRef.current = true;
+
+    (async () => {
+      try {
+        const token = await getToken();
+
+        if (!token) {
+          console.warn("[ClerkAuthAdapter] Unable to fetch Clerk token for auto-join");
+          autoJoinAttemptedRef.current = false;
+          return;
+        }
+
+        const refreshToken = cookie.get(LANGFLOW_REFRESH_TOKEN);
+
+        login(token, "login", refreshToken);
+        sessionStorage.setItem("isOrgSelected", "true");
+        authStore.getState().setIsOrgSelected(true);
+        console.debug("[ClerkAuthAdapter] Auto-joined organization", organization?.id);
+      } catch (error) {
+        console.error("[ClerkAuthAdapter] Auto-join failed", error);
+        autoJoinAttemptedRef.current = false;
+      }
+    })();
+  }, [isSignedIn, isOrgLoaded, isOrgSelected, organization?.id, getToken]);
+
+  // Redirect away from entry routes once the organization is hydrated
+  useEffect(() => {
+    if (!IS_CLERK_AUTH) {
+      return;
+    }
+
+    if (!isSignedIn || !isOrgLoaded || !isOrgSelected) {
+      return;
+    }
+
+    const shouldRedirect =
+      currentPath === "/" || currentPath === "/login" || currentPath === "/organization";
+
+    if (!shouldRedirect) {
+      return;
+    }
+
+    console.debug(
+      "[ClerkAuthAdapter] Redirecting initialized tab to /flows",
+      currentPath,
+    );
+    navigate("/flows", { replace: true });
+  }, [currentPath, isSignedIn, isOrgLoaded, isOrgSelected, navigate]);
 
 
   // ✅ Clerk token listener: backend sync ONLY after org is selected
