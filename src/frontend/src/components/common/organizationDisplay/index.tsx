@@ -1,6 +1,6 @@
 import { IS_CLERK_AUTH, useLogout } from "@/clerk/auth";
 import { useOrganization } from "@clerk/clerk-react";
-import { Building2, LogOut } from "lucide-react";
+import { Building2, ChevronDown, LogOut } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -56,39 +56,46 @@ export function OrganizationDisplay() {
 
   return (
     <>
-      <DropdownMenu>
+      <div
+        className="flex items-center gap-1.5 rounded-md bg-muted/30 px-2.5 py-1 h-auto transition-colors hover:bg-muted/50"
+        data-testid="organization-display"
+      >
+        <Building2 className="h-4 w-4 text-muted-foreground" />
         <ShadTooltip
           content={organization.name}
           side="bottom"
           delayDuration={300}
         >
+          <span className="font-semibold text-sm text-foreground max-w-[200px] truncate">
+            {organization.name}
+          </span>
+        </ShadTooltip>
+        <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
-              className="flex items-center gap-1.5 rounded-md bg-muted/30 px-2.5 py-1 h-auto hover:bg-muted/50"
-              data-testid="organization-display"
+              size="icon"
+              aria-label="Organization options"
+              className="h-6 w-6 p-0 text-muted-foreground hover:bg-muted/60"
             >
-              <Building2 className="h-4 w-4 text-muted-foreground" />
-              <span className="font-semibold text-sm text-foreground max-w-[200px] truncate">
-                {organization.name}
-              </span>
+              <ChevronDown className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-        </ShadTooltip>
-        <DropdownMenuContent align="start" className="w-56">
-          <DropdownMenuLabel className="font-semibold">
-            {organization.name}
-          </DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => setShowSwitchModal(true)}
-            className="cursor-pointer"
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            <span>Switch Organisation</span>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel className="font-semibold">
+              {organization.name}
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => setShowSwitchModal(true)}
+              className="cursor-pointer"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Switch Organisation</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
 
       <Dialog open={showSwitchModal} onOpenChange={setShowSwitchModal}>
         <DialogContent>
