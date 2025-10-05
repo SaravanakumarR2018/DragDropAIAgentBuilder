@@ -1,7 +1,7 @@
 import { IS_CLERK_AUTH, useLogout } from "@/clerk/auth";
 import { useOrganization } from "@clerk/clerk-react";
 import { Building2, ChevronDown, LogOut } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -20,6 +20,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import ShadTooltip from "@/components/common/shadTooltipComponent";
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+} from "@/components/ui/avatar";
 
 /**
  * Component that displays the organization name when Clerk authentication is enabled.
@@ -45,6 +50,22 @@ export function OrganizationDisplay() {
     return null;
   }
 
+  const organizationImageUrl = organization.imageUrl;
+  const organizationInitials = useMemo(() => {
+    if (!organization.name) {
+      return "";
+    }
+
+    const [firstWord = "", secondWord = ""] = organization.name
+      .split(/\s+/)
+      .filter(Boolean);
+
+    const firstInitial = firstWord.charAt(0) ?? "";
+    const secondInitial = secondWord.charAt(0) ?? "";
+
+    return `${firstInitial}${secondInitial}`.toUpperCase();
+  }, [organization.name]);
+
   const handleLogout = () => {
     mutationLogout();
     setShowSwitchModal(false);
@@ -57,16 +78,27 @@ export function OrganizationDisplay() {
   return (
     <>
       <div
-        className="flex items-center gap-1.5 rounded-md bg-muted/30 px-2.5 py-1 h-auto transition-colors hover:bg-muted/50"
+        className="flex min-w-0 items-center gap-1.5 rounded-md bg-muted/30 px-2 py-1 transition-colors hover:bg-muted/50 sm:px-2.5"
         data-testid="organization-display"
+        aria-label={organization.name}
       >
-        <Building2 className="h-4 w-4 text-muted-foreground" />
+        <Avatar className="h-6 w-6 shrink-0 border border-border bg-muted">
+          <AvatarImage
+            src={organizationImageUrl ?? undefined}
+            alt={`${organization.name} logo`}
+            loading="lazy"
+          />
+          <AvatarFallback className="bg-muted text-xs font-semibold text-muted-foreground">
+            {organizationInitials || <Building2 className="h-4 w-4" aria-hidden="true" />}
+          </AvatarFallback>
+        </Avatar>
+        <span className="sr-only sm:hidden">{organization.name}</span>
         <ShadTooltip
           content={organization.name}
           side="bottom"
           delayDuration={300}
         >
-          <span className="font-semibold text-sm text-foreground max-w-[200px] truncate">
+          <span className="hidden text-sm font-semibold text-foreground sm:block sm:max-w-[200px] sm:truncate">
             {organization.name}
           </span>
         </ShadTooltip>
