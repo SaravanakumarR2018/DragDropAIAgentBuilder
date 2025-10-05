@@ -35,23 +35,23 @@ const useAuthStore = create<AuthStoreType>((set, get) => ({
     set({ authenticationErrorCount }),
   setIsOrgSelected: (isOrgSelected) => set({ isOrgSelected }),
 
-  logout: async () => {
-    sessionStorage.removeItem("isOrgSelected");
-    clearStoredActiveOrgId();
-    get().setIsAuthenticated(false);
-    get().setIsAdmin(false);
-    get().setIsOrgSelected(false);
+ logout: async () => {
+  sessionStorage.removeItem("isOrgSelected");
+  clearStoredActiveOrgId();
+  get().setIsAuthenticated(false);
+  get().setIsAdmin(false);
+  get().setIsOrgSelected(false);
 
-    set({
-      isAdmin: false,
-      userData: null,
-      accessToken: null,
-      isAuthenticated: false,
-      autoLogin: false,
-      apiKey: null,
-      isOrgSelected: false,
-    });
-  },
+  set({
+    isAdmin: false,
+    userData: null,
+    accessToken: null,
+    isAuthenticated: false,
+    autoLogin: false,
+    apiKey: null,
+    isOrgSelected: false,
+  });
+},
 
 }));
 
