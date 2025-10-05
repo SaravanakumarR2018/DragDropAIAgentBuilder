@@ -45,6 +45,8 @@ export function OrganizationDisplay() {
     return null;
   }
 
+  const organizationImageUrl = organization.imageUrl;
+
   const handleLogout = () => {
     mutationLogout();
     setShowSwitchModal(false);
@@ -57,16 +59,27 @@ export function OrganizationDisplay() {
   return (
     <>
       <div
-        className="flex items-center gap-1.5 rounded-md bg-muted/30 px-2.5 py-1 h-auto transition-colors hover:bg-muted/50"
+        className="flex min-w-0 items-center gap-1.5 rounded-md bg-muted/30 px-2 py-1 transition-colors hover:bg-muted/50 sm:px-2.5"
         data-testid="organization-display"
       >
-        <Building2 className="h-4 w-4 text-muted-foreground" />
+        <div className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-border bg-muted">
+          {organizationImageUrl ? (
+            <img
+              src={organizationImageUrl}
+              alt={`${organization.name} logo`}
+              className="h-full w-full object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <Building2 className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+          )}
+        </div>
         <ShadTooltip
           content={organization.name}
           side="bottom"
           delayDuration={300}
         >
-          <span className="font-semibold text-sm text-foreground max-w-[200px] truncate">
+          <span className="sr-only text-sm font-semibold text-foreground sm:not-sr-only sm:max-w-[200px] sm:truncate">
             {organization.name}
           </span>
         </ShadTooltip>
