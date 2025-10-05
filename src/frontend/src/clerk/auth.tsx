@@ -4,48 +4,27 @@ import { AuthContext } from "@/contexts/authContext";
 import { api } from "@/controllers/API/api";
 import { getURL } from "@/controllers/API/helpers/constants";
 import { useLogout as useLogoutMutation } from "@/controllers/API/queries/auth";
-import { ClerkProvider, useAuth, useClerk, useOrganization, useUser, SignedOut } from "@clerk/clerk-react";
+import { ClerkProvider, useAuth, useClerk, useOrganization, useUser } from "@clerk/clerk-react";
 import { Users } from "@/types/api";
 import { LANGFLOW_ACCESS_TOKEN, LANGFLOW_REFRESH_TOKEN } from "@/constants/constants";
 import { Cookies } from "react-cookie";
 import OrganizationPage from "./OrganizationPage";
 import authStore from "@/stores/authStore";
+import {
+  getStoredActiveOrgId as readStoredActiveOrgId,
+  setStoredActiveOrgId as persistActiveOrgId,
+} from "./activeOrgStorage";
 
 export const IS_CLERK_AUTH =
   String(import.meta.env.VITE_CLERK_AUTH_ENABLED).toLowerCase() === "true";
 
 export const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || "";
 export const CLERK_DUMMY_PASSWORD = "clerk_dummy_password";
-export const ACTIVE_ORG_STORAGE_KEY = "lf-active-org";
-
-function getStoredActiveOrgId(): string | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  try {
-    return localStorage.getItem(ACTIVE_ORG_STORAGE_KEY);
-  } catch (error) {
-    console.warn("[ClerkAuthAdapter] Unable to read active org from storage", error);
-    return null;
-  }
-}
-
-export function setStoredActiveOrgId(orgId: string | null) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  try {
-    if (orgId) {
-      localStorage.setItem(ACTIVE_ORG_STORAGE_KEY, orgId);
-    } else {
-      localStorage.removeItem(ACTIVE_ORG_STORAGE_KEY);
-    }
-  } catch (error) {
-    console.warn("[ClerkAuthAdapter] Unable to persist active org", error);
-  }
-}
+export {
+  ACTIVE_ORG_STORAGE_KEY,
+  getStoredActiveOrgId,
+  setStoredActiveOrgId,
+} from "./activeOrgStorage";
 
 export function getClerkHealthResponse(
   setHealthCheckTimeout: (timeout: string | null) => void,
@@ -145,7 +124,7 @@ export function ClerkAuthAdapter() {
 
   const isAtRoot = currentPath === "/";
   const isAtLogin = currentPath === "/login";
-  const activeOrgId = getStoredActiveOrgId();
+  const activeOrgId = readStoredActiveOrgId();
 
   console.log("[ClerkAuthAdapter] Render", {
     isSignedIn,
@@ -183,7 +162,7 @@ export function ClerkAuthAdapter() {
       return;
     }
 
-    const activeOrgId = getStoredActiveOrgId();
+    const activeOrgId = readStoredActiveOrgId();
 
     if (!activeOrgId || activeOrgId !== organization.id) {
       return;
@@ -207,7 +186,7 @@ export function ClerkAuthAdapter() {
         login(token, "login", refreshToken);
         sessionStorage.setItem("isOrgSelected", "true");
         authStore.getState().setIsOrgSelected(true);
-        setStoredActiveOrgId(targetOrgId);
+        persistActiveOrgId(targetOrgId);
         console.debug("[ClerkAuthAdapter] Auto-joined organization", organization?.id);
       } catch (error) {
         console.error("[ClerkAuthAdapter] Auto-join failed", error);
@@ -226,7 +205,7 @@ export function ClerkAuthAdapter() {
       return;
     }
 
-    const activeOrgId = getStoredActiveOrgId();
+    const activeOrgId = readStoredActiveOrgId();
 
     if (!activeOrgId || activeOrgId !== organization?.id) {
       return;

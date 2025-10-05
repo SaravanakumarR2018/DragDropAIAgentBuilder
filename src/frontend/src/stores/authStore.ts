@@ -1,12 +1,11 @@
 // authStore.js
+import { clearStoredActiveOrgId } from "@/clerk/activeOrgStorage";
 import { LANGFLOW_ACCESS_TOKEN } from "@/constants/constants";
 import { AuthStoreType } from "@/types/zustand/auth";
 import { Cookies } from "react-cookie";
 import { create } from "zustand";
 
 const cookies = new Cookies();
-const ACTIVE_ORG_STORAGE_KEY = "lf-active-org";
-
 const useAuthStore = create<AuthStoreType>((set, get) => ({
   isAdmin: false,
   isAuthenticated: !!cookies.get(LANGFLOW_ACCESS_TOKEN),
@@ -38,12 +37,7 @@ const useAuthStore = create<AuthStoreType>((set, get) => ({
 
   logout: async () => {
     sessionStorage.removeItem("isOrgSelected");
-    try {
-      localStorage.removeItem(ACTIVE_ORG_STORAGE_KEY);
-    } catch (error) {
-      console.warn("[authStore] Unable to clear active org from storage", error);
-    }
-
+    clearStoredActiveOrgId();
     get().setIsAuthenticated(false);
     get().setIsAdmin(false);
     get().setIsOrgSelected(false);
