@@ -88,6 +88,8 @@ export function OrganizationDisplay() {
               src={organizationImageUrl}
               alt={`${organization.name} logo`}
               loading="lazy"
+              crossOrigin="anonymous"
+              referrerPolicy="no-referrer"
               className="h-full w-full object-cover"
               onError={() => setHasImageError(true)}
             />
