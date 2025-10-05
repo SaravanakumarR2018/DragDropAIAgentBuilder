@@ -1,7 +1,7 @@
 import { IS_CLERK_AUTH, useLogout } from "@/clerk/auth";
 import { useOrganization } from "@clerk/clerk-react";
 import { Building2, ChevronDown, LogOut } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -29,6 +29,7 @@ export function OrganizationDisplay() {
   const { organization, isLoaded } = useOrganization();
   const { mutate: mutationLogout } = useLogout();
   const [showSwitchModal, setShowSwitchModal] = useState(false);
+  const [hasImageError, setHasImageError] = useState(false);
 
   // Don't render if Clerk auth is not enabled
   if (!IS_CLERK_AUTH) {
@@ -45,6 +46,26 @@ export function OrganizationDisplay() {
     return null;
   }
 
+  const organizationImageUrl = organization.imageUrl;
+  const organizationInitials = useMemo(() => {
+    if (!organization.name) {
+      return "";
+    }
+
+    const [firstWord = "", secondWord = ""] = organization.name
+      .split(/\s+/)
+      .filter(Boolean);
+
+    const firstInitial = firstWord.charAt(0) ?? "";
+    const secondInitial = secondWord.charAt(0) ?? "";
+
+    return `${firstInitial}${secondInitial}`.toUpperCase();
+  }, [organization.name]);
+
+  useEffect(() => {
+    setHasImageError(false);
+  }, [organizationImageUrl]);
+
   const handleLogout = () => {
     mutationLogout();
     setShowSwitchModal(false);
@@ -57,16 +78,34 @@ export function OrganizationDisplay() {
   return (
     <>
       <div
-        className="flex items-center gap-1.5 rounded-md bg-muted/30 px-2.5 py-1 h-auto transition-colors hover:bg-muted/50"
+        className="flex min-w-0 items-center gap-1.5 rounded-md bg-muted/30 px-2 py-1 transition-colors hover:bg-muted/50 sm:px-2.5"
         data-testid="organization-display"
+        aria-label={organization.name}
       >
-        <Building2 className="h-4 w-4 text-muted-foreground" />
+        <div className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted">
+          {organizationImageUrl && !hasImageError ? (
+            <img
+              src={organizationImageUrl}
+              alt={`${organization.name} logo`}
+              loading="lazy"
+              className="h-full w-full object-cover"
+              onError={() => setHasImageError(true)}
+            />
+          ) : organizationInitials ? (
+            <span className="text-xs font-semibold text-muted-foreground">
+              {organizationInitials}
+            </span>
+          ) : (
+            <Building2 className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+          )}
+        </div>
+        <span className="sr-only sm:hidden">{organization.name}</span>
         <ShadTooltip
           content={organization.name}
           side="bottom"
           delayDuration={300}
         >
-          <span className="font-semibold text-sm text-foreground max-w-[200px] truncate">
+          <span className="hidden min-w-0 text-sm font-semibold text-foreground sm:block sm:max-w-[200px] sm:truncate md:max-w-[240px]">
             {organization.name}
           </span>
         </ShadTooltip>
