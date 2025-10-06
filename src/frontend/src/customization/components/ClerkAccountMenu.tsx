@@ -1,6 +1,6 @@
 import { UserButton } from "@clerk/clerk-react";
 import { IS_CLERK_AUTH, useLogout } from "@/clerk/auth";
-import { LogOut } from "lucide-react";
+import { LogOut, Users } from "lucide-react";
 import { AccountMenu } from "@/components/core/appHeaderComponent/components/AccountMenu";
 
 export function ClerkAccountMenu() {
@@ -21,6 +21,11 @@ export function ClerkAccountMenu() {
         }}
       >
         <UserButton.MenuItems>
+          <UserButton.Action
+            label="Members"
+            labelIcon={<Users className="h-4 w-4" />}
+            open="organizationProfile"
+          />
           <UserButton.Action
             label="Sign out"
             labelIcon={<LogOut className="h-4 w-4" />}
