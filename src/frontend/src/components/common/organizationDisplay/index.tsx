@@ -56,46 +56,46 @@ export function OrganizationDisplay() {
 
   return (
     <>
-      <div
-        className="flex items-center gap-1.5 rounded-md bg-muted/30 px-2.5 py-1 h-auto transition-colors hover:bg-muted/50"
-        data-testid="organization-display"
+      <ShadTooltip
+        content={organization.name}
+        side="bottom"
+        delayDuration={300}
       >
-        <Building2 className="h-4 w-4 text-muted-foreground" />
-        <ShadTooltip
-          content={organization.name}
-          side="bottom"
-          delayDuration={300}
+        <div
+          className="flex items-center gap-1 rounded-md bg-muted/30 px-2 py-1 h-auto transition-colors hover:bg-muted/50 shrink-0"
+          data-testid="organization-display"
         >
-          <span className="font-semibold text-sm text-foreground max-w-[200px] truncate">
+          <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+          <span className="font-semibold text-sm text-foreground max-w-[200px] truncate hidden lg:inline-block">
             {organization.name}
           </span>
-        </ShadTooltip>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Organization options"
-              className="h-6 w-6 p-0 text-muted-foreground hover:bg-muted/60"
-            >
-              <ChevronDown className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel className="font-semibold">
-              {organization.name}
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => setShowSwitchModal(true)}
-              className="cursor-pointer"
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              <span>Switch Organisation</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Organization options"
+                className="h-5 w-5 p-0 text-muted-foreground hover:bg-muted/60 shrink-0"
+              >
+                <ChevronDown className="h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel className="font-semibold">
+                {organization.name}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => setShowSwitchModal(true)}
+                className="cursor-pointer"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Switch Organisation</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </ShadTooltip>
 
       <Dialog open={showSwitchModal} onOpenChange={setShowSwitchModal}>
         <DialogContent>

@@ -1,0 +1,29 @@
+/* Responsive styles for flow name display in the header */
+
+/* Default: Show flow name text normally */
+.flow-name-responsive .flow-name-text {
+  display: inline;
+}
+
+/* On small screens (< md): Show only first 2 characters */
+@media (max-width: 767px) {
+  .flow-name-responsive .flow-name-text {
+    max-width: 2ch;
+    overflow: hidden;
+    text-overflow: clip;
+  }
+}
+
+/* On medium screens (md to lg): Truncate flow name more aggressively */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .flow-name-responsive .flow-name-text {
+    max-width: 25vw;
+  }
+}
+
+/* On large screens (>= lg): Full flow name with normal truncation */
+@media (min-width: 1024px) {
+  .flow-name-responsive .flow-name-text {
+    max-width: 35vw;
+  }
+}
