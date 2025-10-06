@@ -1,7 +1,11 @@
 import { motion, AnimatePresence } from "framer-motion";
 import type { JSX, SVGProps } from "react";
-import VisualWorkflow from "../../assets/VisualWorkflow.png";
 import { useState } from "react";
+import { LogOut, LayoutDashboard } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import useAuthStore from "@/stores/authStore";
+import { useLogout } from "@/clerk/auth";
+import VisualWorkflow from "../../assets/VisualWorkflow.png";
 
 
 function CheckIcon(props: SVGProps<SVGSVGElement>) {
@@ -25,6 +29,17 @@ function PlayIcon(props: SVGProps<SVGSVGElement>) {
 
 export default function Landing(): JSX.Element {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const navigate = useNavigate();
+  const { mutate: logout } = useLogout();
+
+  const handleDashboardClick = () => {
+    navigate("/flows");
+  };
+
+  const handleSignOutClick = () => {
+    logout();
+  };
   return (
     <div className="h-screen overflow-y-auto bg-[#0f1217] text-white">
       {/* Background accents */}
@@ -81,19 +96,41 @@ export default function Landing(): JSX.Element {
               </div>
             </button>
 
-            {/* Log in (always visible with no-wrap) */}
-            <a
-              href="#demo"
-              className="hidden md:inline-block rounded-xl bg-white px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:opacity-90"
-            >
-              Book a Demo
-            </a>
-            <a
-              href="/login"
-              className="whitespace-nowrap rounded-xl bg-white px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:opacity-90"
-            >
-              Log in
-            </a>
+            {isAuthenticated ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleSignOutClick}
+                  className="hidden items-center gap-2 rounded-xl border border-white/15 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10 md:inline-flex"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Sign out
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDashboardClick}
+                  className="flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:opacity-90"
+                >
+                  <LayoutDashboard className="h-4 w-4" />
+                  Dashboard
+                </button>
+              </>
+            ) : (
+              <>
+                <a
+                  href="#demo"
+                  className="hidden md:inline-block rounded-xl bg-white px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:opacity-90"
+                >
+                  Book a Demo
+                </a>
+                <a
+                  href="/login"
+                  className="whitespace-nowrap rounded-xl bg-white px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:opacity-90"
+                >
+                  Log in
+                </a>
+              </>
+            )}
           </div>
         </div>
       </header>
