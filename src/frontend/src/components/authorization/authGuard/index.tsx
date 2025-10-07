@@ -24,7 +24,6 @@ export const ProtectedRoute = ({ children }) => {
   const { isSignedIn } = useClerkAuth();
   const orgId = organization?.id;
 
-  
   // Get current path
   const location = useLocation();
   const currentPath = location.pathname;
@@ -32,8 +31,6 @@ export const ProtectedRoute = ({ children }) => {
   const isOrgPage = currentPath.includes("organization");
   const isRootPage = currentPath === "/";
   const isFlowsPage = currentPath.includes("/flows");
-  // Keep the marketing landing page accessible at "/" even when authenticated,
-  // so we intentionally avoid redirecting signed-in users to "/flows" here.
 
   // 1️⃣ Redirect to login if not authenticated
   const shouldRedirectToLogin =
