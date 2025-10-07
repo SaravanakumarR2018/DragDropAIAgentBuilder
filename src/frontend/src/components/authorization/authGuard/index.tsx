@@ -32,6 +32,8 @@ export const ProtectedRoute = ({ children }) => {
   const isOrgPage = currentPath.includes("organization");
   const isRootPage = currentPath === "/";
   const isFlowsPage = currentPath.includes("/flows");
+  // Keep the marketing landing page accessible at "/" even when authenticated,
+  // so we intentionally avoid redirecting signed-in users to "/flows" here.
 
   // 1️⃣ Redirect to login if not authenticated
   const shouldRedirectToLogin =
@@ -48,14 +50,6 @@ export const ProtectedRoute = ({ children }) => {
     !isOrgSelected &&
     !isOrgPage &&
     !isLoginPage;
-
-  // ✅ 3️⃣ Redirect "/" to "/flows" ONLY if fully authenticated and org selected
-  const shouldRedirectHome =
-    isOrgLoaded &&
-    isAuthenticated &&
-    isSignedIn &&
-    isOrgSelected &&
-    isRootPage;
 
   // 🔄 Setup token refresh
   useEffect(() => {
@@ -94,11 +88,6 @@ export const ProtectedRoute = ({ children }) => {
   // 🔹 Redirect to /organization
   if (shouldRedirectToOrg) {
     return <CustomNavigate to="/organization" replace />;
-  }
-
-  // 🔹 Redirect "/" to "/flows" only if safe
-  if (shouldRedirectHome) {
-    return <CustomNavigate to="/flows" replace />;
   }
 
   // ✅ Otherwise render the page
