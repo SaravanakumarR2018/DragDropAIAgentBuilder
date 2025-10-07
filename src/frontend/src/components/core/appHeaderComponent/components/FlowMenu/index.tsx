@@ -91,7 +91,7 @@ export const MenuBar = memo((): JSX.Element => {
     <Popover open={openSettings} onOpenChange={setOpenSettings}>
       <PopoverAnchor>
         <div
-          className="relative flex w-full items-center justify-center gap-2"
+          className="relative flex w-full items-center justify-center gap-2 overflow-hidden"
           data-testid="menu_bar_wrapper"
         >
           <div
@@ -130,12 +130,12 @@ export const MenuBar = memo((): JSX.Element => {
           </div>
           <PopoverTrigger asChild>
             <div
-              className="group relative -mr-5 flex shrink-0 cursor-pointer items-center gap-2 text-sm sm:whitespace-normal"
+              className="group relative flex min-w-0 max-w-full cursor-pointer items-center text-sm sm:whitespace-normal"
               data-testid="menu_bar_display"
             >
               <span
                 ref={measureRef}
-                className="w-fit max-w-[35vw] truncate whitespace-pre text-mmd font-semibold sm:max-w-full sm:text-sm"
+                className="block min-w-0 max-w-full truncate whitespace-pre text-mmd font-semibold sm:text-sm"
                 aria-hidden="true"
                 data-testid="flow_name"
               >
@@ -145,11 +145,11 @@ export const MenuBar = memo((): JSX.Element => {
               <IconComponent
                 name="pencil"
                 className={cn(
-                  "h-5 w-3.5 -translate-x-2 opacity-0 transition-all",
-                  !openSettings &&
-                    "sm:group-hover:translate-x-0 sm:group-hover:opacity-100",
+                  "pointer-events-none absolute right-0 top-1/2 h-5 w-3.5 -translate-y-1/2 opacity-0 transition-opacity",
+                  !openSettings && "sm:group-hover:opacity-100",
                 )}
               />
+              <span aria-hidden="true" className="w-5 shrink-0" />
             </div>
           </PopoverTrigger>
           <div className={"ml-5 hidden shrink-0 items-center sm:flex"}>
