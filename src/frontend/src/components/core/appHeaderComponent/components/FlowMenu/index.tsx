@@ -91,10 +91,10 @@ export const MenuBar = memo((): JSX.Element => {
   return onFlowPage ? (
     <Popover open={openSettings} onOpenChange={setOpenSettings}>
       <PopoverAnchor>
-          <div
-            className="relative flex w-full items-center gap-3 px-2 sm:px-4"
-            data-testid="menu_bar_wrapper"
-          >
+        <div
+          className="relative flex w-full flex-nowrap items-center gap-3 px-2 sm:px-4"
+          data-testid="menu_bar_wrapper"
+        >
             <div
               className="header-menu-bar hidden max-w-40 justify-end truncate lg:flex xl:max-w-full"
               data-testid="menu_flow_bar"
@@ -132,7 +132,7 @@ export const MenuBar = memo((): JSX.Element => {
               </div>
               <PopoverTrigger asChild>
                 <div
-                  className="group flex min-w-0 flex-1 cursor-pointer items-center gap-2 pr-2 text-sm sm:whitespace-normal flow-name-responsive"
+                  className="group flex min-w-0 flex-1 cursor-pointer items-center gap-2 pr-3 text-sm sm:whitespace-normal sm:gap-3 sm:pr-4 flow-name-responsive"
                   data-testid="menu_bar_display"
                 >
                   <ShadTooltip
