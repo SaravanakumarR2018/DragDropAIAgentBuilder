@@ -91,10 +91,10 @@ export const MenuBar = memo((): JSX.Element => {
   return onFlowPage ? (
     <Popover open={openSettings} onOpenChange={setOpenSettings}>
       <PopoverAnchor>
-        <div
-          className="relative flex w-full items-center justify-center gap-2"
-          data-testid="menu_bar_wrapper"
-        >
+          <div
+            className="relative flex w-full items-center justify-center gap-2 px-2"
+            data-testid="menu_bar_wrapper"
+          >
           <div
             className="header-menu-bar hidden max-w-40 justify-end truncate lg:flex xl:max-w-full"
             data-testid="menu_flow_bar"
@@ -131,18 +131,23 @@ export const MenuBar = memo((): JSX.Element => {
           </div>
           <PopoverTrigger asChild>
             <div
-              className="group relative -mr-5 flex shrink-0 cursor-pointer items-center gap-2 text-sm sm:whitespace-normal flow-name-responsive"
+              className="group relative flex min-w-0 cursor-pointer items-center gap-2 text-sm sm:whitespace-normal flow-name-responsive"
               data-testid="menu_bar_display"
             >
-              <span
-                ref={measureRef}
-                className="flow-name-text w-fit truncate whitespace-nowrap text-mmd font-semibold sm:text-sm"
-                aria-hidden="true"
-                title={currentFlowName || "Untitled Flow"}
-                data-testid="flow_name"
+              <ShadTooltip
+                content={currentFlowName || "Untitled Flow"}
+                side="bottom"
+                delayDuration={300}
               >
-                {currentFlowName || "Untitled Flow"}
-              </span>
+                <span
+                  ref={measureRef}
+                  className="flow-name-text w-fit truncate whitespace-nowrap text-mmd font-semibold sm:text-sm"
+                  aria-hidden="true"
+                  data-testid="flow_name"
+                >
+                  {currentFlowName || "Untitled Flow"}
+                </span>
+              </ShadTooltip>
 
               <IconComponent
                 name="pencil"
