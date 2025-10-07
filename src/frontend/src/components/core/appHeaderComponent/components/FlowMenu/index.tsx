@@ -92,7 +92,7 @@ export const MenuBar = memo((): JSX.Element => {
     <Popover open={openSettings} onOpenChange={setOpenSettings}>
       <PopoverAnchor>
           <div
-            className="relative flex w-full items-center justify-center gap-2 px-2"
+            className="relative flex w-full items-center justify-center gap-3 px-3 sm:px-4"
             data-testid="menu_bar_wrapper"
           >
           <div
@@ -131,7 +131,7 @@ export const MenuBar = memo((): JSX.Element => {
           </div>
           <PopoverTrigger asChild>
             <div
-              className="group relative flex min-w-0 cursor-pointer items-center gap-2 text-sm sm:whitespace-normal flow-name-responsive"
+              className="group relative flex min-w-0 cursor-pointer items-center gap-2 pr-2 text-sm sm:whitespace-normal flow-name-responsive"
               data-testid="menu_bar_display"
             >
               <ShadTooltip
@@ -141,7 +141,7 @@ export const MenuBar = memo((): JSX.Element => {
               >
                 <span
                   ref={measureRef}
-                  className="flow-name-text w-fit truncate whitespace-nowrap text-mmd font-semibold sm:text-sm"
+                  className="flow-name-text w-full truncate whitespace-nowrap text-mmd font-semibold sm:text-sm"
                   aria-hidden="true"
                   data-testid="flow_name"
                 >

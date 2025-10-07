@@ -83,7 +83,7 @@ export default function AppHeader(): JSX.Element {
       </div>
 
       {/* Middle Section */}
-      <div className="flex-1 flex justify-center px-4 min-w-0">
+      <div className="flex-1 flex justify-center px-4 min-w-0 overflow-hidden">
         <FlowMenu />
       </div>
 

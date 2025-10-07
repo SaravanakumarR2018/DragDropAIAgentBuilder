@@ -1,34 +1,81 @@
 /* Responsive styles for flow name display in the header */
 
-/* Default: Show flow name text normally */
-.flow-name-responsive .flow-name-text {
-  display: inline-block;
+.flow-name-responsive {
+  flex: 1 1 22rem;
+  min-width: 0;
+  max-width: 100%;
 }
 
-/* Provide a flexible but intuitive truncation with ellipsis */
 .flow-name-responsive .flow-name-text {
-  max-width: clamp(10rem, 30vw, 22rem);
+  display: block;
+  min-width: 0;
+  max-width: min(32rem, 100%);
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* On large tablets / small laptops allow a slightly smaller label */
-@media (max-width: 1023px) {
-  .flow-name-responsive .flow-name-text {
-    max-width: clamp(8rem, 34vw, 18rem);
+@media (max-width: 1380px) {
+  .flow-name-responsive {
+    flex-basis: 20rem;
   }
 }
 
-/* On small tablets the label keeps shrinking while keeping ellipsis visible */
-@media (max-width: 899px) {
-  .flow-name-responsive .flow-name-text {
-    max-width: clamp(7rem, 40vw, 16rem);
+@media (max-width: 1200px) {
+  .flow-name-responsive {
+    flex-basis: 18rem;
   }
 }
 
-/* On mobile sizes give the flow name most of the available width */
-@media (max-width: 639px) {
-  .flow-name-responsive .flow-name-text {
-    max-width: clamp(6rem, 60vw, 14rem);
+@media (max-width: 1100px) {
+  .flow-name-responsive {
+    flex-basis: 16rem;
+  }
+}
+
+@media (max-width: 980px) {
+  .flow-name-responsive {
+    flex-basis: 14rem;
+  }
+}
+
+@media (max-width: 880px) {
+  .flow-name-responsive {
+    flex-basis: 12rem;
+  }
+}
+
+@media (max-width: 780px) {
+  .flow-name-responsive {
+    flex-basis: 10rem;
+  }
+}
+
+@media (max-width: 680px) {
+  .flow-name-responsive {
+    flex-basis: 8rem;
+  }
+}
+
+@media (max-width: 600px) {
+  .flow-name-responsive {
+    flex-basis: 7rem;
+  }
+}
+
+@media (max-width: 540px) {
+  .flow-name-responsive {
+    flex-basis: 6rem;
+  }
+}
+
+@media (max-width: 500px) {
+  .flow-name-responsive {
+    flex-basis: 5rem;
+  }
+}
+
+@media (max-width: 460px) {
+  .flow-name-responsive {
+    flex-basis: 4rem;
   }
 }
