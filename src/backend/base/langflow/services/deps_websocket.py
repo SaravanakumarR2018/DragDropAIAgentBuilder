@@ -9,22 +9,20 @@ context is available before downstream dependencies run.
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
+from collections.abc import AsyncGenerator  # noqa:TCH003
 from contextvars import Token
-from typing import Annotated, AsyncGenerator
+from typing import Annotated
 
 from fastapi import Depends, WebSocket, WebSocketException, status
 
 from langflow.logging import logger
 from langflow.services.auth.api_key_codec import decode_api_key
-from langflow.services.auth.clerk_utils import auth_header_ctx
-from langflow.services.auth.clerk_utils import verify_clerk_token
+from langflow.services.auth.clerk_utils import auth_header_ctx, verify_clerk_token
 from langflow.services.deps import get_settings_service
 
 
 async def _populate_org_context(websocket: WebSocket) -> Token | None:
     """Populate ``auth_header_ctx`` with organisation data for WebSockets."""
-
     settings = get_settings_service()
     if not settings.auth_settings.CLERK_AUTH_ENABLED:
         return None
@@ -33,6 +31,7 @@ async def _populate_org_context(websocket: WebSocket) -> Token | None:
 
     token = websocket.cookies.get("access_token_lf") or websocket.query_params.get("token")
     if token:
+        logger.info("Verifying Clerk token for websocket connection.")
         try:
             payload = await verify_clerk_token(token)
         except Exception as exc:  # noqa: BLE001
@@ -46,6 +45,7 @@ async def _populate_org_context(websocket: WebSocket) -> Token | None:
             or websocket.headers.get("api_key")
         )
         if api_key:
+            logger.info("Decoding API key for websocket connection.")
             decoded = decode_api_key(api_key)
             if decoded.organization_id:
                 payload = {"org_id": decoded.organization_id}
@@ -61,8 +61,8 @@ async def _populate_org_context(websocket: WebSocket) -> Token | None:
     )
 
 
-@asynccontextmanager
-async def _websocket_org_context_manager(websocket: WebSocket) -> AsyncGenerator[Token | None, None]:
+async def websocket_org_context(websocket: WebSocket) -> AsyncGenerator[Token | None, None]:
+    """FastAPI dependency that seeds Clerk context for WebSockets."""
     ctx_token: Token | None = None
     try:
         ctx_token = await _populate_org_context(websocket)
@@ -74,11 +74,6 @@ async def _websocket_org_context_manager(websocket: WebSocket) -> AsyncGenerator
             auth_header_ctx.set(None)
 
 
-async def websocket_org_context(websocket: WebSocket) -> AsyncGenerator[Token | None, None]:
-    """FastAPI dependency that seeds Clerk context for WebSockets."""
-
-    async with _websocket_org_context_manager(websocket) as ctx_token:
-        yield ctx_token
-
-
 WebsocketOrgContext = Annotated[Token | None, Depends(websocket_org_context)]
+
+WEBSOCKET_ORG_DEPENDENCIES = [Depends(websocket_org_context)]

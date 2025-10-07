@@ -33,7 +33,7 @@ from langflow.services.auth.utils import get_current_user_for_websocket
 from langflow.services.database.models import MessageTable, User
 from langflow.services.database.models.flow.model import Flow
 from langflow.services.deps import get_variable_service, session_scope
-from langflow.services.deps_websocket import WebsocketOrgContext
+from langflow.services.deps_websocket import WEBSOCKET_ORG_DEPENDENCIES
 from langflow.utils.voice_utils import (
     BYTES_PER_24K_FRAME,
     VAD_SAMPLE_RATE_16K,
@@ -687,12 +687,11 @@ class FunctionCall:
 
 
 # --- WebSocket Endpoints for Flow-as-Tool ---
-@router.websocket("/ws/flow_as_tool/{flow_id}")
+@router.websocket("/ws/flow_as_tool/{flow_id}", dependencies=WEBSOCKET_ORG_DEPENDENCIES)
 async def flow_as_tool_websocket_no_session(
     client_websocket: WebSocket,
     flow_id: str,
     background_tasks: BackgroundTasks,
-    org_context: WebsocketOrgContext,
     session: DbSession,
 ):
     session_id = str(uuid4())
@@ -701,22 +700,19 @@ async def flow_as_tool_websocket_no_session(
         flow_id=flow_id,
         background_tasks=background_tasks,
         session=session,
-        org_context=org_context,
         session_id=session_id,
     )
 
 
-@router.websocket("/ws/flow_as_tool/{flow_id}/{session_id}")
+@router.websocket("/ws/flow_as_tool/{flow_id}/{session_id}", dependencies=WEBSOCKET_ORG_DEPENDENCIES)
 async def flow_as_tool_websocket(
     client_websocket: WebSocket,
     flow_id: str,
     background_tasks: BackgroundTasks,
-    org_context: WebsocketOrgContext,
     session: DbSession,
     session_id: str,
 ):
     """WebSocket endpoint registering the flow as a tool for real-time interaction."""
-    _ = org_context  # Dependency ensures organisation context is seeded
     try:
         await client_websocket.accept()
 
@@ -1119,12 +1115,11 @@ async def flow_as_tool_websocket(
             vad_task.cancel()
 
 
-@router.websocket("/ws/flow_tts/{flow_id}")
+@router.websocket("/ws/flow_tts/{flow_id}", dependencies=WEBSOCKET_ORG_DEPENDENCIES)
 async def flow_tts_websocket_no_session(
     client_websocket: WebSocket,
     flow_id: str,
     background_tasks: BackgroundTasks,
-    org_context: WebsocketOrgContext,
     session: DbSession,
 ):
     session_id = str(uuid4())
@@ -1132,23 +1127,20 @@ async def flow_tts_websocket_no_session(
         client_websocket=client_websocket,
         flow_id=flow_id,
         background_tasks=background_tasks,
-        org_context=org_context,
         session=session,
         session_id=session_id,
     )
 
 
-@router.websocket("/ws/flow_tts/{flow_id}/{session_id}")
+@router.websocket("/ws/flow_tts/{flow_id}/{session_id}", dependencies=WEBSOCKET_ORG_DEPENDENCIES)
 async def flow_tts_websocket(
     client_websocket: WebSocket,
     flow_id: str,
     background_tasks: BackgroundTasks,
-    org_context: WebsocketOrgContext,
     session: DbSession,
     session_id: str,
 ):
     """WebSocket endpoint for direct flow text-to-speech interaction."""
-    _ = org_context  # Dependency ensures organisation context is seeded
     try:
         await client_websocket.accept()
 
