@@ -92,81 +92,74 @@ export const MenuBar = memo((): JSX.Element => {
     <Popover open={openSettings} onOpenChange={setOpenSettings}>
       <PopoverAnchor>
         <div
-          className="relative flex w-full flex-nowrap items-center gap-3 px-2 sm:px-4"
+          className="relative flex w-full items-center justify-center gap-2"
           data-testid="menu_bar_wrapper"
         >
-            <div
-              className="header-menu-bar hidden max-w-40 justify-end truncate lg:flex xl:max-w-full"
-              data-testid="menu_flow_bar"
-              id="menu_flow_bar_navigation"
-            >
-              {currentFolder?.name && (
-                <div className="hidden truncate md:flex">
-                  <div
-                    className="cursor-pointer truncate text-sm text-muted-foreground hover:text-primary"
-                    onClick={() => {
-                      navigate(
-                        currentFolder?.id
-                          ? "/all/folder/" + currentFolder.id
-                          : "/all",
-                      );
-                    }}
-                  >
-                    {currentFolder?.name}
-                  </div>
-                </div>
-              )}
-            </div>
-            <div
-              className="hidden w-fit shrink-0 select-none font-normal text-muted-foreground lg:flex"
-              data-testid="menu_bar_separator"
-            >
-              /
-            </div>
-            <div className="flex min-w-0 flex-1 items-center gap-2">
-              <div className={cn(`flex shrink-0 rounded p-1`, swatchColors[swatchIndex])}>
-                <IconComponent
-                  name={currentFlowIcon ?? "Workflow"}
-                  className="h-3.5 w-3.5"
-                />
-              </div>
-              <PopoverTrigger asChild>
+          <div
+            className="header-menu-bar hidden max-w-40 justify-end truncate md:flex xl:max-w-full"
+            data-testid="menu_flow_bar"
+            id="menu_flow_bar_navigation"
+          >
+            {currentFolder?.name && (
+              <div className="hidden truncate md:flex">
                 <div
-                  className="group flex min-w-0 flex-1 cursor-pointer items-center gap-2 pr-3 text-sm sm:whitespace-normal sm:gap-3 sm:pr-4 flow-name-responsive"
-                  data-testid="menu_bar_display"
+                  className="cursor-pointer truncate text-sm text-muted-foreground hover:text-primary"
+                  onClick={() => {
+                    navigate(
+                      currentFolder?.id
+                        ? "/all/folder/" + currentFolder.id
+                        : "/all",
+                    );
+                  }}
                 >
-                  <ShadTooltip
-                    content={currentFlowName || "Untitled Flow"}
-                    side="bottom"
-                    delayDuration={300}
-                  >
-                    <span
-                      ref={measureRef}
-                      className="flow-name-text block min-w-0 truncate whitespace-nowrap text-mmd font-semibold sm:text-sm"
-                      aria-hidden="true"
-                      data-testid="flow_name"
-                    >
-                      {currentFlowName || "Untitled Flow"}
-                    </span>
-                  </ShadTooltip>
-
-                  <IconComponent
-                    name="pencil"
-                    className={cn(
-                      "h-5 w-3.5 -translate-x-2 opacity-0 transition-all",
-                      !openSettings &&
-                        "sm:group-hover:translate-x-0 sm:group-hover:opacity-100",
-                    )}
-                  />
+                  {currentFolder?.name}
                 </div>
-              </PopoverTrigger>
+              </div>
+            )}
+          </div>
+          <div
+            className="hidden w-fit shrink-0 select-none font-normal text-muted-foreground md:flex"
+            data-testid="menu_bar_separator"
+          >
+            /
+          </div>
+          <div className={cn(`flex rounded p-1`, swatchColors[swatchIndex])}>
+            <IconComponent
+              name={currentFlowIcon ?? "Workflow"}
+              className="h-3.5 w-3.5"
+            />
+          </div>
+          <PopoverTrigger asChild>
+            <div
+              className="group relative -mr-5 flex shrink-0 cursor-pointer items-center gap-2 text-sm sm:whitespace-normal"
+              data-testid="menu_bar_display"
+            >
+              <span
+                ref={measureRef}
+                className="w-fit max-w-[35vw] truncate whitespace-pre text-mmd font-semibold sm:max-w-full sm:text-sm"
+                data-tooltip={currentFlowName || "Untitled Flow"}
+                aria-hidden="true"
+                data-testid="flow_name"
+              >
+                {currentFlowName || "Untitled Flow"}
+              </span>
+
+              <IconComponent
+                name="pencil"
+                className={cn(
+                  "h-5 w-3.5 -translate-x-2 opacity-0 transition-all",
+                  !openSettings &&
+                    "sm:group-hover:translate-x-0 sm:group-hover:opacity-100",
+                )}
+              />
             </div>
-            <div className="ml-auto hidden shrink-0 items-center sm:flex">
-              {!autoSaving && (
-                <ShadTooltip
-                  content={
-                    changesNotSaved
-                      ? saveLoading
+          </PopoverTrigger>
+          <div className={"ml-5 hidden shrink-0 items-center sm:flex"}>
+            {!autoSaving && (
+              <ShadTooltip
+                content={
+                  changesNotSaved
+                    ? saveLoading
                       ? "Saving..."
                       : "Save Changes"
                     : SAVED_HOVER +
