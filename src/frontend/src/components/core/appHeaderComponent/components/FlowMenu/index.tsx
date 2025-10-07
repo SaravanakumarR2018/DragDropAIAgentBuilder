@@ -96,7 +96,7 @@ export const MenuBar = memo((): JSX.Element => {
           data-testid="menu_bar_wrapper"
         >
           <div
-            className="header-menu-bar hidden max-w-40 justify-end truncate md:flex xl:max-w-full"
+            className="header-menu-bar hidden max-w-40 justify-end truncate lg:flex xl:max-w-full"
             data-testid="menu_flow_bar"
             id="menu_flow_bar_navigation"
           >
@@ -118,7 +118,7 @@ export const MenuBar = memo((): JSX.Element => {
             )}
           </div>
           <div
-            className="hidden w-fit shrink-0 select-none font-normal text-muted-foreground md:flex"
+            className="hidden w-fit shrink-0 select-none font-normal text-muted-foreground lg:flex"
             data-testid="menu_bar_separator"
           >
             /
@@ -136,8 +136,9 @@ export const MenuBar = memo((): JSX.Element => {
             >
               <span
                 ref={measureRef}
-                className="flow-name-text w-fit max-w-[35vw] truncate whitespace-pre text-mmd font-semibold sm:max-w-full sm:text-sm"
+                className="flow-name-text w-fit truncate whitespace-nowrap text-mmd font-semibold sm:text-sm"
                 aria-hidden="true"
+                title={currentFlowName || "Untitled Flow"}
                 data-testid="flow_name"
               >
                 {currentFlowName || "Untitled Flow"}
