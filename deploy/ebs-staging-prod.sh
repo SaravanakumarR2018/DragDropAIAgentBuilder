@@ -281,19 +281,13 @@ ensure_ebs_volume() {
     done
 
     # 6️ Detect container UID/GID if exists
-    local CONTAINER_UID=999
-    local CONTAINER_GID=999
-    for color in green blue; do
-        if docker_exists "${APP_NAME}_${color}"; then
-            CONTAINER_UID=$(docker exec "${APP_NAME}_${color}" id -u 2>/dev/null || echo 999)
-            CONTAINER_GID=$(docker exec "${APP_NAME}_${color}" id -g 2>/dev/null || echo 999)
-            break
-        fi
-    done
+    local CONTAINER_UID=1000
+    local CONTAINER_GID=1000
 
     # 7️ Apply correct permissions
-    chown -R "${CONTAINER_UID}:${CONTAINER_GID}" "${LANGFLOW_STORAGE_PATH}" "${POSTGRES_STORAGE_PATH}"
-    ok "Permissions set for Docker (UID:${CONTAINER_UID} GID:${CONTAINER_GID})"
+    chown -R "${CONTAINER_UID}:${CONTAINER_GID}" "${LANGFLOW_STORAGE_PATH}"
+    chown -R 999:999 "${POSTGRES_STORAGE_PATH}" # Postgres often runs as UID 999
+    ok "Permissions set for Docker (Langflow UID:${CONTAINER_UID}, Postgres UID:999)"
 
     ok "✅ EBS volume ready and linked: ${SYSTEM_MOUNT_POINT} → ${APP_MOUNT_POINT}"
 }
