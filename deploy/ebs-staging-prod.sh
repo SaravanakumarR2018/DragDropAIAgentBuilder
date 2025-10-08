@@ -31,32 +31,6 @@ warn()     { printf "\033[0;33m⚠️  %s\033[0m\n" "$*"; }
 err()      { printf "\033[0;31m❌ %s\033[0m\n" "$*"; }
 step()     { CURRENT_STEP="$*"; log "$*"; }
 
-# ---------- Cleanup on failure / interrupt ----------
-cleanup_on_failure() {
-  [[ "${CLEANED_UP}" -eq 1 ]] && return 0
-  CLEANED_UP=1
-  warn "Running failure cleanup"
-
-  # If we switched traffic already, roll back Nginx to previous color
-  if [[ "${SWITCHED}" -eq 1 ]]; then
-    rollback_switch || true
-  fi
-
-  # Kill the target container if it exists (failed health/verify or interrupt)
-  if docker_exists "${TARGET_NAME}"; then
-    warn "Removing target container ${TARGET_NAME}"
-    docker rm -f "${TARGET_NAME}" >/dev/null 2>&1 || true
-  fi
-
-  # If we had stopped the active one but haven't switched yet, bring it back up
-  if [[ "${STOPPED_ACTIVE}" -eq 1 && "${HAD_ACTIVE}" -eq 1 && ! $(docker_running "${ACTIVE_NAME}" && echo yes) ]]; then
-    warn "Restarting previous active container ${ACTIVE_NAME}"
-    docker start "${ACTIVE_NAME}" >/dev/null 2>&1 || true
-  fi
-
-  ok "Failure cleanup completed"
-}
-
 # Traps: run cleanup on errors/interrupts/abnormal exit
 trap 'err "Failed during: ${CURRENT_STEP:-unknown step}"; cleanup_on_failure; exit 1' ERR
 trap 'warn "Interrupted (SIGINT/SIGTERM)"; cleanup_on_failure; exit 130' SIGINT SIGTERM
@@ -803,6 +777,32 @@ wait_until_healthy() {
 
   err "Health check timed out after ${HEALTH_TIMEOUT}s"
   return 1
+}
+
+# ---------- Cleanup on failure / interrupt ----------
+cleanup_on_failure() {
+  [[ "${CLEANED_UP}" -eq 1 ]] && return 0
+  CLEANED_UP=1
+  warn "Running failure cleanup"
+
+  # If we switched traffic already, roll back Nginx to previous color
+  if [[ "${SWITCHED}" -eq 1 ]]; then
+    rollback_switch || true
+  fi
+
+  # Kill the target container if it exists (failed health/verify or interrupt)
+  if docker_exists "${TARGET_NAME}"; then
+    warn "Removing target container ${TARGET_NAME}"
+    docker rm -f "${TARGET_NAME}" >/dev/null 2>&1 || true
+  fi
+
+  # If we had stopped the active one but haven't switched yet, bring it back up
+  if [[ "${STOPPED_ACTIVE}" -eq 1 && "${HAD_ACTIVE}" -eq 1 && ! $(docker_running "${ACTIVE_NAME}" && echo yes) ]]; then
+    warn "Restarting previous active container ${ACTIVE_NAME}"
+    docker start "${ACTIVE_NAME}" >/dev/null 2>&1 || true
+  fi
+
+  ok "Failure cleanup completed"
 }
 
 # ---------- Final reporting ----------
