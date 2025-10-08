@@ -1,7 +1,7 @@
-import { NODE_HEIGHT, NODE_WIDTH } from "@/constants/constants";
-import { AllNodeType, EdgeType } from "@/types/flow";
+import ELK, { type ElkNode } from "elkjs/lib/elk.bundled.js";
 import { cloneDeep } from "lodash";
-import type { ElkNode } from "elkjs";
+import { NODE_HEIGHT, NODE_WIDTH } from "@/constants/constants";
+import type { AllNodeType, EdgeType } from "@/types/flow";
 
 const layoutOptions = {
   "elk.algorithm": "layered",
