@@ -32,9 +32,9 @@ err()      { printf "\033[0;31m❌ %s\033[0m\n" "$*"; }
 step()     { CURRENT_STEP="$*"; log "$*"; }
 
 # Traps: run cleanup on errors/interrupts/abnormal exit
-# trap 'err "Failed during: ${CURRENT_STEP:-unknown step}"; cleanup_on_failure; exit 1' ERR
-# trap 'warn "Interrupted (SIGINT/SIGTERM)"; cleanup_on_failure; exit 130' SIGINT SIGTERM
-# trap 'if [[ "$DEPLOY_SUCCESS" -ne 1 ]]; then warn "Exiting without success"; cleanup_on_failure; fi; report_status' EXIT
+trap 'err "Failed during: ${CURRENT_STEP:-unknown step}"; cleanup_on_failure; exit 1' ERR
+trap 'warn "Interrupted (SIGINT/SIGTERM)"; cleanup_on_failure; exit 130' SIGINT SIGTERM
+trap 'if [[ "$DEPLOY_SUCCESS" -ne 1 ]]; then warn "Exiting without success"; cleanup_on_failure; fi; report_status' EXIT
 
 # ---------- Defaults ----------
 APP_NAME="app"
@@ -145,8 +145,7 @@ http_ok() {
   [[ "$code" -ge 200 && "$code" -lt 400 ]]
 }
 
-prepare_langflow_env() { 
-  # Ensure required DB variables are set
+prepare_langflow_env() {
   [[ -n "$DB_USER" && -n "$DB_PASSWORD" && -n "$DB_NAME" ]] || {
     err "--db-user, --db-password and --db-name are required"; exit 1;
   }
