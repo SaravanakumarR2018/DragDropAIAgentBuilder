@@ -1,12 +1,7 @@
 import { usePostValidateCode } from "@/controllers/API/queries/nodes/use-post-validate-code";
 import { usePostValidateComponentCode } from "@/controllers/API/queries/nodes/use-post-validate-component-code";
 import { clearHandlesFromAdvancedFields } from "@/utils/reactflowUtils";
-import "ace-builds/src-noconflict/ace";
-import "ace-builds/src-noconflict/ext-language_tools";
-import "ace-builds/src-noconflict/ext-searchbox";
-import "ace-builds/src-noconflict/mode-python";
-import "ace-builds/src-noconflict/theme-github";
-import "ace-builds/src-noconflict/theme-twilight";
+import { lazyLoadAce } from "@/utils/lazyLoadAce";
 import { useEffect, useRef, useState } from "react";
 import AceEditor from "react-ace";
 import type ReactAce from "react-ace/lib/ace";

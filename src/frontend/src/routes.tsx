@@ -19,26 +19,10 @@ import {
 } from "./customization/feature-flags";
 import { CustomRoutesStore } from "./customization/utils/custom-routes-store";
 import { CustomRoutesStorePages } from "./customization/utils/custom-routes-store-pages";
-import { AppAuthenticatedPage } from "./pages/AppAuthenticatedPage";
-import { AppInitPage } from "./pages/AppInitPage";
-import { AppWrapperPage } from "./pages/AppWrapperPage";
-import FlowPage from "./pages/FlowPage";
-import LoginPage from "./pages/LoginPage";
-import FilesPage from "./pages/MainPage/pages/filesPage";
-import HomePage from "./pages/MainPage/pages/homePage";
-import KnowledgePage from "./pages/MainPage/pages/knowledgePage";
-import CollectionPage from "./pages/MainPage/pages/main-page";
-import SettingsPage from "./pages/SettingsPage";
-import ApiKeysPage from "./pages/SettingsPage/pages/ApiKeysPage";
-import GeneralPage from "./pages/SettingsPage/pages/GeneralPage";
-import GlobalVariablesPage from "./pages/SettingsPage/pages/GlobalVariablesPage";
-import MCPServersPage from "./pages/SettingsPage/pages/MCPServersPage";
-import MessagesPage from "./pages/SettingsPage/pages/messagesPage";
-import ShortcutsPage from "./pages/SettingsPage/pages/ShortcutsPage";
-import ViewPage from "./pages/ViewPage";
 import { LoadingPage } from "./pages/LoadingPage";
 import { CollectionIndexRedirect } from "./routes/CollectionIndexRedirect";
 
+// --- Lazy Imports ---
 const AppWrapperPage = lazy(() =>
   import("./pages/AppWrapperPage").then((module) => ({
     default: module.AppWrapperPage,
@@ -60,6 +44,7 @@ const CustomDashboardWrapperPage = lazy(
 const CollectionPage = lazy(() => import("./pages/MainPage/pages/main-page"));
 const HomePage = lazy(() => import("./pages/MainPage/pages/homePage"));
 const FilesPage = lazy(() => import("./pages/MainPage/pages/filesPage"));
+const KnowledgePage = lazy(() => import("./pages/MainPage/pages/knowledgePage"));
 const FlowPage = lazy(() => import("./pages/FlowPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const GlobalVariablesPage = lazy(
@@ -74,6 +59,9 @@ const ShortcutsPage = lazy(
 );
 const MessagesPage = lazy(
   () => import("./pages/SettingsPage/pages/messagesPage"),
+);
+const MCPServersPage = lazy(
+  () => import("./pages/SettingsPage/pages/MCPServersPage"),
 );
 const ViewPage = lazy(() => import("./pages/ViewPage"));
 const OrganizationPage = lazy(() => import("./clerk/OrganizationPage"));
@@ -92,11 +80,11 @@ const LoginAdminPage = lazy(() =>
     default: module.LoginAdminPage,
   })),
 );
-
 const AdminPage = lazy(() => import("./pages/AdminPage"));
 const DeleteAccountPage = lazy(() => import("./pages/DeleteAccountPage"));
 const PlaygroundPage = lazy(() => import("./pages/Playground"));
 
+// --- Router Configuration ---
 const router = createBrowserRouter(
   createRoutesFromElements([
     <Route path="/playground/:id/">
@@ -162,80 +150,36 @@ const router = createBrowserRouter(
                 }
               >
                 <Route index element={<CollectionIndexRedirect />} />
+
+                {/* --- Assets Section (Upstream addition) --- */}
                 {ENABLE_FILE_MANAGEMENT && (
-                  <Route
-                    index
-                    element={<CustomNavigate replace to={"flows"} />}
-                  />
-                  {ENABLE_FILE_MANAGEMENT && (
-                    <Route path="assets">
+                  <Route path="assets">
+                    <Route
+                      index
+                      element={<CustomNavigate replace to="files" />}
+                    />
+                    <Route
+                      path="files"
+                      element={
+                        <Suspense fallback={<LoadingPage />}>
+                          <FilesPage />
+                        </Suspense>
+                      }
+                    />
+                    {ENABLE_KNOWLEDGE_BASES && (
                       <Route
-                        index
-                        element={<CustomNavigate replace to="files" />}
+                        path="knowledge-bases"
+                        element={
+                          <Suspense fallback={<LoadingPage />}>
+                            <KnowledgePage />
+                          </Suspense>
+                        }
                       />
-                      <Route path="files" element={<FilesPage />} />
-                      {ENABLE_KNOWLEDGE_BASES && (
-                        <Route
-                          path="knowledge-bases"
-                          element={<KnowledgePage />}
-                        />
-                      )}
-                    </Route>
-                  )}
-                  <Route
-                    path="flows/"
-                    element={<HomePage key="flows" type="flows" />}
-                  />
-                  <Route
-                    path="components/"
-                    element={<HomePage key="components" type="components" />}
-                  >
-                    <Route
-                      path="folder/:folderId"
-                      element={<HomePage key="components" type="components" />}
-                    />
+                    )}
                   </Route>
-                  <Route
-                    path="all/"
-                    element={<HomePage key="flows" type="flows" />}
-                  >
-                    <Route
-                      path="folder/:folderId"
-                      element={<HomePage key="flows" type="flows" />}
-                    />
-                  </Route>
-                  <Route
-                    path="mcp/"
-                    element={<HomePage key="mcp" type="mcp" />}
-                  >
-                    <Route
-                      path="folder/:folderId"
-                      element={<HomePage key="mcp" type="mcp" />}
-                    />
-                  </Route>
-                </Route>
-                <Route path="settings" element={<SettingsPage />}>
-                  <Route
-                    index
-                    element={<CustomNavigate replace to={"general"} />}
-                  />
-                  <Route
-                    path="global-variables"
-                    element={<GlobalVariablesPage />}
-                  />
-                  <Route path="mcp-servers" element={<MCPServersPage />} />
-                  <Route path="api-keys" element={<ApiKeysPage />} />
-                  <Route
-                    path="general/:scrollId?"
-                    element={
-                    path="files"
-                    element={
-                      <Suspense fallback={<LoadingPage />}>
-                        <FilesPage />
-                      </Suspense>
-                    }
-                  />
                 )}
+
+                {/* --- Flow Routes --- */}
                 <Route
                   path="flows/"
                   element={
@@ -296,6 +240,8 @@ const router = createBrowserRouter(
                   />
                 </Route>
               </Route>
+
+              {/* --- Settings Routes --- */}
               <Route
                 path="settings"
                 element={
@@ -310,6 +256,14 @@ const router = createBrowserRouter(
                   element={
                     <Suspense fallback={<LoadingPage />}>
                       <GlobalVariablesPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="mcp-servers"
+                  element={
+                    <Suspense fallback={<LoadingPage />}>
+                      <MCPServersPage />
                     </Suspense>
                   }
                 />
@@ -349,10 +303,11 @@ const router = createBrowserRouter(
                 />
                 {CustomRoutesStore()}
               </Route>
+
               {CustomRoutesStorePages()}
-              <Route path="account">
+              <Route path="account/delete">
                 <Route
-                  path="delete"
+                  index
                   element={
                     <Suspense fallback={<LoadingPage />}>
                       <DeleteAccountPage />
@@ -371,6 +326,8 @@ const router = createBrowserRouter(
                 }
               />
             </Route>
+
+            {/* --- Flow Pages --- */}
             <Route path="flow/:id/">
               <Route
                 path=""
@@ -408,6 +365,8 @@ const router = createBrowserRouter(
             </Route>
           </Route>
         </Route>
+
+        {/* --- Auth Pages --- */}
         <Route
           path="login"
           element={

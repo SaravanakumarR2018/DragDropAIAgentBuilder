@@ -735,12 +735,15 @@ async def load_flows_from_directory() -> None:
     flows_path = settings_service.settings.load_flows_path
     if not flows_path:
         return
-    if not settings_service.auth_settings.AUTO_LOGIN:
-        logger.warning("AUTO_LOGIN is disabled, not loading flows from directory")
-        return
 
     async with session_scope(use_organisation=False) as session:
-        user = await get_user_by_username(session, settings_service.auth_settings.SUPERUSER)
+        # Find superuser by role instead of username to avoid issues with credential reset
+        from langflow.services.database.models.user.model import User
+
+        stmt = select(User).where(User.is_superuser == True)  # noqa: E712
+        result = await session.exec(stmt)
+        user = result.first()
+
         if user is None:
             msg = "No superuser found in the database"
             raise NoResultFound(msg)
@@ -795,11 +798,14 @@ async def load_bundles_from_urls() -> tuple[list[TemporaryDirectory], list[str]]
     bundle_urls = settings_service.settings.bundle_urls
     if not bundle_urls:
         return [], []
-    if not settings_service.auth_settings.AUTO_LOGIN:
-        logger.warning("AUTO_LOGIN is disabled, not loading flows from URLs")
 
     async with session_scope(use_organisation=False) as session:
-        user = await get_user_by_username(session, settings_service.auth_settings.SUPERUSER)
+        # Find superuser by role instead of username to avoid issues with credential reset
+        from langflow.services.database.models.user.model import User
+
+        stmt = select(User).where(User.is_superuser == True)  # noqa: E712
+        result = await session.exec(stmt)
+        user = result.first()
         if user is None:
             msg = "No superuser found in the database"
             raise NoResultFound(msg)
@@ -897,35 +903,47 @@ async def find_existing_flow(session, flow_id, flow_endpoint_name):
         return existing
     return None
 
-
-async def create_or_update_starter_projects(all_types_dict: dict, *, do_create: bool = True, use_organisation: bool = False) -> None:
+async def create_or_update_starter_projects(
+    all_types_dict: dict,
+    *,
+    do_create: bool = True,
+    use_organisation: bool = False
+) -> None:
     """Create or update starter projects.
 
     Args:
-        all_types_dict (dict): Dictionary containing all component types and their templates
+        all_types_dict (dict): Dictionary containing all component types and their templates.
         do_create (bool, optional): Whether to create new projects. Defaults to True.
-    use_organisation (bool, optional): Whether to use organisation-scoped database sessions.
-            Defaults to False.
+        use_organisation (bool, optional): Whether to use organisation-scoped database sessions.
     """
+    settings_service = get_settings_service()
+    if not settings_service.settings.create_starter_projects:
+        # Skip startup logic for environments that don't want starter projects.
+        return
+
     async with session_scope(use_organisation=use_organisation) as session:
-        new_folder = await create_starter_folder(session)
+        new_folder = await get_or_create_starter_folder(session)
         starter_projects = await load_starter_projects()
-        await delete_start_projects(session, new_folder.id)
-        await copy_profile_pictures()
-        for project_path, project in starter_projects:
-            (
-                project_name,
-                project_description,
-                project_is_component,
-                updated_at_datetime,
-                project_data,
-                project_icon,
-                project_icon_bg_color,
-                project_gradient,
-                project_tags,
-            ) = get_project_data(project)
-            do_update_starter_projects = os.environ.get("LANGFLOW_UPDATE_STARTER_PROJECTS", "true").lower() == "true"
-            if do_update_starter_projects:
+
+        if settings_service.settings.update_starter_projects:
+            await logger.adebug("Updating starter projects")
+            successfully_updated_projects = 0
+            await delete_starter_projects(session, new_folder.id)
+            await copy_profile_pictures()
+
+            for project_path, project in starter_projects:
+                (
+                    project_name,
+                    project_description,
+                    project_is_component,
+                    updated_at_datetime,
+                    project_data,
+                    project_icon,
+                    project_icon_bg_color,
+                    project_gradient,
+                    project_tags,
+                ) = get_project_data(project)
+
                 updated_project_data = update_projects_components_with_latest_component_versions(
                     project_data.copy(), all_types_dict
                 )
@@ -933,27 +951,67 @@ async def create_or_update_starter_projects(all_types_dict: dict, *, do_create: 
                 if updated_project_data != project_data:
                     project_data = updated_project_data
                     await update_project_file(project_path, project, updated_project_data)
-            if do_create and project_name and project_data:
-                existing_flows = await get_all_flows_similar_to_project(session, new_folder.id)
-                for existing_project in existing_flows:
-                    await session.delete(existing_project)
 
-                create_new_project(
-                    session=session,
-                    project_name=project_name,
-                    project_description=project_description,
-                    project_is_component=project_is_component,
-                    updated_at_datetime=updated_at_datetime,
-                    project_data=project_data,
-                    project_icon=project_icon,
-                    project_icon_bg_color=project_icon_bg_color,
-                    project_gradient=project_gradient,
-                    project_tags=project_tags,
-                    new_folder_id=new_folder.id,
-                )
+                try:
+                    create_new_project(
+                        session=session,
+                        project_name=project_name,
+                        project_description=project_description,
+                        project_is_component=project_is_component,
+                        updated_at_datetime=updated_at_datetime,
+                        project_data=project_data,
+                        project_icon=project_icon,
+                        project_icon_bg_color=project_icon_bg_color,
+                        project_gradient=project_gradient,
+                        project_tags=project_tags,
+                        new_folder_id=new_folder.id,
+                    )
+                except Exception:
+                    await logger.aexception(f"Error while creating starter project {project_name}")
+
+                successfully_updated_projects += 1
+            await logger.adebug(f"Successfully updated {successfully_updated_projects} starter projects")
+
+        elif do_create:
+            await logger.adebug("Creating new starter projects")
+            successfully_created_projects = 0
+            existing_flows = await get_all_flows_similar_to_project(session, new_folder.id)
+            existing_flow_names = [f.name for f in existing_flows]
+
+            for _, project in starter_projects:
+                (
+                    project_name,
+                    project_description,
+                    project_is_component,
+                    updated_at_datetime,
+                    project_data,
+                    project_icon,
+                    project_icon_bg_color,
+                    project_gradient,
+                    project_tags,
+                ) = get_project_data(project)
+                if project_name not in existing_flow_names:
+                    try:
+                        create_new_project(
+                            session=session,
+                            project_name=project_name,
+                            project_description=project_description,
+                            project_is_component=project_is_component,
+                            updated_at_datetime=updated_at_datetime,
+                            project_data=project_data,
+                            project_icon=project_icon,
+                            project_icon_bg_color=project_icon_bg_color,
+                            project_gradient=project_gradient,
+                            project_tags=project_tags,
+                            new_folder_id=new_folder.id,
+                        )
+                    except Exception:
+                        await logger.aexception(f"Error while creating starter project {project_name}")
+                    successfully_created_projects += 1
+            await logger.adebug(f"Successfully created {successfully_created_projects} starter projects")
 
 
-async def initialize_super_user_if_needed() -> None:
+async def initialize_auto_login_default_superuser() -> None:
     settings_service = get_settings_service()
     if not settings_service.auth_settings.AUTO_LOGIN:
         return
@@ -1046,32 +1104,45 @@ async def get_or_create_default_folder(session: AsyncSession, user_id: UUID) -> 
 async def sync_flows_from_fs():
     flow_mtimes = {}
     fs_flows_polling_interval = get_settings_service().settings.fs_flows_polling_interval / 1000
-    while True:
-        try:
-            async with session_scope(use_organisation=False) as session:
-                stmt = select(Flow).where(col(Flow.fs_path).is_not(None))
-                flows = (await session.exec(stmt)).all()
-                for flow in flows:
-                    mtime = flow_mtimes.setdefault(flow.id, 0)
-                    path = anyio.Path(flow.fs_path)
-                    try:
-                        if await path.exists():
-                            new_mtime = (await path.stat()).st_mtime
-                            if new_mtime > mtime:
-                                update_data = orjson.loads(await path.read_text(encoding="utf-8"))
-                                try:
-                                    for field_name in ("name", "description", "data", "locked"):
-                                        if new_value := update_data.get(field_name):
-                                            setattr(flow, field_name, new_value)
-                                    if folder_id := update_data.get("folder_id"):
-                                        flow.folder_id = UUID(folder_id)
-                                    await session.commit()
-                                    await session.refresh(flow)
-                                except Exception:  # noqa: BLE001
-                                    logger.exception(f"Couldn't update flow {flow.id} in database from path {path}")
-                                flow_mtimes[flow.id] = new_mtime
-                    except Exception:  # noqa: BLE001
-                        logger.exception(f"Error while handling flow file {path}")
-        except Exception:  # noqa: BLE001
-            logger.exception("Error while syncing flows from database")
-        await asyncio.sleep(fs_flows_polling_interval)
+    try:
+        while True:
+            try:
+                async with session_scope(use_organisation=False) as session:
+                    stmt = select(Flow).where(col(Flow.fs_path).is_not(None))
+                    flows = (await session.exec(stmt)).all()
+                    for flow in flows:
+                        mtime = flow_mtimes.setdefault(flow.id, 0)
+                        path = anyio.Path(flow.fs_path)
+                        try:
+                            if await path.exists():
+                                new_mtime = (await path.stat()).st_mtime
+                                if new_mtime > mtime:
+                                    update_data = orjson.loads(await path.read_text(encoding="utf-8"))
+                                    try:
+                                        for field_name in ("name", "description", "data", "locked"):
+                                            if new_value := update_data.get(field_name):
+                                                setattr(flow, field_name, new_value)
+                                        if folder_id := update_data.get("folder_id"):
+                                            flow.folder_id = UUID(folder_id)
+                                        await session.commit()
+                                        await session.refresh(flow)
+                                    except Exception:
+                                        await logger.aexception(f"Couldn't update flow {flow.id} in database from path {path}")
+                                    flow_mtimes[flow.id] = new_mtime
+                        except Exception:
+                            await logger.aexception(f"Error while handling flow file {path}")
+            except asyncio.CancelledError:
+                await logger.adebug("Flow sync cancelled")
+                break
+            except (sa.exc.OperationalError, ValueError) as e:
+                if "no active connection" in str(e) or "connection is closed" in str(e):
+                    await logger.adebug("Database connection lost, assuming shutdown")
+                    break
+                raise
+            except Exception:
+                await logger.aexception("Error while syncing flows from database")
+                break
+
+            await asyncio.sleep(fs_flows_polling_interval)
+    except asyncio.CancelledError:
+        await logger.adebug("Flow sync task cancelled")

@@ -1,4 +1,4 @@
-import ELK, { type ElkNode } from "elkjs/lib/elk.bundled.js";
+import { type ElkNode } from "elkjs/lib/elk.bundled.js";
 import { cloneDeep } from "lodash";
 import { NODE_HEIGHT, NODE_WIDTH } from "@/constants/constants";
 import type { AllNodeType, EdgeType } from "@/types/flow";

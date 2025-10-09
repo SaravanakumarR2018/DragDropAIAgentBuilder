@@ -131,17 +131,14 @@ async def teardown_superuser(settings_service, session: AsyncSession) -> None:
 
 async def teardown_services() -> None:
     """Teardown all the services."""
-    async with session_scope() as session:
-        await teardown_superuser(get_settings_service(), session)
-
-    from lfx.services.manager import get_service_manager
     try:
         async with get_db_service(use_organisation=False).with_session() as session:
             await teardown_superuser(get_settings_service(), session)
     except Exception as exc:  # noqa: BLE001
         logger.exception(exc)
-    try:
-        from langflow.services.manager import service_manager
+
+    from langflow.services.manager import service_manager
+    from lfx.services.manager import get_service_manager
 
     service_manager = get_service_manager()
     await service_manager.teardown()
