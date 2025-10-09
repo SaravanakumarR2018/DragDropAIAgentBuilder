@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { UserButton, useClerk, useUser } from "@clerk/clerk-react";
 import { IS_CLERK_AUTH, useLogout } from "@/clerk/auth";
 import { LogOut, Users, Settings, User } from "lucide-react";
@@ -10,6 +9,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
+import { useState } from "react";
 import ThemeButtons from "@/components/core/appHeaderComponent/components/ThemeButtons";
 
 export function ClerkAccountMenu() {
