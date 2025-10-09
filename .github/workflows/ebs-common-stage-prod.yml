@@ -216,7 +216,6 @@ jobs:
               DB_NAME="${{ secrets.POSTGRES_DB }}"
               VOLUME_NAME="${{ vars.STAGING_VOLUME_NAME }}"
             else
-
               IMAGE="forwardemailforaifirstdesk/langflow:prod-${{ steps.branch.outputs.branch_name }}-${{ steps.commit.outputs.commit_id }}"
               DOMAIN="${{env.PROD_HOST}}"
               EMAIL="${{ github.event.inputs.email }}"
