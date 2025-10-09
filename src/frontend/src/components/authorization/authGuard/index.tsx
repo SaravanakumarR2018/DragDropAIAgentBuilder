@@ -49,13 +49,8 @@ export const ProtectedRoute = ({ children }) => {
     !isOrgPage &&
     !isLoginPage;
 
-  // ✅ 3️⃣ Redirect "/" to "/flows" ONLY if fully authenticated and org selected
-  const shouldRedirectHome =
-    isOrgLoaded &&
-    isAuthenticated &&
-    isSignedIn &&
-    isOrgSelected &&
-    isRootPage;
+  // ✅ 3️⃣ DO NOT redirect "/" to "/flows" - authenticated users should stay on landing page
+  const shouldRedirectHome = false;
 
   // 🔄 Setup token refresh
   useEffect(() => {

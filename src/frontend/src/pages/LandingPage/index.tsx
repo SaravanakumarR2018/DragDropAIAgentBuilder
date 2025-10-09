@@ -2,6 +2,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { JSX, SVGProps } from "react";
 import VisualWorkflow from "../../assets/VisualWorkflow.png";
 import { useState } from "react";
+import useAuthStore from "@/stores/authStore";
+import { useLogout } from "@/clerk/auth";
+import { useNavigate } from "react-router-dom";
 
 
 function CheckIcon(props: SVGProps<SVGSVGElement>) {
@@ -23,8 +26,37 @@ function PlayIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+function AnimatedArrowIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <motion.svg 
+      viewBox="0 0 24 24" 
+      aria-hidden="true" 
+      {...props}
+      animate={{ x: [0, 4, 0] }}
+      transition={{ 
+        duration: 1.5, 
+        repeat: Infinity, 
+        ease: "easeInOut" 
+      }}
+    >
+      <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" fill="currentColor" />
+    </motion.svg>
+  );
+}
+
 export default function Landing(): JSX.Element {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const { mutate: logout } = useLogout();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+  };
+
+  const handleDashboardClick = () => {
+    navigate("/flows");
+  };
   return (
     <div className="h-screen overflow-y-auto bg-[#0f1217] text-white">
       {/* Background accents */}
@@ -81,19 +113,43 @@ export default function Landing(): JSX.Element {
               </div>
             </button>
 
-            {/* Log in (always visible with no-wrap) */}
-            <a
-              href="#demo"
-              className="hidden md:inline-block rounded-xl bg-white px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:opacity-90"
-            >
-              Book a Demo
-            </a>
-            <a
-              href="/login"
-              className="whitespace-nowrap rounded-xl bg-white px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:opacity-90"
-            >
-              Log in
-            </a>
+            {/* Conditional buttons based on authentication */}
+            {isAuthenticated ? (
+              <>
+                {/* Sign Out button (replaces Book a Demo when authenticated) */}
+                <button
+                  onClick={handleLogout}
+                  className="hidden md:inline-block rounded-xl bg-white px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:opacity-90"
+                >
+                  Sign Out
+                </button>
+                {/* Dashboard button with animated arrow (replaces Log in when authenticated) */}
+                <button
+                  onClick={handleDashboardClick}
+                  className="whitespace-nowrap rounded-xl bg-gradient-to-r from-teal-500 to-blue-500 px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 flex items-center gap-2"
+                >
+                  Dashboard
+                  <AnimatedArrowIcon className="h-4 w-4" />
+                </button>
+              </>
+            ) : (
+              <>
+                {/* Book a Demo (shown when unauthenticated) */}
+                <a
+                  href="#demo"
+                  className="hidden md:inline-block rounded-xl bg-white px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:opacity-90"
+                >
+                  Book a Demo
+                </a>
+                {/* Log in (shown when unauthenticated) */}
+                <a
+                  href="/login"
+                  className="whitespace-nowrap rounded-xl bg-white px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:opacity-90"
+                >
+                  Log in
+                </a>
+              </>
+            )}
           </div>
         </div>
       </header>

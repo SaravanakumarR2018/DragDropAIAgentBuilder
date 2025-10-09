@@ -146,7 +146,7 @@ export function ClerkAuthAdapter() {
       console.log("[ClerkAuthAdapter] Redirecting to /organization (no org selected)");
       navigate("/organization", { replace: true });
     }
-  }, [isSignedIn, isOrgLoaded, organization?.id, currentPath, navigate]);
+  }, [isSignedIn, isOrgLoaded, organization?.id, currentPath, navigate, isOrgSelected]);
 
   // Auto-join the active Clerk organization in fresh tabs
   useEffect(() => {
@@ -196,6 +196,7 @@ export function ClerkAuthAdapter() {
   }, [isSignedIn, isOrgLoaded, isOrgSelected, organization?.id, getToken]);
 
   // Redirect away from entry routes once the organization is hydrated
+  // NOTE: "/" (root) is excluded - authenticated users can stay on landing page
   useEffect(() => {
     if (!IS_CLERK_AUTH) {
       return;
@@ -212,7 +213,7 @@ export function ClerkAuthAdapter() {
     }
 
     const shouldRedirect =
-      currentPath === "/" || currentPath === "/login" || currentPath === "/organization";
+      currentPath === "/login" || currentPath === "/organization";
 
     if (!shouldRedirect) {
       return;
