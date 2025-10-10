@@ -24,7 +24,6 @@ export const ProtectedRoute = ({ children }) => {
   const { isSignedIn } = useClerkAuth();
   const orgId = organization?.id;
 
-  
   // Get current path
   const location = useLocation();
   const currentPath = location.pathname;
@@ -48,14 +47,6 @@ export const ProtectedRoute = ({ children }) => {
     !isOrgSelected &&
     !isOrgPage &&
     !isLoginPage;
-
-  // ✅ 3️⃣ Redirect "/" to "/flows" ONLY if fully authenticated and org selected
-  const shouldRedirectHome =
-    isOrgLoaded &&
-    isAuthenticated &&
-    isSignedIn &&
-    isOrgSelected &&
-    isRootPage;
 
   // 🔄 Setup token refresh
   useEffect(() => {
@@ -94,11 +85,6 @@ export const ProtectedRoute = ({ children }) => {
   // 🔹 Redirect to /organization
   if (shouldRedirectToOrg) {
     return <CustomNavigate to="/organization" replace />;
-  }
-
-  // 🔹 Redirect "/" to "/flows" only if safe
-  if (shouldRedirectHome) {
-    return <CustomNavigate to="/flows" replace />;
   }
 
   // ✅ Otherwise render the page
