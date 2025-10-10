@@ -5,15 +5,12 @@
  * When another tab logs out, this component:
  * 1. Immediately cancels all ongoing React Query requests
  * 2. Clears all cached query data
- * 3. Signs out from Clerk (if enabled)
- * 4. Clears authentication state
- * 5. Redirects to login page
+ * 3. Clears authentication state
+ * 4. Redirects to login page when needed
  * 
  * This prevents the CPU spike caused by infinite query retries.
  */
 
-import { IS_CLERK_AUTH } from "@/clerk/auth";
-import { useClerk } from "@clerk/clerk-react";
 import { useCustomNavigate } from "@/customization/hooks/use-custom-navigate";
 import { ENABLE_CUSTOM_PARAM } from "@/customization/feature-flags";
 import useAuthStore from "@/stores/authStore";
@@ -31,7 +28,6 @@ export function AuthBroadcastListener() {
   const location = useLocation();
   const { customParam } = useParams();
   const logout = useAuthStore((state) => state.logout);
-  const { signOut } = IS_CLERK_AUTH ? useClerk() : { signOut: async () => {} };
 
   /**
    * Handle logout event from another tab
@@ -50,18 +46,6 @@ export function AuthBroadcastListener() {
     }
     return "/login";
   }, [customParam]);
-
-  const getAbsoluteUrl = useCallback(
-    (path: string) => {
-      if (typeof window === "undefined") {
-        return path;
-      }
-
-      const normalizedPath = path.startsWith("/") ? path : `/${path}`;
-      return `${window.location.origin}${normalizedPath}`;
-    },
-    [],
-  );
 
   const handleCrossTabLogout = useCallback(async () => {
     const currentPath = location.pathname;
@@ -102,35 +86,11 @@ export function AuthBroadcastListener() {
       // 5. For root path "/", stay on the page (just update auth state)
       if (isOnRootPath) {
         console.debug("[AuthBroadcast] On root path, staying at / (UI will update to show Login/Book Demo)");
-        // Sign out from Clerk in background (best effort, don't block)
-        // If this fails, the login page will detect and clean up stale session
-        if (IS_CLERK_AUTH && signOut) {
-          const redirectUrl = getAbsoluteUrl(rootPath);
-          signOut({ redirectUrl }).catch((error) => {
-            console.debug("[AuthBroadcast] Clerk signOut failed (will be cleaned up on next login):", error);
-          });
-          console.debug("[AuthBroadcast] Clerk signOut initiated (background)");
-        }
         console.log("[AuthBroadcast] Cross-tab logout completed - staying at /");
         return;
       }
 
-      // 6. For protected pages, redirect IMMEDIATELY (don't wait for Clerk)
-      if (IS_CLERK_AUTH && signOut) {
-        console.debug("[AuthBroadcast] Redirecting to /login immediately...");
-        // Navigate first (instant)
-        navigate(loginPath, { replace: true });
-        // Then sign out from Clerk in background (best effort)
-        // If this fails, the login page will detect and clean up stale session
-        const redirectUrl = getAbsoluteUrl(loginPath);
-        signOut({ redirectUrl }).catch((error) => {
-          console.debug("[AuthBroadcast] Clerk signOut failed (will be cleaned up on next login):", error);
-        });
-        console.debug("[AuthBroadcast] Clerk signOut initiated (background)");
-        return;
-      }
-
-      // 7. Redirect to login (for non-Clerk auth)
+      // 6. For protected pages, redirect immediately to login
       console.debug("[AuthBroadcast] Redirecting to login...");
       navigate(loginPath, { replace: true });
 
@@ -143,14 +103,12 @@ export function AuthBroadcastListener() {
       }
     }
   }, [
-    getAbsoluteUrl,
     location.pathname,
     loginPath,
     queryClient,
     logout,
     navigate,
     rootPath,
-    signOut,
   ]);
 
   useEffect(() => {
