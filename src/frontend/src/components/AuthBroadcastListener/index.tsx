@@ -15,19 +15,21 @@
 import { IS_CLERK_AUTH } from "@/clerk/auth";
 import { useClerk } from "@clerk/clerk-react";
 import { useCustomNavigate } from "@/customization/hooks/use-custom-navigate";
+import { ENABLE_CUSTOM_PARAM } from "@/customization/feature-flags";
 import useAuthStore from "@/stores/authStore";
 import useFlowsManagerStore from "@/stores/flowsManagerStore";
 import useFlowStore from "@/stores/flowStore";
 import { useFolderStore } from "@/stores/foldersStore";
 import { authBroadcast } from "@/utils/auth-broadcast";
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useCallback, useEffect, useMemo } from "react";
+import { useLocation, useParams } from "react-router-dom";
 
 export function AuthBroadcastListener() {
   const queryClient = useQueryClient();
   const navigate = useCustomNavigate();
   const location = useLocation();
+  const { customParam } = useParams();
   const logout = useAuthStore((state) => state.logout);
   const { signOut } = IS_CLERK_AUTH ? useClerk() : { signOut: async () => {} };
 
@@ -35,6 +37,32 @@ export function AuthBroadcastListener() {
    * Handle logout event from another tab
    * This runs when ANY other tab calls logout
    */
+  const rootPath = useMemo(() => {
+    if (ENABLE_CUSTOM_PARAM && customParam) {
+      return `/${customParam}`;
+    }
+    return "/";
+  }, [customParam]);
+
+  const loginPath = useMemo(() => {
+    if (ENABLE_CUSTOM_PARAM && customParam) {
+      return `/${customParam}/login`;
+    }
+    return "/login";
+  }, [customParam]);
+
+  const getAbsoluteUrl = useCallback(
+    (path: string) => {
+      if (typeof window === "undefined") {
+        return path;
+      }
+
+      const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+      return `${window.location.origin}${normalizedPath}`;
+    },
+    [],
+  );
+
   const handleCrossTabLogout = useCallback(async () => {
     const currentPath = location.pathname;
 
@@ -45,7 +73,7 @@ export function AuthBroadcastListener() {
     }
 
     // Special handling for root path "/" - it's a public page
-    const isOnRootPath = currentPath === "/";
+    const isOnRootPath = currentPath === rootPath;
 
     console.log("[AuthBroadcast] Logout event received from another tab", {
       currentPath,
@@ -77,7 +105,8 @@ export function AuthBroadcastListener() {
         // Sign out from Clerk in background (best effort, don't block)
         // If this fails, the login page will detect and clean up stale session
         if (IS_CLERK_AUTH && signOut) {
-          signOut().catch((error) => {
+          const redirectUrl = getAbsoluteUrl(rootPath);
+          signOut({ redirectUrl }).catch((error) => {
             console.debug("[AuthBroadcast] Clerk signOut failed (will be cleaned up on next login):", error);
           });
           console.debug("[AuthBroadcast] Clerk signOut initiated (background)");
@@ -90,10 +119,11 @@ export function AuthBroadcastListener() {
       if (IS_CLERK_AUTH && signOut) {
         console.debug("[AuthBroadcast] Redirecting to /login immediately...");
         // Navigate first (instant)
-        navigate("/login", { replace: true });
+        navigate(loginPath, { replace: true });
         // Then sign out from Clerk in background (best effort)
         // If this fails, the login page will detect and clean up stale session
-        signOut().catch((error) => {
+        const redirectUrl = getAbsoluteUrl(loginPath);
+        signOut({ redirectUrl }).catch((error) => {
           console.debug("[AuthBroadcast] Clerk signOut failed (will be cleaned up on next login):", error);
         });
         console.debug("[AuthBroadcast] Clerk signOut initiated (background)");
@@ -102,17 +132,26 @@ export function AuthBroadcastListener() {
 
       // 7. Redirect to login (for non-Clerk auth)
       console.debug("[AuthBroadcast] Redirecting to login...");
-      navigate("/login", { replace: true });
+      navigate(loginPath, { replace: true });
 
       console.log("[AuthBroadcast] Cross-tab logout completed successfully");
     } catch (error) {
       console.error("[AuthBroadcast] Error during cross-tab logout:", error);
       // Force redirect even if cleanup fails (but not for root path)
       if (!isOnRootPath) {
-        navigate("/login", { replace: true });
+        navigate(loginPath, { replace: true });
       }
     }
-  }, [location.pathname, queryClient, logout, navigate, signOut]);
+  }, [
+    getAbsoluteUrl,
+    location.pathname,
+    loginPath,
+    queryClient,
+    logout,
+    navigate,
+    rootPath,
+    signOut,
+  ]);
 
   useEffect(() => {
     // Only run on client side
