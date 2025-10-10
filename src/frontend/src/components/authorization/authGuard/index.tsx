@@ -33,7 +33,12 @@ export const ProtectedRoute = ({ children }) => {
   const isRootPage = currentPath === "/";
   const isFlowsPage = currentPath.includes("/flows");
 
-  // 1️⃣ Redirect to login if not authenticated
+  // ✅ Root path "/" is PUBLIC - don't redirect unauthenticated users
+  if (isRootPage) {
+    return children; // Always allow access to landing page
+  }
+
+  // 1️⃣ Redirect to login if not authenticated (for protected pages only)
   const shouldRedirectToLogin =
     isOrgLoaded &&
     (!isAuthenticated || !isSignedIn) &&

@@ -14,7 +14,7 @@ export function CatchAllRedirect() {
   // Determine if user is truly authenticated (either logged in or auto-login enabled)
   const isUserAuthenticated = isAuthenticated || autoLogin === true;
 
-  // Redirect authenticated users to /flows, unauthenticated users to /
+  // Redirect authenticated users to /flows, unauthenticated users to landing page "/"
   const redirectTo = isUserAuthenticated ? "/flows" : "/";
 
   return <CustomNavigate replace to={redirectTo} />;
