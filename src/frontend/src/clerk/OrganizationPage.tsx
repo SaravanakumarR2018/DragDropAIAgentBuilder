@@ -31,6 +31,12 @@ export default function OrganizationSwitcherPage() {
   const isOrgSelectedManually = searchParams.get("selected") === "true";
   const [isBootstrapping, setIsBootstrapping] = useState(false);
 
+  const enterpriseAccounts = (user as unknown as { enterpriseAccounts?: unknown[] } | null)?.enterpriseAccounts;
+  const isEnterpriseUser = Array.isArray(enterpriseAccounts) && enterpriseAccounts.length > 0;
+  const organizationMemberships = user?.organizationMemberships ?? [];
+  const hasOrganizations = organizationMemberships.length > 0;
+  const shouldShowEnterpriseEmptyState = isEnterpriseUser && !hasOrganizations;
+
   useEffect(() => {
     if (!organization?.id || !isOrgSelectedManually || bootstrapped.current)
       return;
@@ -116,13 +122,46 @@ export default function OrganizationSwitcherPage() {
         justifyContent: "center",
         alignItems: "center",
         minHeight: "100vh",
+        padding: "2rem",
       }}
     >
-      <OrganizationList
-        hidePersonal
-        afterCreateOrganizationUrl="/organization?selected=true"
-        afterSelectOrganizationUrl="/organization?selected=true"
-      />
+      {isEnterpriseUser && (
+        <style>
+          {`
+            .enterprise-org-list [data-localization-key="organizationSwitcher.createOrganization"] {
+              display: none !important;
+            }
+          `}
+        </style>
+      )}
+      {shouldShowEnterpriseEmptyState ? (
+        <div
+          style={{
+            maxWidth: "32rem",
+            textAlign: "center",
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.75rem",
+          }}
+        >
+          <h1 style={{ fontSize: "1.5rem", fontWeight: 600 }}>
+            You&apos;re signed in with enterprise SSO
+          </h1>
+          <p style={{ color: "#4b5563", lineHeight: 1.5 }}>
+            Your account is managed by your organization, so creating new
+            organizations is disabled. Please contact your administrator if you
+            need a new organization to be set up for you.
+          </p>
+        </div>
+      ) : (
+        <div className={isEnterpriseUser ? "enterprise-org-list" : undefined}>
+          <OrganizationList
+            hidePersonal
+            afterCreateOrganizationUrl="/organization?selected=true"
+            afterSelectOrganizationUrl="/organization?selected=true"
+          />
+        </div>
+      )}
     </div>
   );
 }
