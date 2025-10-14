@@ -668,13 +668,15 @@ def superuser(
     In production mode, requires authentication.
     """
     configure(log_level=log_level)
-
-    asyncio.run(_create_superuser(username, password, auth_token))
-
+    # ✅ Keep multi-org-aware DB initialization for CLI context
     db_service = get_db_service(use_organisation=False)
 
+    # ✅ Use updated async helper from upstream
+    asyncio.run(_create_superuser(username, password, auth_token))
+
+
 async def _create_superuser(username: str, password: str, auth_token: str | None):
-    """Create a superuser."""
+    """Create a superuser (supports multi-org)."""
     await initialize_services()
 
     settings_service = get_settings_service()
@@ -697,10 +699,7 @@ async def _create_superuser(username: str, password: str, auth_token: str | None
 
     from langflow.services.database.models.user.crud import get_all_superusers
 
-    existing_superusers = []
     async with session_scope() as session:
-        # Note that the default superuser is created by the initialize_services() function,
-        # but leaving this check here in case we change that behavior
         existing_superusers = await get_all_superusers(session)
     is_first_setup = len(existing_superusers) == 0
 
@@ -715,28 +714,28 @@ async def _create_superuser(username: str, password: str, auth_token: str | None
             raise typer.Exit(1)
 
         typer.echo(f"AUTO_LOGIN enabled. Creating default superuser '{username}'...")
-        # Do not echo the default password to avoid exposing it in logs.
-    # AUTO_LOGIN is false - production mode
     elif is_first_setup:
         typer.echo("No superusers found. Creating first superuser...")
     else:
-        # Authentication is required in production mode
+        # Authentication required in production mode
         if not auth_token:
             typer.echo("Error: Creating a superuser requires authentication.")
             typer.echo("Please provide --auth-token with a valid superuser API key or JWT token.")
             typer.echo("To get a token, use: `uv run langflow api_key`")
             raise typer.Exit(1)
 
-        # Validate the auth token
+        # Validate auth token
         try:
+            from langflow.services.auth.utils import check_key, get_current_user_by_jwt
+            from jose import JWTError
+            from fastapi import HTTPException
+
             auth_user = None
             async with session_scope() as session:
-                # Try JWT first
                 user = None
                 try:
                     user = await get_current_user_by_jwt(auth_token, session)
                 except (JWTError, HTTPException):
-                    # Try API key
                     api_key_result = await check_key(session, auth_token)
                     if api_key_result and hasattr(api_key_result, "is_superuser"):
                         user = api_key_result
@@ -748,25 +747,24 @@ async def _create_superuser(username: str, password: str, auth_token: str | None
                 )
                 raise typer.Exit(1)
         except typer.Exit:
-            raise  # Re-raise typer.Exit without wrapping
+            raise
         except Exception as e:  # noqa: BLE001
             typer.echo(f"Error: Authentication failed - {e!s}")
             raise typer.Exit(1) from None
 
-    # Auth complete, create the superuser
+    # ✅ Use org-aware DB service again
+    db_service = get_db_service(use_organisation=False)
+
     async with session_scope() as session:
         from langflow.services.auth.utils import create_super_user
+        from langflow.services.database.models.user.model import User
 
         if await create_super_user(db=session, username=username, password=password):
-            # Verify that the superuser was created
-            from langflow.services.database.models.user.model import User
-
             stmt = select(User).where(User.username == username)
             created_user: User = (await session.exec(stmt)).first()
             if created_user is None or not created_user.is_superuser:
                 typer.echo("Superuser creation failed.")
                 return
-            # Now create the first folder for the user
             result = await get_or_create_default_folder(session, created_user.id)
             if result:
                 typer.echo("Default folder created successfully.")
@@ -774,13 +772,11 @@ async def _create_superuser(username: str, password: str, auth_token: str | None
                 msg = "Could not create default folder."
                 raise RuntimeError(msg)
 
-            # Log the superuser creation for audit purposes
             logger.warning(
                 f"SECURITY AUDIT: New superuser '{username}' created via CLI command"
                 + (" by authenticated user" if auth_token else " (first-time setup)")
             )
             typer.echo("Superuser created successfully.")
-
         else:
             logger.error(f"SECURITY AUDIT: Failed attempt to create superuser '{username}' via CLI")
             typer.echo("Superuser creation failed.")
@@ -965,3 +961,4 @@ if __name__ == "__main__":
     except Exception as e:
         logger.exception(e)
         raise typer.Exit(1) from e
+    

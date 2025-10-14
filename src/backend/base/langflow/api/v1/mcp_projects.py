@@ -1238,11 +1238,12 @@ async def register_project_with_composer(project: Folder):
 
 
 async def init_mcp_servers():
-    """Initialize MCP servers for all projects."""
+    """Initialize MCP servers for the default database and organisation databases."""
     try:
         settings_service = get_settings_service()
 
-        async with session_scope() as session:
+        # Use non-org base database
+        async with session_scope(use_organisation=False) as session:
             projects = (await session.exec(select(Folder))).all()
 
             for project in projects:
@@ -1253,9 +1254,7 @@ async def init_mcp_servers():
                         should_update_to_apikey = False
 
                         if not project.auth_settings:
-                            # No auth settings at all
                             should_update_to_apikey = True
-                        # Check if existing auth settings have auth_type "none"
                         elif project.auth_settings.get("auth_type") == "none":
                             should_update_to_apikey = True
 
@@ -1268,14 +1267,12 @@ async def init_mcp_servers():
                                 f"({project.id}) due to AUTO_LOGIN=false"
                             )
 
-                    # WARN: If oauth projects exist in the database and the MCP Composer is disabled,
-                    # these projects will be reset to "apikey" or "none" authentication, erasing all oauth settings.
+                    # Reset OAuth projects to appropriate auth type if MCP Composer is disabled
                     if (
                         not settings_service.settings.mcp_composer_enabled
                         and project.auth_settings
                         and project.auth_settings.get("auth_type") == "oauth"
                     ):
-                        # Reset OAuth projects to appropriate auth type based on AUTO_LOGIN setting
                         fallback_auth_type = "apikey" if not settings_service.auth_settings.AUTO_LOGIN else "none"
                         clean_auth = AuthSettings(auth_type=fallback_auth_type)
                         project.auth_settings = clean_auth.model_dump(exclude_none=True)
@@ -1285,11 +1282,12 @@ async def init_mcp_servers():
                             f"authentication because MCP Composer is disabled"
                         )
 
+                    # Initialize SSE + MCP server
                     get_project_sse(project.id)
                     get_project_mcp_server(project.id)
                     await logger.adebug(f"Initialized MCP server for project: {project.name} ({project.id})")
 
-                    # Only register with MCP Composer if OAuth authentication is configured
+                    # If MCP Composer is enabled and project uses OAuth, register it
                     if get_settings_service().settings.mcp_composer_enabled and project.auth_settings:
                         auth_type = project.auth_settings.get("auth_type")
                         if auth_type == "oauth":
@@ -1301,17 +1299,24 @@ async def init_mcp_servers():
                 except Exception as e:  # noqa: BLE001
                     msg = f"Failed to initialize MCP server for project {project.id}: {e}"
                     await logger.aexception(msg)
-                    # Continue to next project even if this one fails
+                    # Continue to next project
 
-            # Auto-configure starter projects with MCP server settings if enabled
+            # Auto-configure starter projects with MCP server settings
             await auto_configure_starter_projects_mcp(session)
-            # Commit any auth settings updates
             await session.commit()
 
     except Exception as e:  # noqa: BLE001
         msg = f"Failed to initialize MCP servers: {e}"
         await logger.aexception(msg)
 
+    # 🔸 Add your multi-org extension
+    try:
+        from langflow.services.mcp import init_mcp_servers_for_all_orgs
+
+        await init_mcp_servers_for_all_orgs()
+    except Exception as e:
+        msg = f"Failed to initialize organisation MCP servers: {e}"
+        logger.exception(msg)
 
 async def verify_project_access(project_id: UUID, current_user: CurrentActiveMCPUser) -> Folder:
     """Verify project exists and user has access."""

@@ -22,14 +22,13 @@ from .deps import get_db_service, get_service, get_settings_service, session_sco
 if TYPE_CHECKING:
     from lfx.services.settings.manager import SettingsService
     from sqlmodel.ext.asyncio.session import AsyncSession
-
+``
 
 async def get_or_create_super_user(session: AsyncSession, username, password, is_default):
     from langflow.services.database.models.user.model import User
 
     stmt = select(User).where(User.username == username)
-    result = await session.exec(stmt)
-    user = result.first()
+    result = await session.exec(stmt)    user = result.first()
 
     if user and user.is_superuser:
         return None  # Superuser already exists

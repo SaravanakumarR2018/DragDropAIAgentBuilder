@@ -22,6 +22,7 @@ import { CustomRoutesStorePages } from "./customization/utils/custom-routes-stor
 import { LoadingPage } from "./pages/LoadingPage";
 import { CollectionIndexRedirect } from "./routes/CollectionIndexRedirect";
 
+// ---- Lazy imports (your HEAD) ----
 const AppWrapperPage = lazy(() =>
   import("./pages/AppWrapperPage").then((module) => ({
     default: module.AppWrapperPage,
@@ -58,6 +59,12 @@ const ShortcutsPage = lazy(
 const MessagesPage = lazy(
   () => import("./pages/SettingsPage/pages/messagesPage"),
 );
+const MCPServersPage = lazy(
+  () => import("./pages/SettingsPage/pages/MCPServersPage"),
+);
+const KnowledgePage = lazy(
+  () => import("./pages/MainPage/pages/knowledgePage"),
+);
 const ViewPage = lazy(() => import("./pages/ViewPage"));
 const OrganizationPage = lazy(() => import("./clerk/OrganizationPage"));
 const LoginPage = lazy(() =>
@@ -80,6 +87,7 @@ const AdminPage = lazy(() => import("./pages/AdminPage"));
 const DeleteAccountPage = lazy(() => import("./pages/DeleteAccountPage"));
 const PlaygroundPage = lazy(() => import("./pages/Playground"));
 
+// ---- Router ----
 const router = createBrowserRouter(
   createRoutesFromElements([
     <Route path="/playground/:id/">
@@ -145,15 +153,35 @@ const router = createBrowserRouter(
                 }
               >
                 <Route index element={<CollectionIndexRedirect />} />
+                <Route
+                  index
+                  element={<CustomNavigate replace to={"flows"} />}
+                />
                 {ENABLE_FILE_MANAGEMENT && (
-                  <Route
-                    path="files"
-                    element={
-                      <Suspense fallback={<LoadingPage />}>
-                        <FilesPage />
-                      </Suspense>
-                    }
-                  />
+                  <Route path="assets">
+                    <Route
+                      index
+                      element={<CustomNavigate replace to="files" />}
+                    />
+                    <Route
+                      path="files"
+                      element={
+                        <Suspense fallback={<LoadingPage />}>
+                          <FilesPage />
+                        </Suspense>
+                      }
+                    />
+                    {ENABLE_KNOWLEDGE_BASES && (
+                      <Route
+                        path="knowledge-bases"
+                        element={
+                          <Suspense fallback={<LoadingPage />}>
+                            <KnowledgePage />
+                          </Suspense>
+                        }
+                      />
+                    )}
+                  </Route>
                 )}
                 <Route
                   path="flows/"
@@ -215,6 +243,8 @@ const router = createBrowserRouter(
                   />
                 </Route>
               </Route>
+
+              {/* Settings Routes */}
               <Route
                 path="settings"
                 element={
@@ -229,6 +259,14 @@ const router = createBrowserRouter(
                   element={
                     <Suspense fallback={<LoadingPage />}>
                       <GlobalVariablesPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="mcp-servers"
+                  element={
+                    <Suspense fallback={<LoadingPage />}>
+                      <MCPServersPage />
                     </Suspense>
                   }
                 />
@@ -268,7 +306,9 @@ const router = createBrowserRouter(
                 />
                 {CustomRoutesStore()}
               </Route>
+
               {CustomRoutesStorePages()}
+
               <Route path="account">
                 <Route
                   path="delete"
@@ -279,6 +319,7 @@ const router = createBrowserRouter(
                   }
                 />
               </Route>
+
               <Route
                 path="admin"
                 element={
@@ -290,6 +331,8 @@ const router = createBrowserRouter(
                 }
               />
             </Route>
+
+            {/* Flow and View Routes */}
             <Route path="flow/:id/">
               <Route
                 path=""
@@ -327,6 +370,8 @@ const router = createBrowserRouter(
             </Route>
           </Route>
         </Route>
+
+        {/* Auth routes */}
         <Route
           path="login"
           element={

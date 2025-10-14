@@ -736,7 +736,7 @@ async def load_flows_from_directory() -> None:
     if not flows_path:
         return
 
-    async with session_scope() as session:
+    async with session_scope(use_organisation=False) as session:
         # Find superuser by role instead of username to avoid issues with credential reset
         from langflow.services.database.models.user.model import User
 
@@ -798,7 +798,7 @@ async def load_bundles_from_urls() -> tuple[list[TemporaryDirectory], list[str]]
     if not bundle_urls:
         return [], []
 
-    async with session_scope() as session:
+    async with session_scope(use_organisation=False) as session:
         # Find superuser by role instead of username to avoid issues with credential reset
         from langflow.services.database.models.user.model import User
 
@@ -902,30 +902,28 @@ async def find_existing_flow(session, flow_id, flow_endpoint_name):
     return None
 
 
-async def create_or_update_starter_projects(all_types_dict: dict) -> None:
-    """Create or update starter projects.
-
-    Args:
-        all_types_dict (dict): Dictionary containing all component types and their templates
-    """
-    if not get_settings_service().settings.create_starter_projects:
-        # no-op for environments that don't want to create starter projects.
-        # note that this doesn't check if the starter projects are already loaded in the db;
-        # this is intended to be used to skip all startup project logic.
+async def create_or_update_starter_projects(
+    all_types_dict: dict,
+    *,
+    do_create: bool = True,
+    use_organisation: bool = False
+) -> None:
+    """Create or update starter projects."""
+    settings = get_settings_service().settings
+    if not settings.create_starter_projects:
+        await logger.adebug("Skipping starter project creation (disabled in settings).")
         return
 
-    async with session_scope() as session:
+    async with session_scope(use_organisation=use_organisation) as session:
         new_folder = await get_or_create_starter_folder(session)
         starter_projects = await load_starter_projects()
 
-        if get_settings_service().settings.update_starter_projects:
+        if settings.update_starter_projects:
             await logger.adebug("Updating starter projects")
-            # 1. Delete all existing starter projects
-            successfully_updated_projects = 0
             await delete_starter_projects(session, new_folder.id)
             await copy_profile_pictures()
 
-            # 2. Update all starter projects with the latest component versions (this modifies the actual file data)
+            successfully_updated_projects = 0
             for project_path, project in starter_projects:
                 (
                     project_name,
@@ -943,11 +941,10 @@ async def create_or_update_starter_projects(all_types_dict: dict) -> None:
                 )
                 updated_project_data = update_edges_with_latest_component_versions(updated_project_data)
                 if updated_project_data != project_data:
-                    project_data = updated_project_data
                     await update_project_file(project_path, project, updated_project_data)
+                    project_data = updated_project_data
 
                 try:
-                    # Create the updated starter project
                     create_new_project(
                         session=session,
                         project_name=project_name,
@@ -961,17 +958,17 @@ async def create_or_update_starter_projects(all_types_dict: dict) -> None:
                         project_tags=project_tags,
                         new_folder_id=new_folder.id,
                     )
+                    successfully_updated_projects += 1
                 except Exception:  # noqa: BLE001
                     await logger.aexception(f"Error while creating starter project {project_name}")
 
-                successfully_updated_projects += 1
             await logger.adebug(f"Successfully updated {successfully_updated_projects} starter projects")
         else:
-            # Even if we're not updating starter projects, we still need to create any that don't exist
             await logger.adebug("Creating new starter projects")
             successfully_created_projects = 0
             existing_flows = await get_all_flows_similar_to_project(session, new_folder.id)
             existing_flow_names = [existing_flow.name for existing_flow in existing_flows]
+
             for _, project in starter_projects:
                 (
                     project_name,
@@ -999,10 +996,11 @@ async def create_or_update_starter_projects(all_types_dict: dict) -> None:
                             project_tags=project_tags,
                             new_folder_id=new_folder.id,
                         )
+                        successfully_created_projects += 1
                     except Exception:  # noqa: BLE001
                         await logger.aexception(f"Error while creating starter project {project_name}")
-                    successfully_created_projects += 1
-                await logger.adebug(f"Successfully created {successfully_created_projects} starter projects")
+
+            await logger.adebug(f"Successfully created {successfully_created_projects} starter projects")
 
 
 async def initialize_auto_login_default_superuser() -> None:
@@ -1101,7 +1099,7 @@ async def sync_flows_from_fs():
     try:
         while True:
             try:
-                async with session_scope() as session:
+                async with session_scope(use_organisation=False) as session:
                     stmt = select(Flow).where(col(Flow.fs_path).is_not(None))
                     flows = (await session.exec(stmt)).all()
                     for flow in flows:
@@ -1133,8 +1131,8 @@ async def sync_flows_from_fs():
             except (sa.exc.OperationalError, ValueError) as e:
                 if "no active connection" in str(e) or "connection is closed" in str(e):
                     await logger.adebug("Database connection lost, assuming shutdown")
-                    break  # Exit gracefully, don't error
-                raise  # Re-raise if it's a real connection problem
+                    break
+                raise
             except Exception:  # noqa: BLE001
                 await logger.aexception("Error while syncing flows from database")
                 break

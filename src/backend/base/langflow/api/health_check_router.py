@@ -5,7 +5,6 @@ from lfx.log.logger import logger
 from pydantic import BaseModel
 from sqlmodel import select
 
-from langflow.api.utils import DbSession
 from langflow.services.database.models.flow.model import Flow
 from langflow.services.deps import get_chat_service
 from langflow.services.deps_no_org import DbNoOrgSession
@@ -42,7 +41,7 @@ async def health_check(
     session: DbNoOrgSession,
 ) -> HealthResponse:
     response = HealthResponse()
-    # use a fixed valid UUId that UUID collision is very unlikely
+    # use a fixed valid UUID that UUID collision is very unlikely
     user_id = "da93c2bd-c857-4b10-8c8c-60988103320f"
     try:
         # Check database to query a bogus flow

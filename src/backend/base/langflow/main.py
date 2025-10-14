@@ -435,6 +435,7 @@ def create_app():
 
     app.middleware("http")(clerk_token_middleware)
 
+    settings = get_settings_service().settings
     if prome_port_str := os.environ.get("LANGFLOW_PROMETHEUS_PORT"):
         # set here for create_app() entry point
         prome_port = int(prome_port_str)

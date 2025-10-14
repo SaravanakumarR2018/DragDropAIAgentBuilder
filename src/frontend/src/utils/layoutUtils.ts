@@ -1,9 +1,7 @@
 import ELK, { type ElkNode } from "elkjs/lib/elk.bundled.js";
 import { cloneDeep } from "lodash";
 import { NODE_HEIGHT, NODE_WIDTH } from "@/constants/constants";
-import { AllNodeType, EdgeType } from "@/types/flow";
-import { cloneDeep } from "lodash";
-import type { ElkNode } from "elkjs";
+import type { AllNodeType, EdgeType } from "@/types/flow";
 
 const layoutOptions = {
   "elk.algorithm": "layered",
@@ -33,28 +31,23 @@ export const getLayoutedNodes = async (
         .filter((e) => e.source === n.id)
         .map((e) => ({
           id: e.sourceHandle,
-          properties: {
-            side: "EAST",
-          },
+          properties: { side: "EAST" },
         }));
 
       const sourcePorts = edges
         .filter((e) => e.target === n.id)
         .map((e) => ({
           id: e.targetHandle,
-          properties: {
-            side: "WEST",
-          },
+          properties: { side: "WEST" },
         }));
+
       return {
         id: n.id,
         width: NODE_WIDTH,
         height: NODE_HEIGHT,
-        // ⚠️ we need to tell elk that the ports are fixed, in order to reduce edge crossings
         properties: {
           "org.eclipse.elk.portConstraints": "FIXED_ORDER",
         },
-        // we are also passing the id, so we can also handle edges without a sourceHandle or targetHandle option
         ports: [{ id: n.id }, ...targetPorts, ...sourcePorts],
       };
     }) as ElkNode[],
@@ -64,6 +57,7 @@ export const getLayoutedNodes = async (
       targets: [e.targetHandle || e.target],
     })),
   };
+
   const layoutedGraph = await elk.layout(graph);
 
   const layoutedNodes = nodes.map((node) => {
@@ -79,5 +73,6 @@ export const getLayoutedNodes = async (
       },
     };
   });
+
   return layoutedNodes;
 };
