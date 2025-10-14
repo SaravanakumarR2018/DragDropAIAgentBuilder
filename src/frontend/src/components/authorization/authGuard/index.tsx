@@ -32,7 +32,12 @@ export const ProtectedRoute = ({ children }) => {
   const isRootPage = currentPath === "/";
   const isFlowsPage = currentPath.includes("/flows");
 
-  // 1️⃣ Redirect to login if not authenticated
+  // ✅ Root path "/" is PUBLIC - don't redirect unauthenticated users
+  if (isRootPage) {
+    return children; // Always allow access to landing page
+  }
+
+  // 1️⃣ Redirect to login if not authenticated (for protected pages only)
   const shouldRedirectToLogin =
     isOrgLoaded &&
     (!isAuthenticated || !isSignedIn) &&
@@ -48,13 +53,8 @@ export const ProtectedRoute = ({ children }) => {
     !isOrgPage &&
     !isLoginPage;
 
-  // ✅ 3️⃣ Redirect "/" to "/flows" ONLY if fully authenticated and org selected
-  const shouldRedirectHome =
-    isOrgLoaded &&
-    isAuthenticated &&
-    isSignedIn &&
-    isOrgSelected &&
-    isRootPage;
+  // ✅ 3️⃣ DO NOT redirect "/" to "/flows" - authenticated users should stay on landing page
+  const shouldRedirectHome = false;
 
   // 🔄 Setup token refresh
   useEffect(() => {

@@ -22,11 +22,20 @@ export const ProtectedLoginRoute = ({ children }) => {
     isOrgLoaded = isLoaded;
   }
 
-    // ✅ Only enforce this wrapper on the actual login page
+  // ✅ Check if we're on login or organization page
   const isLoginPage = location.pathname.includes("login");
-  if (!isLoginPage) return children;
+  const isOrgPage = location.pathname.includes("organization");
+  const isOrgSelectedInStore = useAuthStore((state) => state.isOrgSelected);
+  const isOrgSelectedInSession = sessionStorage.getItem("isOrgSelected") === "true";
   
-  const isOrgSelected = IS_CLERK_AUTH ? !!organizationId : true;
+  // For organization page, check if org is already selected
+  const isOrgSelected = IS_CLERK_AUTH 
+    ? (!!organizationId || isOrgSelectedInStore || isOrgSelectedInSession)
+    : true;
+
+  // Only apply redirect logic on login or organization pages when authenticated with org selected
+  const shouldApplyGuard = isLoginPage || isOrgPage;
+  if (!shouldApplyGuard) return children;
 
   const canRedirect =
     isOrgLoaded &&
@@ -40,7 +49,7 @@ export const ProtectedLoginRoute = ({ children }) => {
     if (redirectPath) {
       return <CustomNavigate to={redirectPath} replace />;
     }
-    return <CustomNavigate to="/home" replace />;
+    return <CustomNavigate to="/flows" replace />;
   }
   return children;
 };

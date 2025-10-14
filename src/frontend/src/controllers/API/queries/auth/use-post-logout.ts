@@ -9,6 +9,7 @@ import useFlowsManagerStore from "@/stores/flowsManagerStore";
 import { useFolderStore } from "@/stores/foldersStore";
 import type { useMutationFunctionType } from "@/types/api";
 import { getAuthCookie } from "@/utils/utils";
+import { authBroadcast } from "@/utils/auth-broadcast";
 import { api } from "../../api";
 import { getURL } from "../../helpers/constants";
 import { UseRequestProcessor } from "../../services/request-processor";
@@ -30,12 +31,16 @@ export const useLogout: useMutationFunctionType<undefined, void> = (
     if (autoLogin) {
       return {};
     }
+
     const res = await api.post(`${getURL("LOGOUT")}`);
     return res.data;
   }
 
   const mutation = mutate(["useLogout"], logoutUser, {
     onSuccess: () => {
+      // Broadcast logout to other tabs BEFORE local cleanup
+      authBroadcast.broadcastLogout();
+
       logout();
 
       useFlowStore.getState().resetFlowState();

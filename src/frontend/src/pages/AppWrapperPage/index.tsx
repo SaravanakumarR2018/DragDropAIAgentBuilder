@@ -12,9 +12,9 @@ export function AppWrapperPage() {
   const { pathname } = useLocation();
   const { healthCheckTimeout, fetchingHealth, refetch } = useHealthCheck();
 
-  // Render the marketing landing page instead of the authenticated app shell
-  // when a visitor hits the root route without an active session.
-  if (!isAuthenticated && pathname === "/") {
+  // Render the marketing landing page when visitor hits the root route
+  // regardless of authentication status
+  if (pathname === "/") {
     return <Landing />;
   }
 

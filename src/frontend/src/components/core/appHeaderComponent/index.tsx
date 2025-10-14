@@ -62,8 +62,8 @@ export default function AppHeader(): JSX.Element {
       >
         <Button
           unstyled
-          onClick={() => navigate("/")}
-          className="mr-1 flex h-8 w-8 items-center"
+          onClick={() => navigate("flows")}
+          className="mr-1 flex h-8 w-8 items-center shrink-0"
           data-testid="icon-ChevronLeft"
         >
           {ENABLE_DATASTAX_LANGFLOW ? (

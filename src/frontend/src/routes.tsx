@@ -21,6 +21,7 @@ import { CustomRoutesStore } from "./customization/utils/custom-routes-store";
 import { CustomRoutesStorePages } from "./customization/utils/custom-routes-store-pages";
 import { LoadingPage } from "./pages/LoadingPage";
 import { CollectionIndexRedirect } from "./routes/CollectionIndexRedirect";
+import { CatchAllRedirect } from "./routes/CatchAllRedirect";
 
 // ---- Lazy imports (your HEAD) ----
 const AppWrapperPage = lazy(() =>
@@ -413,7 +414,7 @@ const router = createBrowserRouter(
           }
         />
       </Route>
-      <Route path="*" element={<CustomNavigate replace to="/" />} />
+      <Route path="*" element={<CatchAllRedirect />} />
     </Route>,
   ]),
   { basename: BASENAME || undefined },
