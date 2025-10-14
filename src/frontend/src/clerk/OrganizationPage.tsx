@@ -31,8 +31,40 @@ export default function OrganizationSwitcherPage() {
   const isOrgSelectedManually = searchParams.get("selected") === "true";
   const [isBootstrapping, setIsBootstrapping] = useState(false);
 
-  const enterpriseAccounts = (user as unknown as { enterpriseAccounts?: unknown[] } | null)?.enterpriseAccounts;
-  const isEnterpriseUser = Array.isArray(enterpriseAccounts) && enterpriseAccounts.length > 0;
+  type EnterpriseDetectionUser = {
+    enterpriseAccounts?: unknown[] | null;
+    samlAccounts?: unknown[] | null;
+    externalAccounts?:
+      | Array<{
+          provider?: string | null;
+          strategy?: string | null;
+          verification?: { strategy?: string | null } | null;
+        }>
+      | null;
+  };
+  const enterpriseDetectionUser = user as unknown as EnterpriseDetectionUser | null;
+  const enterpriseAccounts = enterpriseDetectionUser?.enterpriseAccounts ?? [];
+  const samlAccounts = enterpriseDetectionUser?.samlAccounts ?? [];
+  const externalAccounts = enterpriseDetectionUser?.externalAccounts ?? [];
+  const hasEnterpriseAccounts =
+    (Array.isArray(enterpriseAccounts) && enterpriseAccounts.length > 0) ||
+    (Array.isArray(samlAccounts) && samlAccounts.length > 0) ||
+    (Array.isArray(externalAccounts) &&
+      externalAccounts.some((account) => {
+        if (!account) return false;
+        const provider = account.provider?.toLowerCase() ?? "";
+        const strategy = account.strategy?.toLowerCase() ?? "";
+        const verificationStrategy = account.verification?.strategy?.toLowerCase() ?? "";
+        return (
+          strategy === "enterprise_sso" ||
+          strategy === "saml" ||
+          verificationStrategy === "enterprise_sso" ||
+          verificationStrategy === "saml" ||
+          provider === "saml" ||
+          provider.startsWith("saml_")
+        );
+      }));
+  const isEnterpriseUser = hasEnterpriseAccounts;
   const organizationMemberships = user?.organizationMemberships ?? [];
   const hasOrganizations = organizationMemberships.length > 0;
   const shouldShowEnterpriseEmptyState = isEnterpriseUser && !hasOrganizations;
@@ -125,15 +157,6 @@ export default function OrganizationSwitcherPage() {
         padding: "2rem",
       }}
     >
-      {isEnterpriseUser && (
-        <style>
-          {`
-            .enterprise-org-list [data-localization-key="organizationSwitcher.createOrganization"] {
-              display: none !important;
-            }
-          `}
-        </style>
-      )}
       {shouldShowEnterpriseEmptyState ? (
         <div
           style={{
@@ -154,13 +177,22 @@ export default function OrganizationSwitcherPage() {
           </p>
         </div>
       ) : (
-        <div className={isEnterpriseUser ? "enterprise-org-list" : undefined}>
-          <OrganizationList
-            hidePersonal
-            afterCreateOrganizationUrl="/organization?selected=true"
-            afterSelectOrganizationUrl="/organization?selected=true"
-          />
-        </div>
+        <OrganizationList
+          hidePersonal
+          afterCreateOrganizationUrl="/organization?selected=true"
+          afterSelectOrganizationUrl="/organization?selected=true"
+          appearance={
+            isEnterpriseUser
+              ? {
+                  elements: {
+                    organizationListCreateOrganizationActionButton: {
+                      display: "none",
+                    },
+                  },
+                }
+              : undefined
+          }
+        />
       )}
     </div>
   );
