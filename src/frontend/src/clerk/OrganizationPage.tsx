@@ -147,6 +147,20 @@ export default function OrganizationSwitcherPage() {
     return <LoadingPage />;
   }
 
+  const primaryEmailAddress =
+    user?.primaryEmailAddress?.emailAddress ||
+    user?.emailAddresses?.[0]?.emailAddress ||
+    null;
+  const userDisplayName =
+    user?.fullName || user?.username || primaryEmailAddress || "Signed in user";
+  const userInitials =
+    userDisplayName
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((chunk) => chunk.charAt(0).toUpperCase())
+      .join("") ||
+    (primaryEmailAddress ? primaryEmailAddress.charAt(0).toUpperCase() : "?");
+
   return (
     <div
       style={{
@@ -157,43 +171,135 @@ export default function OrganizationSwitcherPage() {
         padding: "2rem",
       }}
     >
-      {shouldShowEnterpriseEmptyState ? (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: "1.5rem",
+          width: "100%",
+          maxWidth: "36rem",
+        }}
+      >
         <div
           style={{
-            maxWidth: "32rem",
-            textAlign: "center",
             display: "flex",
-            flexDirection: "column",
-            gap: "0.75rem",
+            alignItems: "center",
+            gap: "1rem",
+            background: "#f9fafb",
+            border: "1px solid #e5e7eb",
+            borderRadius: "0.75rem",
+            padding: "1rem 1.25rem",
+            width: "100%",
+            boxShadow: "0 10px 30px rgba(15, 23, 42, 0.08)",
           }}
         >
-          <h1 style={{ fontSize: "1.5rem", fontWeight: 600 }}>
-            You&apos;re signed in with enterprise SSO
-          </h1>
-          <p style={{ color: "#4b5563", lineHeight: 1.5 }}>
-            Your account is managed by your organization, so creating new
-            organizations is disabled. Please contact your administrator if you
-            need a new organization to be set up for you.
-          </p>
+          {user?.imageUrl ? (
+            <img
+              src={user.imageUrl}
+              alt={`${userDisplayName} avatar`}
+              style={{
+                width: "3rem",
+                height: "3rem",
+                borderRadius: "9999px",
+                objectFit: "cover",
+                border: "2px solid #e0e7ff",
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                width: "3rem",
+                height: "3rem",
+                borderRadius: "9999px",
+                background: "#6366f1",
+                color: "white",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontWeight: 600,
+                fontSize: "1.125rem",
+                textTransform: "uppercase",
+              }}
+            >
+              {userInitials.slice(0, 2)}
+            </div>
+          )}
+          <div style={{ flex: 1 }}>
+            <p
+              style={{
+                margin: 0,
+                fontSize: "1rem",
+                fontWeight: 600,
+                color: "#111827",
+              }}
+            >
+              {userDisplayName}
+            </p>
+            {primaryEmailAddress && (
+              <p
+                style={{
+                  margin: "0.125rem 0 0",
+                  fontSize: "0.875rem",
+                  color: "#4b5563",
+                }}
+              >
+                {primaryEmailAddress}
+              </p>
+            )}
+          </div>
+          <span
+            style={{
+              fontSize: "0.875rem",
+              fontWeight: 500,
+              color: "#6366f1",
+              background: "#eef2ff",
+              padding: "0.35rem 0.75rem",
+              borderRadius: "9999px",
+            }}
+          >
+            Select organization
+          </span>
         </div>
-      ) : (
-        <OrganizationList
-          hidePersonal
-          afterCreateOrganizationUrl="/organization?selected=true"
-          afterSelectOrganizationUrl="/organization?selected=true"
-          appearance={
-            isEnterpriseUser
-              ? {
-                  elements: {
-                    organizationListCreateOrganizationActionButton: {
-                      display: "none",
+
+        {shouldShowEnterpriseEmptyState ? (
+          <div
+            style={{
+              maxWidth: "32rem",
+              textAlign: "center",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.75rem",
+            }}
+          >
+            <h1 style={{ fontSize: "1.5rem", fontWeight: 600 }}>
+              You&apos;re signed in with enterprise SSO
+            </h1>
+            <p style={{ color: "#4b5563", lineHeight: 1.5 }}>
+              Your account is managed by your organization, so creating new
+              organizations is disabled. Please contact your administrator if you
+              need a new organization to be set up for you.
+            </p>
+          </div>
+        ) : (
+          <OrganizationList
+            hidePersonal
+            afterCreateOrganizationUrl="/organization?selected=true"
+            afterSelectOrganizationUrl="/organization?selected=true"
+            appearance={
+              isEnterpriseUser
+                ? {
+                    elements: {
+                      organizationListCreateOrganizationActionButton: {
+                        display: "none",
+                      },
                     },
-                  },
-                }
-              : undefined
-          }
-        />
-      )}
+                  }
+                : undefined
+            }
+          />
+        )}
+      </div>
     </div>
   );
 }
