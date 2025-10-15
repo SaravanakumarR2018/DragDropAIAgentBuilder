@@ -147,6 +147,67 @@ export default function OrganizationSwitcherPage() {
     return <LoadingPage />;
   }
 
+  const primaryEmailAddress =
+    user?.primaryEmailAddress?.emailAddress ||
+    user?.emailAddresses?.[0]?.emailAddress ||
+    null;
+  const userDisplayName =
+    user?.fullName || user?.username || primaryEmailAddress || "Signed in user";
+  const userInitials =
+    userDisplayName
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((chunk) => chunk.charAt(0).toUpperCase())
+      .join("") ||
+    (primaryEmailAddress ? primaryEmailAddress.charAt(0).toUpperCase() : "?");
+
+  const baseAppearance = {
+    elements: {
+      rootBox: {
+        boxShadow: "none",
+        backgroundColor: "transparent",
+        padding: 0,
+        width: "100%",
+      },
+      organizationList: {
+        width: "100%",
+        gap: "1rem",
+      },
+      organizationList__title: {
+        display: "none",
+      },
+      organizationList__subtitle: {
+        display: "none",
+      },
+      organizationSwitcherTrigger: {
+        borderRadius: "0.75rem",
+        border: "1px solid #e5e7eb",
+        boxShadow: "none",
+      },
+      organizationSwitcherTriggerIcon: {
+        color: "#6366f1",
+      },
+      organizationSwitcherTriggerText: {
+        fontWeight: 600,
+      },
+      organizationSwitcherTriggerSubtitle: {
+        color: "#4b5563",
+      },
+    },
+  };
+
+  const organizationListAppearance = isEnterpriseUser
+    ? {
+        ...baseAppearance,
+        elements: {
+          ...baseAppearance.elements,
+          organizationListCreateOrganizationActionButton: {
+            display: "none",
+          },
+        },
+      }
+    : baseAppearance;
+
   return (
     <div
       style={{
@@ -155,45 +216,140 @@ export default function OrganizationSwitcherPage() {
         alignItems: "center",
         minHeight: "100vh",
         padding: "2rem",
+        background: "linear-gradient(180deg, #f9fafb 0%, #ffffff 100%)",
       }}
     >
-      {shouldShowEnterpriseEmptyState ? (
-        <div
-          style={{
-            maxWidth: "32rem",
-            textAlign: "center",
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.75rem",
-          }}
-        >
-          <h1 style={{ fontSize: "1.5rem", fontWeight: 600 }}>
-            You&apos;re signed in with enterprise SSO
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "32rem",
+          background: "#ffffff",
+          borderRadius: "1.5rem",
+          boxShadow: "0 20px 45px rgba(15, 23, 42, 0.12)",
+          border: "1px solid rgba(99, 102, 241, 0.12)",
+          padding: "2.5rem 2.25rem",
+          display: "flex",
+          flexDirection: "column",
+          gap: "1.75rem",
+        }}
+      >
+        <div style={{ textAlign: "center" }}>
+          <h1
+            style={{
+              margin: 0,
+              fontSize: "1.5rem",
+              fontWeight: 600,
+              color: "#111827",
+            }}
+          >
+            Choose an organization
           </h1>
-          <p style={{ color: "#4b5563", lineHeight: 1.5 }}>
-            Your account is managed by your organization, so creating new
-            organizations is disabled. Please contact your administrator if you
-            need a new organization to be set up for you.
+          <p
+            style={{
+              margin: "0.5rem 0 0",
+              fontSize: "0.95rem",
+              color: "#4b5563",
+            }}
+          >
+            to continue to Visual AI Agents Builder
           </p>
         </div>
-      ) : (
-        <OrganizationList
-          hidePersonal
-          afterCreateOrganizationUrl="/organization?selected=true"
-          afterSelectOrganizationUrl="/organization?selected=true"
-          appearance={
-            isEnterpriseUser
-              ? {
-                  elements: {
-                    organizationListCreateOrganizationActionButton: {
-                      display: "none",
-                    },
-                  },
-                }
-              : undefined
-          }
-        />
-      )}
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "1rem",
+            background: "#f4f5ff",
+            borderRadius: "0.9rem",
+            padding: "0.9rem 1.1rem",
+            border: "1px solid rgba(99, 102, 241, 0.18)",
+          }}
+        >
+          {user?.imageUrl ? (
+            <img
+              src={user.imageUrl}
+              alt={`${userDisplayName} avatar`}
+              style={{
+                width: "3rem",
+                height: "3rem",
+                borderRadius: "9999px",
+                objectFit: "cover",
+                border: "2px solid rgba(99, 102, 241, 0.35)",
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                width: "3rem",
+                height: "3rem",
+                borderRadius: "9999px",
+                background: "#6366f1",
+                color: "white",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontWeight: 600,
+                fontSize: "1.125rem",
+                textTransform: "uppercase",
+              }}
+            >
+              {userInitials.slice(0, 2)}
+            </div>
+          )}
+          <div style={{ flex: 1 }}>
+            <p
+              style={{
+                margin: 0,
+                fontSize: "1rem",
+                fontWeight: 600,
+                color: "#1f2937",
+              }}
+            >
+              {userDisplayName}
+            </p>
+            {primaryEmailAddress && (
+              <p
+                style={{
+                  margin: "0.2rem 0 0",
+                  fontSize: "0.875rem",
+                  color: "#4b5563",
+                }}
+              >
+                {primaryEmailAddress}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {shouldShowEnterpriseEmptyState ? (
+          <div
+            style={{
+              textAlign: "center",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.75rem",
+              color: "#4b5563",
+            }}
+          >
+            <h2 style={{ fontSize: "1.25rem", fontWeight: 600, margin: 0 }}>
+              You&apos;re signed in with enterprise SSO
+            </h2>
+            <p style={{ lineHeight: 1.5, margin: 0 }}>
+              Your account is managed by your organization, so creating new
+              organizations is disabled. Please contact your administrator if you
+              need a new organization to be set up for you.
+            </p>
+          </div>
+        ) : (
+          <OrganizationList
+            hidePersonal
+            afterCreateOrganizationUrl="/organization?selected=true"
+            afterSelectOrganizationUrl="/organization?selected=true"
+            appearance={organizationListAppearance}
+          />
+        )}
+      </div>
     </div>
   );
 }
