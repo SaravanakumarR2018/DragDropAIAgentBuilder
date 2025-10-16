@@ -216,7 +216,9 @@ export default function OrganizationSwitcherPage() {
         alignItems: "center",
         minHeight: "100vh",
         padding: "2rem",
-        backgroundColor: "#f5f7fb",
+        backgroundColor: "#0f1217",
+        backgroundImage:
+          "radial-gradient(circle at top left, rgba(13, 148, 136, 0.2), transparent 55%), radial-gradient(circle at bottom right, rgba(79, 70, 229, 0.2), transparent 55%)",
       }}
     >
       <div
@@ -225,7 +227,7 @@ export default function OrganizationSwitcherPage() {
           maxWidth: "28rem",
           background: "#ffffff",
           borderRadius: "1.5rem",
-          boxShadow: "0 18px 40px rgba(15, 23, 42, 0.12)",
+          boxShadow: "0 18px 40px rgba(15, 23, 42, 0.18)",
           border: "1px solid rgba(148, 163, 184, 0.18)",
           padding: "2.25rem 2rem",
           display: "flex",
@@ -233,6 +235,22 @@ export default function OrganizationSwitcherPage() {
           gap: "1.5rem",
         }}
       >
+        <div
+          style={{
+            alignSelf: "center",
+            padding: "0.4rem 1.4rem",
+            borderRadius: "9999px",
+            background: "linear-gradient(135deg, #2563eb, #0ea5e9)",
+            color: "white",
+            fontWeight: 700,
+            fontSize: "1rem",
+            letterSpacing: "0.02em",
+            boxShadow: "0 10px 20px rgba(14, 165, 233, 0.25)",
+          }}
+        >
+          Visual AI Agents Builder
+        </div>
+
         <div
           style={{
             display: "flex",
@@ -282,7 +300,7 @@ export default function OrganizationSwitcherPage() {
               minWidth: 0,
               display: "flex",
               flexDirection: "column",
-              gap: "0.2rem",
+              gap: "0.3rem",
             }}
           >
             <p
@@ -291,11 +309,9 @@ export default function OrganizationSwitcherPage() {
                 fontSize: "1rem",
                 fontWeight: 600,
                 color: "#1f2937",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
+                lineHeight: 1.35,
+                wordBreak: "break-word",
               }}
-              title={userDisplayName}
             >
               {userDisplayName}
             </p>
@@ -303,11 +319,11 @@ export default function OrganizationSwitcherPage() {
               <p
                 style={{
                   margin: 0,
-                  fontSize: "0.875rem",
+                  fontSize: "0.9rem",
                   color: "#4b5563",
-                  overflowWrap: "anywhere",
+                  lineHeight: 1.4,
+                  wordBreak: "break-word",
                 }}
-                title={primaryEmailAddress}
               >
                 {primaryEmailAddress}
               </p>
