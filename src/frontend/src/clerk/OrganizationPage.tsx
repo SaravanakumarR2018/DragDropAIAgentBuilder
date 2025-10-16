@@ -342,15 +342,6 @@ export default function OrganizationSwitcherPage() {
           >
             Choose an organization
           </h1>
-          <p
-            style={{
-              margin: "0.45rem 0 0",
-              fontSize: "0.95rem",
-              color: "#4b5563",
-            }}
-          >
-            to continue to Visual AI Agents Builder
-          </p>
         </div>
 
         {shouldShowEnterpriseEmptyState ? (
