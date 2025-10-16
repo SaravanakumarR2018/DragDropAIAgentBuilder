@@ -151,49 +151,49 @@ export default function OrganizationSwitcherPage() {
     <div
       style={{
         display: "flex",
+        flexDirection: "column",
         justifyContent: "center",
         alignItems: "center",
         minHeight: "100vh",
         padding: "2rem",
+        gap: shouldShowEnterpriseEmptyState ? "1.5rem" : "0",
       }}
     >
+      <OrganizationList
+        hidePersonal
+        afterCreateOrganizationUrl="/organization?selected=true"
+        afterSelectOrganizationUrl="/organization?selected=true"
+        appearance={
+          isEnterpriseUser
+            ? {
+                elements: {
+                  organizationListCreateOrganizationActionButton: {
+                    display: "none",
+                  },
+                },
+              }
+            : undefined
+        }
+      />
+
       {shouldShowEnterpriseEmptyState ? (
         <div
           style={{
             maxWidth: "32rem",
+            width: "100%",
+            border: "1px solid #e5e7eb",
+            borderRadius: "0.75rem",
+            padding: "1.5rem",
+            backgroundColor: "#f9fafb",
+            color: "#4b5563",
+            lineHeight: 1.5,
             textAlign: "center",
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.75rem",
           }}
         >
-          <h1 style={{ fontSize: "1.5rem", fontWeight: 600 }}>
-            You&apos;re signed in with enterprise SSO
-          </h1>
-          <p style={{ color: "#4b5563", lineHeight: 1.5 }}>
-            Your account is managed by your organization, so creating new
-            organizations is disabled. Please contact your administrator if you
-            need a new organization to be set up for you.
-          </p>
+          Your account is managed under enterprise SSO. Contact your administrator
+          to set up an organization.
         </div>
-      ) : (
-        <OrganizationList
-          hidePersonal
-          afterCreateOrganizationUrl="/organization?selected=true"
-          afterSelectOrganizationUrl="/organization?selected=true"
-          appearance={
-            isEnterpriseUser
-              ? {
-                  elements: {
-                    organizationListCreateOrganizationActionButton: {
-                      display: "none",
-                    },
-                  },
-                }
-              : undefined
-          }
-        />
-      )}
+      ) : null}
     </div>
   );
 }
