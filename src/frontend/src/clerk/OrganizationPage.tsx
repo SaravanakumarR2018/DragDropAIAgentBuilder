@@ -310,8 +310,11 @@ export default function OrganizationSwitcherPage() {
                 fontWeight: 600,
                 color: "#1f2937",
                 lineHeight: 1.35,
-                wordBreak: "break-word",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
               }}
+              title={userDisplayName}
             >
               {userDisplayName}
             </p>
@@ -322,8 +325,11 @@ export default function OrganizationSwitcherPage() {
                   fontSize: "0.9rem",
                   color: "#4b5563",
                   lineHeight: 1.4,
-                  wordBreak: "break-word",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
                 }}
+                title={primaryEmailAddress}
               >
                 {primaryEmailAddress}
               </p>
