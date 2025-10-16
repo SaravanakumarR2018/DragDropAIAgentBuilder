@@ -31,6 +31,44 @@ export default function OrganizationSwitcherPage() {
   const isOrgSelectedManually = searchParams.get("selected") === "true";
   const [isBootstrapping, setIsBootstrapping] = useState(false);
 
+  type EnterpriseDetectionUser = {
+    enterpriseAccounts?: unknown[] | null;
+    samlAccounts?: unknown[] | null;
+    externalAccounts?:
+      | Array<{
+          provider?: string | null;
+          strategy?: string | null;
+          verification?: { strategy?: string | null } | null;
+        }>
+      | null;
+  };
+  const enterpriseDetectionUser = user as unknown as EnterpriseDetectionUser | null;
+  const enterpriseAccounts = enterpriseDetectionUser?.enterpriseAccounts ?? [];
+  const samlAccounts = enterpriseDetectionUser?.samlAccounts ?? [];
+  const externalAccounts = enterpriseDetectionUser?.externalAccounts ?? [];
+  const hasEnterpriseAccounts =
+    (Array.isArray(enterpriseAccounts) && enterpriseAccounts.length > 0) ||
+    (Array.isArray(samlAccounts) && samlAccounts.length > 0) ||
+    (Array.isArray(externalAccounts) &&
+      externalAccounts.some((account) => {
+        if (!account) return false;
+        const provider = account.provider?.toLowerCase() ?? "";
+        const strategy = account.strategy?.toLowerCase() ?? "";
+        const verificationStrategy = account.verification?.strategy?.toLowerCase() ?? "";
+        return (
+          strategy === "enterprise_sso" ||
+          strategy === "saml" ||
+          verificationStrategy === "enterprise_sso" ||
+          verificationStrategy === "saml" ||
+          provider === "saml" ||
+          provider.startsWith("saml_")
+        );
+      }));
+  const isEnterpriseUser = hasEnterpriseAccounts;
+  const organizationMemberships = user?.organizationMemberships ?? [];
+  const hasOrganizations = organizationMemberships.length > 0;
+  const shouldShowEnterpriseEmptyState = isEnterpriseUser && !hasOrganizations;
+
   useEffect(() => {
     if (!organization?.id || !isOrgSelectedManually || bootstrapped.current)
       return;
@@ -116,13 +154,46 @@ export default function OrganizationSwitcherPage() {
         justifyContent: "center",
         alignItems: "center",
         minHeight: "100vh",
+        padding: "2rem",
       }}
     >
-      <OrganizationList
-        hidePersonal
-        afterCreateOrganizationUrl="/organization?selected=true"
-        afterSelectOrganizationUrl="/organization?selected=true"
-      />
+      {shouldShowEnterpriseEmptyState ? (
+        <div
+          style={{
+            maxWidth: "32rem",
+            textAlign: "center",
+            display: "flex",
+            flexDirection: "column",
+            gap: "0.75rem",
+          }}
+        >
+          <h1 style={{ fontSize: "1.5rem", fontWeight: 600 }}>
+            You&apos;re signed in with enterprise SSO
+          </h1>
+          <p style={{ color: "#4b5563", lineHeight: 1.5 }}>
+            Your account is managed by your organization, so creating new
+            organizations is disabled. Please contact your administrator if you
+            need a new organization to be set up for you.
+          </p>
+        </div>
+      ) : (
+        <OrganizationList
+          hidePersonal
+          afterCreateOrganizationUrl="/organization?selected=true"
+          afterSelectOrganizationUrl="/organization?selected=true"
+          appearance={
+            isEnterpriseUser
+              ? {
+                  elements: {
+                    organizationListCreateOrganizationActionButton: {
+                      display: "none",
+                    },
+                  },
+                }
+              : undefined
+          }
+        />
+      )}
     </div>
   );
 }
