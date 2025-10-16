@@ -115,6 +115,22 @@ export default function OrganizationSwitcherPage() {
     null;
   const userDisplayName =
     user?.fullName || user?.username || primaryEmailAddress || "Signed in user";
+  const isEnterpriseUser = Boolean(
+    user?.publicMetadata?.isEnterprise ||
+      user?.publicMetadata?.plan === "enterprise" ||
+      user?.unsafeMetadata?.isEnterprise ||
+      user?.unsafeMetadata?.plan === "enterprise" ||
+      user?.externalAccounts?.some((account) => {
+        const provider = account.provider?.toLowerCase?.();
+        return provider === "saml" || provider === "openid_connect";
+      }) ||
+      user?.externalAccounts?.some(
+        (account) => account.verification?.strategy === "saml",
+      ),
+  );
+  const organizationMemberships = user?.organizationMemberships ?? [];
+  const shouldShowEnterpriseEmptyState =
+    isEnterpriseUser && organizationMemberships.length === 0;
   const userInitials =
     userDisplayName
       .split(/\s+/)
