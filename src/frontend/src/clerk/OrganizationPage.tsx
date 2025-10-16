@@ -147,53 +147,205 @@ export default function OrganizationSwitcherPage() {
     return <LoadingPage />;
   }
 
+  const displayName =
+    (user?.fullName && user.fullName.trim()) ||
+    user?.username ||
+    [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
+    user?.primaryEmailAddress?.emailAddress ||
+    user?.id ||
+    "";
+
+  const emailAddress =
+    user?.primaryEmailAddress?.emailAddress ||
+    user?.emailAddresses?.[0]?.emailAddress ||
+    "";
+
+  const avatarUrl = user?.imageUrl;
+  const initials = (
+    (user?.firstName?.[0] || "") + (user?.lastName?.[0] || user?.firstName?.[1] || "")
+  ).toUpperCase();
+
   return (
     <div
       style={{
         display: "flex",
         justifyContent: "center",
-        alignItems: "center",
-        minHeight: "100vh",
-        padding: "2rem",
+        alignItems: "flex-start",
+        minHeight: "100dvh",
+        width: "100%",
+        padding: "2.5rem 1.5rem",
+        boxSizing: "border-box",
+        backgroundColor: "#f8fafc",
+        overflowY: "auto",
       }}
     >
-      {shouldShowEnterpriseEmptyState ? (
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "38rem",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "stretch",
+          gap: "1.5rem",
+        }}
+      >
         <div
           style={{
-            maxWidth: "32rem",
-            textAlign: "center",
+            padding: "1.25rem 1.5rem",
+            borderRadius: "1.25rem",
+            background:
+              "linear-gradient(135deg, rgba(15,23,42,0.9) 0%, rgba(30,64,175,0.85) 45%, rgba(59,130,246,0.8) 100%)",
+            border: "1px solid rgba(99, 102, 241, 0.35)",
+            boxShadow:
+              "0 18px 45px rgba(30, 64, 175, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.2)",
             display: "flex",
-            flexDirection: "column",
-            gap: "0.75rem",
+            justifyContent: "center",
+            alignItems: "center",
           }}
         >
-          <h1 style={{ fontSize: "1.5rem", fontWeight: 600 }}>
-            You&apos;re signed in with enterprise SSO
+          <h1
+            style={{
+              margin: 0,
+              fontSize: "1.75rem",
+              fontWeight: 800,
+              letterSpacing: "0.01em",
+              textAlign: "center",
+              background: "linear-gradient(90deg, #c7d2fe 0%, #f8fafc 50%, #c7d2fe 100%)",
+              WebkitBackgroundClip: "text",
+              color: "transparent",
+              textShadow:
+                "0 2px 6px rgba(15, 23, 42, 0.35), 0 0 1px rgba(148, 163, 184, 0.45)",
+            }}
+          >
+            Visual AI Agent Builder
           </h1>
-          <p style={{ color: "#4b5563", lineHeight: 1.5 }}>
-            Your account is managed by your organization, so creating new
-            organizations is disabled. Please contact your administrator if you
-            need a new organization to be set up for you.
-          </p>
         </div>
-      ) : (
-        <OrganizationList
-          hidePersonal
-          afterCreateOrganizationUrl="/organization?selected=true"
-          afterSelectOrganizationUrl="/organization?selected=true"
-          appearance={
-            isEnterpriseUser
-              ? {
-                  elements: {
-                    organizationListCreateOrganizationActionButton: {
-                      display: "none",
-                    },
-                  },
-                }
-              : undefined
-          }
-        />
-      )}
+
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "1rem",
+            padding: "1.25rem 1.5rem",
+            borderRadius: "1.25rem",
+            backgroundColor: "var(--clerk-color-background, #ffffff)",
+            border: "1px solid rgba(15, 23, 42, 0.08)",
+            boxShadow: "0 18px 45px rgba(15, 23, 42, 0.08)",
+          }}
+        >
+            <div
+              style={{
+                width: "4rem",
+                height: "4rem",
+                borderRadius: "9999px",
+                overflow: "hidden",
+                border: "2px solid rgba(99, 102, 241, 0.35)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background:
+                  "linear-gradient(135deg, rgba(99,102,241,0.16), rgba(129,140,248,0.22))",
+              }}
+            >
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt={displayName || "Current user"}
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              ) : (
+                <span
+                  style={{
+                    color: "#312e81",
+                    fontSize: "1.5rem",
+                    fontWeight: 600,
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  {initials || (displayName?.[0]?.toUpperCase() ?? "U")}
+                </span>
+              )}
+            </div>
+
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div
+                style={{
+                  fontSize: "1.625rem",
+                  fontWeight: 700,
+                  color: "#1e293b",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+                title={displayName || undefined}
+              >
+                {displayName || "Current member"}
+              </div>
+              <div
+                style={{
+                  marginTop: "0.35rem",
+                  fontSize: "1rem",
+                  color: "#475569",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+                title={emailAddress || undefined}
+              >
+                {emailAddress || "Signed in user"}
+              </div>
+            </div>
+        </div>
+
+        {shouldShowEnterpriseEmptyState ? (
+          <div
+            style={{
+              maxWidth: "32rem",
+              textAlign: "center",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.75rem",
+              margin: "0 auto",
+            }}
+          >
+            <h1 style={{ fontSize: "1.5rem", fontWeight: 600 }}>
+              You&apos;re signed in with enterprise SSO
+            </h1>
+            <p style={{ color: "#4b5563", lineHeight: 1.5 }}>
+              Your account is managed by your organization, so creating new
+              organizations is disabled. Please contact your administrator if
+              you need a new organization to be set up for you.
+            </p>
+          </div>
+        ) : (
+          <div
+            style={{
+              backgroundColor: "var(--clerk-color-background, #ffffff)",
+              borderRadius: "1.25rem",
+              padding: "1.25rem 1.5rem",
+              boxShadow: "0 12px 35px rgba(15, 23, 42, 0.08)",
+              border: "1px solid rgba(15, 23, 42, 0.08)",
+            }}
+          >
+            <OrganizationList
+              hidePersonal
+              afterCreateOrganizationUrl="/organization?selected=true"
+              afterSelectOrganizationUrl="/organization?selected=true"
+              appearance={
+                isEnterpriseUser
+                  ? {
+                      elements: {
+                        organizationListCreateOrganizationActionButton: {
+                          display: "none",
+                        },
+                      },
+                    }
+                  : undefined
+              }
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
