@@ -191,52 +191,64 @@ export default function OrganizationSwitcherPage() {
       >
         <div
           style={{
-            padding: "1.25rem 1.5rem",
-            borderRadius: "1.25rem",
-            background:
-              "linear-gradient(135deg, rgba(15,23,42,0.9) 0%, rgba(30,64,175,0.85) 45%, rgba(59,130,246,0.8) 100%)",
-            border: "1px solid rgba(99, 102, 241, 0.35)",
-            boxShadow:
-              "0 18px 45px rgba(30, 64, 175, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.2)",
             display: "flex",
             justifyContent: "center",
-            alignItems: "center",
           }}
         >
-          <h1
+          <button
+            type="button"
+            aria-label="Visual AI Agent Builder"
             style={{
-              margin: 0,
-              fontSize: "1.75rem",
-              fontWeight: 800,
-              letterSpacing: "0.01em",
-              textAlign: "center",
-              background: "linear-gradient(90deg, #c7d2fe 0%, #f8fafc 50%, #c7d2fe 100%)",
-              WebkitBackgroundClip: "text",
-              color: "transparent",
-              textShadow:
-                "0 2px 6px rgba(15, 23, 42, 0.35), 0 0 1px rgba(148, 163, 184, 0.45)",
+              alignItems: "center",
+              alignSelf: "center",
+              backgroundColor: "var(--clerk-color-background, #ffffff)",
+              border: "1px solid rgba(99, 102, 241, 0.35)",
+              borderRadius: "9999px",
+              boxShadow: "0 10px 28px rgba(15, 23, 42, 0.08)",
+              display: "inline-flex",
+              gap: "0.5rem",
+              justifyContent: "center",
+              minHeight: "1.75rem",
+              padding: "0.375rem 1.25rem",
+              width: "min(50%, 14rem)",
             }}
           >
-            Visual AI Agent Builder
-          </h1>
+            <span
+              style={{
+                background: "linear-gradient(90deg, #4f46e5 0%, #38bdf8 100%)",
+                WebkitBackgroundClip: "text",
+                color: "transparent",
+                fontSize: "1rem",
+                fontWeight: 700,
+                letterSpacing: "0.01em",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Visual AI Agent Builder
+            </span>
+          </button>
         </div>
 
         <div
           style={{
-            display: "flex",
             alignItems: "center",
-            gap: "1rem",
-            padding: "1.25rem 1.5rem",
-            borderRadius: "1.25rem",
+            alignSelf: "stretch",
             backgroundColor: "var(--clerk-color-background, #ffffff)",
             border: "1px solid rgba(15, 23, 42, 0.08)",
-            boxShadow: "0 18px 45px rgba(15, 23, 42, 0.08)",
+            borderRadius: "1rem",
+            boxShadow: "0 12px 32px rgba(15, 23, 42, 0.06)",
+            boxSizing: "border-box",
+            display: "flex",
+            gap: "0.75rem",
+            minHeight: "3.5rem",
+            padding: "0.875rem 1.25rem",
+            width: "100%",
           }}
         >
             <div
               style={{
-                width: "4rem",
-                height: "4rem",
+                width: "2.75rem",
+                height: "2.75rem",
                 borderRadius: "9999px",
                 overflow: "hidden",
                 border: "2px solid rgba(99, 102, 241, 0.35)",
@@ -267,12 +279,22 @@ export default function OrganizationSwitcherPage() {
               )}
             </div>
 
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div
+              style={{
+                display: "flex",
+                flex: 1,
+                flexDirection: "column",
+                gap: "0.15rem",
+                justifyContent: "center",
+                minWidth: 0,
+              }}
+            >
               <div
                 style={{
-                  fontSize: "1.625rem",
-                  fontWeight: 700,
+                  fontSize: "1rem",
+                  fontWeight: 600,
                   color: "#1e293b",
+                  lineHeight: 1.3,
                   whiteSpace: "nowrap",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
@@ -283,9 +305,9 @@ export default function OrganizationSwitcherPage() {
               </div>
               <div
                 style={{
-                  marginTop: "0.35rem",
-                  fontSize: "1rem",
                   color: "#475569",
+                  fontSize: "1rem",
+                  lineHeight: 1.3,
                   whiteSpace: "nowrap",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
@@ -325,6 +347,8 @@ export default function OrganizationSwitcherPage() {
               padding: "1.25rem 1.5rem",
               boxShadow: "0 12px 35px rgba(15, 23, 42, 0.08)",
               border: "1px solid rgba(15, 23, 42, 0.08)",
+              boxSizing: "border-box",
+              width: "100%",
             }}
           >
             <OrganizationList
