@@ -206,10 +206,28 @@ check_clerk_key() {
     echo "✅ VITE_CLERK_PUBLISHABLE_KEY is set"
 }
 
+# Function to check or prompt for Clerk Frontend API
+check_frontend_api() {
+    if [ -z "${VITE_CLERK_FRONTEND_API:-}" ]; then
+        echo ""
+        echo "🌐 Clerk Frontend API not found in environment."
+        read -p "👉 Enter your Clerk Frontend API (e.g., clerk.myapp.dev): " USER_INPUT
+        if [ -z "$USER_INPUT" ]; then
+            echo "❌ Error: VITE_CLERK_FRONTEND_API cannot be empty!"
+            echo ""
+            echo "💡 Example: clerk.red.lcl.dev or clerk.staging.myapp.com"
+            exit 1
+        fi
+        export VITE_CLERK_FRONTEND_API="$USER_INPUT"
+    fi
+    echo "✅ VITE_CLERK_FRONTEND_API is set to: ${VITE_CLERK_FRONTEND_API}"
+}
+
 # Configuration from GitHub workflow (staging environment)
 VITE_AUTO_LOGIN=false
 VITE_CLERK_AUTH_ENABLED=true
 VITE_CLERK_PUBLISHABLE_KEY="${VITE_CLERK_PUBLISHABLE_KEY:-}"
+VITE_CLERK_FRONTEND_API="${VITE_CLERK_FRONTEND_API:-}"
 
 # Docker image details
 IMAGE_NAME="langflow"
@@ -228,7 +246,10 @@ POSTGRES_PORT="5432"
 build_docker() {
     # Check for required environment variable
     check_clerk_key
-    
+
+    # Check or prompt for Clerk Frontend API
+    check_frontend_api
+
     # Ask for custom tag
     echo ""
     echo "🏷️  Docker Image Tagging"
@@ -260,14 +281,20 @@ build_docker() {
     echo ""
     echo "🔨 Building Docker image with tag: ${IMAGE_NAME}:${IMAGE_TAG}"
     
-    BUILD_CMD="TAG=\"${IMAGE_NAME}:${IMAGE_TAG}\" DOCKER_BUILDKIT=1 VITE_AUTO_LOGIN=${VITE_AUTO_LOGIN} VITE_CLERK_AUTH_ENABLED=${VITE_CLERK_AUTH_ENABLED} VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY} make docker_build"
+    BUILD_CMD="TAG=\"${IMAGE_NAME}:${IMAGE_TAG}\" DOCKER_BUILDKIT=1 \
+    VITE_AUTO_LOGIN=${VITE_AUTO_LOGIN} \
+    VITE_CLERK_AUTH_ENABLED=${VITE_CLERK_AUTH_ENABLED} \
+    VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY} \
+    VITE_CLERK_FRONTEND_API=${VITE_CLERK_FRONTEND_API} \
+    make docker_build"
     display_command "$BUILD_CMD" "Building Docker image"
-    
+
     TAG="${IMAGE_NAME}:${IMAGE_TAG}" \
     DOCKER_BUILDKIT=1 \
     VITE_AUTO_LOGIN=${VITE_AUTO_LOGIN} \
     VITE_CLERK_AUTH_ENABLED=${VITE_CLERK_AUTH_ENABLED} \
     VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY} \
+    VITE_CLERK_FRONTEND_API=${VITE_CLERK_FRONTEND_API} \
     make docker_build
     
     echo ""
@@ -366,12 +393,19 @@ run_docker() {
                 display_command "$NETWORK_RM_CMD" "Removing network"
                 docker network rm "$NETWORK_TO_REMOVE" 2>/dev/null || true
                 
-                # Remove only the Langflow image (not postgres)
-                if [ -n "$LANGFLOW_IMAGE" ] && [[ ! "$LANGFLOW_IMAGE" =~ ^postgres: ]]; then
-                    echo "🗑️  Removing old Langflow image: $LANGFLOW_IMAGE"
-                    IMG_RM_CMD="docker rmi \"$LANGFLOW_IMAGE\""
-                    display_command "$IMG_RM_CMD" "Removing image to free up space"
-                    docker rmi "$LANGFLOW_IMAGE" 2>/dev/null || true
+                # Automatically remove old image if it was a localbuild
+                if [ -n "$LANGFLOW_IMAGE" ]; then
+                    if [[ "$LANGFLOW_IMAGE" == langflow:localbuild_* ]]; then
+                        echo ""
+                        echo "🗑️  Old local build image detected: $LANGFLOW_IMAGE"
+                        echo "   Removing to free disk space..."
+                        IMG_RM_CMD="docker rmi \"$LANGFLOW_IMAGE\""
+                        display_command "$IMG_RM_CMD" "Removing old image to free up space"
+                        docker rmi "$LANGFLOW_IMAGE" 2>/dev/null || true
+                        echo "✅ Removed old local build image: $LANGFLOW_IMAGE"
+                    else
+                        echo "ℹ️  Skipping image removal (non-local build): $LANGFLOW_IMAGE"
+                    fi
                 fi
                 
                 echo "✅ Existing containers stopped. Proceeding with new containers..."
