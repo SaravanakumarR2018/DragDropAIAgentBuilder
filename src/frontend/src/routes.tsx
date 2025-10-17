@@ -185,7 +185,7 @@ const router = createBrowserRouter(
                 <Route
                   path="all/"
                   element={
-                    <Suspense fallback={<WorkspaceLoadingPage />}>
+                    <Suspense fallback={<LoadingPage />}>
                       <HomePage key="flows" type="flows" />
                     </Suspense>
                   }
@@ -193,7 +193,7 @@ const router = createBrowserRouter(
                   <Route
                     path="folder/:folderId"
                     element={
-                      <Suspense fallback={<WorkspaceLoadingPage />}>
+                      <Suspense fallback={<LoadingPage />}>
                         <HomePage key="flows" type="flows" />
                       </Suspense>
                     }
@@ -312,7 +312,7 @@ const router = createBrowserRouter(
                 <Route
                   path=""
                   element={
-                    <Suspense fallback={<LoadingPage />}>
+                    <Suspense fallback={<WorkspaceLoadingPage />}>
                       <FlowPage />
                     </Suspense>
                   }
