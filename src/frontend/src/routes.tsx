@@ -22,7 +22,6 @@ import { LoadingPage } from "./pages/LoadingPage";
 import { CollectionIndexRedirect } from "./routes/CollectionIndexRedirect";
 import { CatchAllRedirect } from "./routes/CatchAllRedirect";
 import { WorkspaceLoadingPage } from "./pages/WorkspaceLoadingPage";
-import Loading from "./components/ui/loading";
 
 const AppWrapperPage = lazy(() =>
   import("./pages/AppWrapperPage").then((module) => ({
@@ -304,7 +303,7 @@ const router = createBrowserRouter(
                 <Route
                   path="folder/:folderId/"
                   element={
-                    <Suspense fallback={<LoadingPage />}>
+                    <Suspense fallback={<WorkspaceLoadingPage />}>
                       <FlowPage />
                     </Suspense>
                   }
