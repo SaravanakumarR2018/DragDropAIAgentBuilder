@@ -9,10 +9,10 @@ export function WorkspaceLoadingPage({ overlay = false }: { overlay?: boolean })
         overlay && "fixed left-0 top-0 z-[999]",
       )}
     >
-      <LoadingComponent remSize={50} />
       <p className="max-w-md text-lg font-medium text-muted-foreground">
         Holding on tight your workspace is loading
       </p>
+      <LoadingComponent remSize={50} />
     </div>
   );
 }
