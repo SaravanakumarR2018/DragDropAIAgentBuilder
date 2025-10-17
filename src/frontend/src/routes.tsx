@@ -167,7 +167,7 @@ const router = createBrowserRouter(
                 <Route
                   path="components/"
                   element={
-                    <Suspense fallback={<LoadingPage/>}>
+                    <Suspense fallback={<LoadingPage />}>
                       <HomePage key="components" type="components" />
                     </Suspense>
                   }
@@ -331,7 +331,7 @@ const router = createBrowserRouter(
         <Route
           path="login"
           element={
-            <Suspense fallback={<LoadingPage}>
+            <Suspense fallback={<LoadingPage />}>
               <ProtectedLoginRoute>
                 <LoginPage />
               </ProtectedLoginRoute>
