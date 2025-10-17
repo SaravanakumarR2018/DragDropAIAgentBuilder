@@ -208,9 +208,9 @@ export default function OrganizationSwitcherPage() {
               display: "inline-flex",
               gap: "0.5rem",
               justifyContent: "center",
-              minHeight: "2.75rem",
-              padding: "0.5rem 1.5rem",
-              width: "min(18rem, 50%)",
+              minHeight: "1.75rem",
+              padding: "0.375rem 1.25rem",
+              width: "min(50%, 14rem)",
             }}
           >
             <span
@@ -231,22 +231,24 @@ export default function OrganizationSwitcherPage() {
 
         <div
           style={{
-            display: "flex",
             alignItems: "center",
-            gap: "0.75rem",
-            padding: "0.75rem 1rem",
-            borderRadius: "0.9rem",
+            alignSelf: "stretch",
             backgroundColor: "var(--clerk-color-background, #ffffff)",
             border: "1px solid rgba(15, 23, 42, 0.08)",
+            borderRadius: "1rem",
             boxShadow: "0 12px 32px rgba(15, 23, 42, 0.06)",
+            boxSizing: "border-box",
+            display: "flex",
+            gap: "0.75rem",
             minHeight: "3.5rem",
+            padding: "0.875rem 1.25rem",
             width: "100%",
           }}
         >
             <div
               style={{
-                width: "3rem",
-                height: "3rem",
+                width: "2.75rem",
+                height: "2.75rem",
                 borderRadius: "9999px",
                 overflow: "hidden",
                 border: "2px solid rgba(99, 102, 241, 0.35)",
@@ -282,7 +284,7 @@ export default function OrganizationSwitcherPage() {
                 display: "flex",
                 flex: 1,
                 flexDirection: "column",
-                gap: "0.125rem",
+                gap: "0.15rem",
                 justifyContent: "center",
                 minWidth: 0,
               }}
@@ -304,7 +306,7 @@ export default function OrganizationSwitcherPage() {
               <div
                 style={{
                   color: "#475569",
-                  fontSize: "0.875rem",
+                  fontSize: "1rem",
                   lineHeight: 1.3,
                   whiteSpace: "nowrap",
                   overflow: "hidden",
@@ -345,6 +347,8 @@ export default function OrganizationSwitcherPage() {
               padding: "1.25rem 1.5rem",
               boxShadow: "0 12px 35px rgba(15, 23, 42, 0.08)",
               border: "1px solid rgba(15, 23, 42, 0.08)",
+              boxSizing: "border-box",
+              width: "100%",
             }}
           >
             <OrganizationList

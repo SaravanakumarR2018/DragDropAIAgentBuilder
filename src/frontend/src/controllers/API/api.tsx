@@ -41,67 +41,21 @@ function ApiInterceptor() {
   );
 
   useEffect(() => {
-    const resolveRequestUrl = (
-      input: unknown,
-      fallback?: string,
-    ): string => {
-      if (typeof input === "string") {
-        return input;
-      }
-
-      if (
-        input &&
-        typeof input === "object" &&
-        "url" in input &&
-        typeof (input as { url?: unknown }).url === "string"
-      ) {
-        return (input as { url: string }).url;
-      }
-
-      if (typeof fallback === "string") {
-        return fallback;
-      }
-
-      return "";
-    };
-
     const unregister = fetchIntercept.register({
       request: function (url, config) {
-        const normalizedConfig: RequestInit & {
-          headers?: Record<string, string>;
-          url?: string;
-        } = {
-          ...(config ?? {}),
-        };
-
-        const existingHeaders = normalizedConfig.headers;
-        let headers: Record<string, string>;
-
-        if (existingHeaders instanceof Headers) {
-          headers = Object.fromEntries(existingHeaders.entries());
-        } else if (Array.isArray(existingHeaders)) {
-          headers = Object.fromEntries(existingHeaders);
-        } else {
-          headers = { ...(existingHeaders ?? {}) } as Record<string, string>;
-        }
-
-        normalizedConfig.headers = headers;
-
-        const requestUrl = resolveRequestUrl(url, normalizedConfig.url);
-
         const accessToken = customGetAccessToken();
 
-        if (accessToken && requestUrl && !isAuthorizedURL(requestUrl)) {
-          normalizedConfig.headers["Authorization"] = `Bearer ${accessToken}`;
+        if (accessToken && !isAuthorizedURL(config?.url)) {
+          config.headers["Authorization"] = `Bearer ${accessToken}`;
         }
 
-        if (requestUrl && !isExternalURL(requestUrl)) {
+        if (!isExternalURL(url)) {
           for (const [key, value] of Object.entries(customHeaders)) {
-            normalizedConfig.headers[key] = value;
+            config.headers[key] = value;
           }
         }
 
-        return [url, normalizedConfig];
+        return [url, config];
       },
     });
 
