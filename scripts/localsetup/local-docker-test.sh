@@ -189,38 +189,58 @@ display_multiline_command() {
 }
 
 # Check if VITE_CLERK_PUBLISHABLE_KEY is set
-check_clerk_key() {
-    if [ -z "${VITE_CLERK_PUBLISHABLE_KEY:-}" ]; then
-        echo "❌ Error: VITE_CLERK_PUBLISHABLE_KEY environment variable is not set!"
+check_clerk_envs() {
+    local missing=false
+
+    echo ""
+    echo "🔍 Checking Clerk environment variables..."
+
+    if [ -z "${VITE_CLERK_PUBLISHABLE_KEY:-}" ] && [ -z "${VITE_CLERK_FRONTEND_API:-}" ]; then
+        echo "❌ Both Clerk environment variables are missing!"
         echo ""
-        echo "🔑 This is a required environment variable for building the Docker image."
+        echo "You must set both before continuing:"
+        echo "    export VITE_CLERK_PUBLISHABLE_KEY=\"pk_test_your_key_here\""
+        echo "    export VITE_CLERK_FRONTEND_API=\"clerk.yourapp.dev\""
         echo ""
-        echo "✅ To set it, run:"
+        echo "💡 Example:"
+        echo "    export VITE_CLERK_PUBLISHABLE_KEY=\"pk_test_12345ABCDE\""
+        echo "    export VITE_CLERK_FRONTEND_API=\"clerk.localhost.dev\""
+        echo ""
+        missing=true
+
+    elif [ -z "${VITE_CLERK_PUBLISHABLE_KEY:-}" ]; then
+        echo "❌ VITE_CLERK_PUBLISHABLE_KEY is missing!"
+        echo "✅ VITE_CLERK_FRONTEND_API is set to: ${VITE_CLERK_FRONTEND_API}"
+        echo ""
+        echo "Set it using:"
         echo "    export VITE_CLERK_PUBLISHABLE_KEY=\"pk_test_your_key_here\""
         echo ""
-        echo "📝 Then run the build command again:"
-        echo "    $0 build"
+        missing=true
+
+    elif [ -z "${VITE_CLERK_FRONTEND_API:-}" ]; then
+        echo "❌ VITE_CLERK_FRONTEND_API is missing!"
+        echo "✅ VITE_CLERK_PUBLISHABLE_KEY is set"
+        echo ""
+        echo "Set it using:"
+        echo "    export VITE_CLERK_FRONTEND_API=\"clerk.yourapp.dev\""
+        echo ""
+        echo "💡 Example:"
+        echo "    export VITE_CLERK_FRONTEND_API=\"clerk.localhost.dev\""
+        echo ""
+        missing=true
+
+    else
+        echo "✅ Both Clerk environment variables are set"
+        echo "   - VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY}"
+        echo "   - VITE_CLERK_FRONTEND_API: ${VITE_CLERK_FRONTEND_API}"
+    fi
+
+    if [ "$missing" = true ]; then
+        echo ""
+        echo "❌ Please fix the missing variables above before continuing."
         echo ""
         exit 1
     fi
-    echo "✅ VITE_CLERK_PUBLISHABLE_KEY is set"
-}
-
-# Function to check or prompt for Clerk Frontend API
-check_frontend_api() {
-    if [ -z "${VITE_CLERK_FRONTEND_API:-}" ]; then
-        echo ""
-        echo "🌐 Clerk Frontend API not found in environment."
-        read -p "👉 Enter your Clerk Frontend API (e.g., clerk.myapp.dev): " USER_INPUT
-        if [ -z "$USER_INPUT" ]; then
-            echo "❌ Error: VITE_CLERK_FRONTEND_API cannot be empty!"
-            echo ""
-            echo "💡 Example: clerk.red.lcl.dev or clerk.staging.myapp.com"
-            exit 1
-        fi
-        export VITE_CLERK_FRONTEND_API="$USER_INPUT"
-    fi
-    echo "✅ VITE_CLERK_FRONTEND_API is set to: ${VITE_CLERK_FRONTEND_API}"
 }
 
 # Configuration from GitHub workflow (staging environment)
@@ -244,11 +264,8 @@ POSTGRES_PORT="5432"
 
 # Function to build Docker image
 build_docker() {
-    # Check for required environment variable
-    check_clerk_key
-
-    # Check or prompt for Clerk Frontend API
-    check_frontend_api
+    # Check Clerk environment variables together
+    check_clerk_envs
 
     # Ask for custom tag
     echo ""
