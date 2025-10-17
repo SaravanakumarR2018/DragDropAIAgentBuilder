@@ -159,7 +159,7 @@ const router = createBrowserRouter(
                 <Route
                   path="flows/"
                   element={
-                    <Suspense fallback={<WorkspaceLoadingPage />}>
+                    <Suspense fallback={<LoadingPage />}>
                       <HomePage key="flows" type="flows" />
                     </Suspense>
                   }
@@ -167,7 +167,7 @@ const router = createBrowserRouter(
                 <Route
                   path="components/"
                   element={
-                    <Suspense fallback={<WorkspaceLoadingPage />}>
+                    <Suspense fallback={<LoadingPage/>}>
                       <HomePage key="components" type="components" />
                     </Suspense>
                   }
@@ -175,7 +175,7 @@ const router = createBrowserRouter(
                   <Route
                     path="folder/:folderId"
                     element={
-                      <Suspense fallback={<WorkspaceLoadingPage />}>
+                      <Suspense fallback={<LoadingPage />}>
                         <HomePage key="components" type="components" />
                       </Suspense>
                     }
@@ -295,7 +295,7 @@ const router = createBrowserRouter(
               <Route
                 path=""
                 element={
-                  <Suspense fallback={<WorkspaceLoadingPage />}>
+                  <Suspense fallback={<LoadingPage />}>
                     <CustomDashboardWrapperPage />
                   </Suspense>
                 }
@@ -320,7 +320,7 @@ const router = createBrowserRouter(
               <Route
                 path="view"
                 element={
-                  <Suspense fallback={<WorkspaceLoadingPage />}>
+                  <Suspense fallback={<LoadingPage />}>
                     <ViewPage />
                   </Suspense>
                 }
@@ -331,7 +331,7 @@ const router = createBrowserRouter(
         <Route
           path="login"
           element={
-            <Suspense fallback={<WorkspaceLoadingPage />}>
+            <Suspense fallback={<LoadingPage}>
               <ProtectedLoginRoute>
                 <LoginPage />
               </ProtectedLoginRoute>
