@@ -21,6 +21,7 @@ import { CustomRoutesStorePages } from "./customization/utils/custom-routes-stor
 import { LoadingPage } from "./pages/LoadingPage";
 import { CollectionIndexRedirect } from "./routes/CollectionIndexRedirect";
 import { CatchAllRedirect } from "./routes/CatchAllRedirect";
+import { WorkspaceLoadingPage } from "./pages/WorkspaceLoadingPage";
 
 const AppWrapperPage = lazy(() =>
   import("./pages/AppWrapperPage").then((module) => ({
@@ -294,7 +295,7 @@ const router = createBrowserRouter(
               <Route
                 path=""
                 element={
-                  <Suspense fallback={<LoadingPage />}>
+                  <Suspense fallback={<WorkspaceLoadingPage />}>
                     <CustomDashboardWrapperPage />
                   </Suspense>
                 }
