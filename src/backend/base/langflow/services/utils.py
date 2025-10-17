@@ -22,13 +22,13 @@ from .deps import get_db_service, get_service, get_settings_service, session_sco
 if TYPE_CHECKING:
     from lfx.services.settings.manager import SettingsService
     from sqlmodel.ext.asyncio.session import AsyncSession
-``
 
 async def get_or_create_super_user(session: AsyncSession, username, password, is_default):
     from langflow.services.database.models.user.model import User
 
     stmt = select(User).where(User.username == username)
-    result = await session.exec(stmt)    user = result.first()
+    result = await session.exec(stmt)    
+    user = result.first()
 
     if user and user.is_superuser:
         return None  # Superuser already exists
@@ -287,7 +287,7 @@ async def initialize_services(*, fix_migration: bool = False) -> None:
     await initialize_database(fix_migration=fix_migration)
     db_service = get_db_service(use_organisation=False)
     await db_service.initialize_alembic_log_file()
-    async with session_scope() as session:
+    async with session_scope(use_organisation=False) as session:
         settings_service = get_service(ServiceType.SETTINGS_SERVICE)
         await setup_superuser(settings_service, session)
     try:

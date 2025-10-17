@@ -10,6 +10,8 @@ from lfx.log.logger import logger
 from lfx.services.schema import ServiceType
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+    from sqlmodel.ext.asyncio.session import AsyncSession
     from lfx.services.interfaces import (
         CacheServiceProtocol,
         ChatServiceProtocol,
@@ -52,9 +54,14 @@ def get_service(service_type: ServiceType, default=None):
         return None
 
 
-def get_db_service() -> DatabaseServiceProtocol | None:
+def get_db_service(*, use_organisation: bool = True) -> DatabaseServiceProtocol | None:
     """Retrieves the database service instance."""
     from lfx.services.schema import ServiceType
+
+    from langflow.services.database.organisation import OrganizationService
+
+    if use_organisation and get_settings_service().auth_settings.CLERK_AUTH_ENABLED:
+        return OrganizationService.get_db_service_for_request()
 
     return get_service(ServiceType.DATABASE_SERVICE)
 
@@ -102,13 +109,13 @@ def get_tracing_service() -> TracingServiceProtocol | None:
 
 
 @asynccontextmanager
-async def session_scope():
+async def session_scope(*, use_organisation: bool = True) -> AsyncGenerator[AsyncSession, None]:
     """Session scope context manager.
 
     Returns a real session if database service is available, otherwise a NoopSession.
     This ensures code can always call session methods without None checking.
     """
-    db_service = get_db_service()
+    db_service = get_db_service(use_organisation=use_organisation)
     if db_service is None or inspect.isabstract(type(db_service)):
         from lfx.services.session import NoopSession
 
