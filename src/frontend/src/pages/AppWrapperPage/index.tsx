@@ -1,9 +1,9 @@
-import AlertDisplayArea from "@/alerts/displayArea";
-import CrashErrorComponent from "@/components/common/crashErrorComponent";
 import { ErrorBoundary } from "react-error-boundary";
 import useAuthStore from "@/stores/authStore";
-import { Outlet , useLocation } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import Landing from "../LandingPage";
+import AlertDisplayArea from "@/alerts/displayArea";
+import CrashErrorComponent from "@/components/common/crashErrorComponent";
 import { GenericErrorComponent } from "./components/GenericErrorComponent";
 import { useHealthCheck } from "./hooks/use-health-check";
 
