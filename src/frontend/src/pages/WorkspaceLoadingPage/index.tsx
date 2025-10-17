@@ -1,4 +1,4 @@
-import { ProgressBar } from "@/components/common/progressBar";
+import { ProgressBar as LoadingComponent } from "@/components/common/progressBar";
 import { cn } from "@/utils/utils";
 
 export function WorkspaceLoadingPage({ overlay = false }: { overlay?: boolean }) {
@@ -12,7 +12,7 @@ export function WorkspaceLoadingPage({ overlay = false }: { overlay?: boolean })
       <p className="max-w-md text-lg font-medium text-muted-foreground">
         Holding on tight your workspace is loading
       </p>
-      <ProgressBar remSize={50} />
+      <LoadingComponent remSize={50} />
     </div>
   );
 }
