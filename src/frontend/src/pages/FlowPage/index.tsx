@@ -172,9 +172,7 @@ export default function FlowPage({ view }: { view?: boolean }): JSX.Element {
         )}
       </div>
       {(!currentFlow || isLoading) && (
-        <div className="fixed inset-0 flex items-center justify-center">
-          <WorkspaceLoadingPage overlay={Boolean(currentFlow)} />
-        </div>
+        <WorkspaceLoadingPage overlay={Boolean(currentFlow)} />
       )}
       {blocker.state === "blocked" && (
         <>
