@@ -88,7 +88,7 @@ const router = createBrowserRouter(
         path=""
         element={
           <ContextWrapper key={1}>
-            <Suspense fallback={<WorkspaceLoadingPage />}>
+            <Suspense fallback={<LoadingPage />}>
               <PlaygroundPage />
             </Suspense>
           </ContextWrapper>
@@ -106,7 +106,7 @@ const router = createBrowserRouter(
       <Route
         path=""
         element={
-          <Suspense fallback={<WorkspaceLoadingPage />}>
+          <Suspense fallback={<LoadingPage />}>
             <AppWrapperPage />
           </Suspense>
         }
@@ -114,7 +114,7 @@ const router = createBrowserRouter(
         <Route
           path=""
           element={
-            <Suspense fallback={<WorkspaceLoadingPage />}>
+            <Suspense fallback={<LoadingPage />}>
               <ProtectedRoute>
                 <AppInitPage />
               </ProtectedRoute>
@@ -132,7 +132,7 @@ const router = createBrowserRouter(
             <Route
               path=""
               element={
-                <Suspense fallback={<WorkspaceLoadingPage />}>
+                <Suspense fallback={<LoadingPage />}>
                   <CustomDashboardWrapperPage />
                 </Suspense>
               }
@@ -140,7 +140,7 @@ const router = createBrowserRouter(
               <Route
                 path=""
                 element={
-                  <Suspense fallback={<WorkspaceLoadingPage />}>
+                  <Suspense fallback={<LoadingPage />}>
                     <CollectionPage />
                   </Suspense>
                 }
@@ -150,7 +150,7 @@ const router = createBrowserRouter(
                   <Route
                     path="files"
                     element={
-                      <Suspense fallback={<WorkspaceLoadingPage />}>
+                      <Suspense fallback={<LoadingPage />}>
                         <FilesPage />
                       </Suspense>
                     }
@@ -209,7 +209,7 @@ const router = createBrowserRouter(
                   <Route
                     path="folder/:folderId"
                     element={
-                      <Suspense fallback={<WorkspaceLoadingPage />}>
+                      <Suspense fallback={<LoadingPage />}>
                         <HomePage key="mcp" type="mcp" />
                       </Suspense>
                     }
