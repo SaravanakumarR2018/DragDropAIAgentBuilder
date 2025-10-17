@@ -311,7 +311,7 @@ const router = createBrowserRouter(
                 <Route
                   path=""
                   element={
-                    <Suspense fallback={<LoadingPage />}>
+                    <Suspense fallback={<WorkspaceLoadingPage />}>
                       <FlowPage />
                     </Suspense>
                   }
@@ -341,7 +341,7 @@ const router = createBrowserRouter(
         <Route
           path="organization"
           element={
-            <Suspense fallback={<WorkspaceLoadingPage />}>
+            <Suspense fallback={<LoadingPage />}>
               <ProtectedLoginRoute>
                 <OrganizationPage />
               </ProtectedLoginRoute>
@@ -351,7 +351,7 @@ const router = createBrowserRouter(
         <Route
           path="signup"
           element={
-            <Suspense fallback={<WorkspaceLoadingPage />}>
+            <Suspense fallback={<LoadingPage />}>
               <ProtectedLoginRoute>
                 <SignUp />
               </ProtectedLoginRoute>
@@ -361,7 +361,7 @@ const router = createBrowserRouter(
         <Route
           path="login/admin"
           element={
-            <Suspense fallback={<WorkspaceLoadingPage />}>
+            <Suspense fallback={<LoadingPage />}>
               <ProtectedLoginRoute>
                 <LoginAdminPage />
               </ProtectedLoginRoute>
