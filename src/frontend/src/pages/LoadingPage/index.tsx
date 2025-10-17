@@ -1,4 +1,4 @@
-import { ProgressBar as LoadingComponent } from "@/components/common/progressBar";
+import { ProgressBar } from "@/components/common/progressBar";
 import { cn } from "@/utils/utils";
 
 export function LoadingPage({ overlay = false }: { overlay?: boolean }) {
@@ -9,7 +9,7 @@ export function LoadingPage({ overlay = false }: { overlay?: boolean }) {
         overlay && "fixed left-0 top-0 z-[999]",
       )}
     >
-      <LoadingComponent remSize={50} />
+      <ProgressBar remSize={50} />
     </div>
   );
 }
