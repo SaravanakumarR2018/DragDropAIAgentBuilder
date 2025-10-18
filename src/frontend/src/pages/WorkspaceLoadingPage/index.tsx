@@ -10,7 +10,7 @@ export function WorkspaceLoadingPage({ overlay = false }: { overlay?: boolean })
       )}
     >
       <p className="max-w-md text-lg font-medium text-muted-foreground">
-        Holding on tight your workspace is loading
+        Hang in tight. Setting up things for you...
       </p>
       <LoadingComponent remSize={50} />
     </div>
