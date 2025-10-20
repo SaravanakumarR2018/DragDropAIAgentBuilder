@@ -124,7 +124,7 @@ const router = createBrowserRouter(
           <Route
             path=""
             element={
-              <Suspense fallback={null}>
+              <Suspense fallback={<LoadingPage />}>
                 <AppAuthenticatedPage />
               </Suspense>
             }
