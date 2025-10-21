@@ -29,13 +29,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Free up disk space
+      - name: Aggressive cleanup before build
         run: |
-          echo "Initial disk usage:"
+          echo "=== Initial disk usage ==="
           df -h
+          echo "=== Aggressive cleanup starting ==="
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
-          docker system prune -af || true
-          echo "After cleanup:"
+          sudo rm -rf /var/lib/docker /var/lib/containers || true
+          sudo systemctl stop docker || true
+          sudo systemctl start docker || true
+          docker system prune -af --volumes || true
+          echo "=== After aggressive cleanup ==="
           df -h
 
       - name: Checkout selected branch
@@ -110,37 +114,42 @@ jobs:
           username: forwardemailforaifirstdesk
           password: ${{ secrets.DOCKERHUB_TOKEN }}  
 
-      - name: Build Docker Image (for staging)
-        if: ${{ github.event.inputs.environment == 'staging' }}
+      - name: Build & Push Docker Image
         run: |
+          set -e
           COMMIT_ID=${{ steps.commit.outputs.commit_id }}
           BRANCH_NAME=${{ steps.branch.outputs.branch_name }}
-          echo "Using branch=$BRANCH_NAME commit=$COMMIT_ID"
+          ENVIRONMENT=${{ github.event.inputs.environment }}
 
-          echo "=== Building Staging Image ==="
-          DOCKER=${DOCKER:-docker}
+          echo "=== Building Docker Image for environment: $ENVIRONMENT ==="
+
+          if [ "$ENVIRONMENT" = "staging" ]; then
+            CLERK_KEY="${{ secrets.CLERK_PUBLISHABLE_KEY }}"
+            CLERK_FRONTEND_API="${{ vars.STAGING_CLERK_FRONTEND_API }}"
+            TAG="langflow:staging-$BRANCH_NAME-$COMMIT_ID"
+          else
+            CLERK_KEY="${{ secrets.PROD_CLERK_PUBLISHABLE_KEY }}"
+            CLERK_FRONTEND_API="${{ vars.PROD_CLERK_FRONTEND_API }}"
+            TAG="langflow:prod-$BRANCH_NAME-$COMMIT_ID"
+          fi
+
+          echo "Using tag: $TAG"
 
           DOCKER_BUILDKIT=1 \
           VITE_AUTO_LOGIN=false \
           VITE_CLERK_AUTH_ENABLED=true \
-          VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.CLERK_PUBLISHABLE_KEY }} \
-          VITE_CLERK_FRONTEND_API=${{ vars.STAGING_CLERK_FRONTEND_API }} \
-          make docker_build TAG=langflow:staging-$BRANCH_NAME-$COMMIT_ID DOCKER=$DOCKER
+          VITE_CLERK_PUBLISHABLE_KEY="$CLERK_KEY" \
+          VITE_CLERK_FRONTEND_API="$CLERK_FRONTEND_API" \
+          make docker_build TAG=$TAG
 
-          docker tag langflow:staging-$BRANCH_NAME-$COMMIT_ID forwardemailforaifirstdesk/langflow:staging-$BRANCH_NAME-$COMMIT_ID
-          docker push forwardemailforaifirstdesk/langflow:staging-$BRANCH_NAME-$COMMIT_ID
+          docker tag $TAG forwardemailforaifirstdesk/$TAG
+          docker push forwardemailforaifirstdesk/$TAG
 
-          echo "=== Building Prod Image ==="
-
-          DOCKER_BUILDKIT=1 \
-          VITE_AUTO_LOGIN=false \
-          VITE_CLERK_AUTH_ENABLED=true \
-          VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.PROD_CLERK_PUBLISHABLE_KEY }} \
-          VITE_CLERK_FRONTEND_API=${{ vars.PROD_CLERK_FRONTEND_API }} \
-          make docker_build TAG=langflow:prod-$BRANCH_NAME-$COMMIT_ID DOCKER=$DOCKER
-        
-          docker tag langflow:prod-$BRANCH_NAME-$COMMIT_ID forwardemailforaifirstdesk/langflow:prod-$BRANCH_NAME-$COMMIT_ID
-          docker push forwardemailforaifirstdesk/langflow:prod-$BRANCH_NAME-$COMMIT_ID
+          echo "=== Cleaning up Docker cache and disk space ==="
+          docker system prune -af --volumes || true
+          sudo rm -rf /var/lib/docker/tmp/* || true
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc || true
+          df -h
 
       - name: Cleanup old Docker Hub tags (skip for prod)
         if: ${{ github.event.inputs.environment == 'staging' }}
