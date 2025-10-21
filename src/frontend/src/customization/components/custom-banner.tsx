@@ -1,3 +1,1 @@
-export function CustomBanner() {
-  return <></>;
-}
+export { EnvironmentWatermark as CustomBanner } from "./environment-watermark-banner";
