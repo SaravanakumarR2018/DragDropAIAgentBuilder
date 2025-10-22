@@ -76,14 +76,13 @@ export function AppInitPage() {
   return (
     //need parent component with width and height
     <>
-      {isLoaded ? (
-        (isLoading || (!isFetched && !shouldSkip) || (!isExamplesFetched && !shouldSkip)) && (
-          <LoadingPage overlay />
-        )
-      ) : (
+      {!isLoaded ? (
         <CustomLoadingPage />
+      ) : (
+        <>
+          {(isFetched && isExamplesFetched) || shouldSkip ? <Outlet /> : <CustomLoadingPage />}
+        </>
       )}
-      {(isFetched && isExamplesFetched) || shouldSkip ? <Outlet /> : null}
     </>
   );
 }

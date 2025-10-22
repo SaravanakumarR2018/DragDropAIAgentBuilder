@@ -31,6 +31,44 @@ export default function OrganizationSwitcherPage() {
   const isOrgSelectedManually = searchParams.get("selected") === "true";
   const [isBootstrapping, setIsBootstrapping] = useState(false);
 
+  type EnterpriseDetectionUser = {
+    enterpriseAccounts?: unknown[] | null;
+    samlAccounts?: unknown[] | null;
+    externalAccounts?:
+      | Array<{
+          provider?: string | null;
+          strategy?: string | null;
+          verification?: { strategy?: string | null } | null;
+        }>
+      | null;
+  };
+  const enterpriseDetectionUser = user as unknown as EnterpriseDetectionUser | null;
+  const enterpriseAccounts = enterpriseDetectionUser?.enterpriseAccounts ?? [];
+  const samlAccounts = enterpriseDetectionUser?.samlAccounts ?? [];
+  const externalAccounts = enterpriseDetectionUser?.externalAccounts ?? [];
+  const hasEnterpriseAccounts =
+    (Array.isArray(enterpriseAccounts) && enterpriseAccounts.length > 0) ||
+    (Array.isArray(samlAccounts) && samlAccounts.length > 0) ||
+    (Array.isArray(externalAccounts) &&
+      externalAccounts.some((account) => {
+        if (!account) return false;
+        const provider = account.provider?.toLowerCase() ?? "";
+        const strategy = account.strategy?.toLowerCase() ?? "";
+        const verificationStrategy = account.verification?.strategy?.toLowerCase() ?? "";
+        return (
+          strategy === "enterprise_sso" ||
+          strategy === "saml" ||
+          verificationStrategy === "enterprise_sso" ||
+          verificationStrategy === "saml" ||
+          provider === "saml" ||
+          provider.startsWith("saml_")
+        );
+      }));
+  const isEnterpriseUser = hasEnterpriseAccounts;
+  const organizationMemberships = user?.organizationMemberships ?? [];
+  const hasOrganizations = organizationMemberships.length > 0;
+  const shouldShowEnterpriseEmptyState = isEnterpriseUser && !hasOrganizations;
+
   useEffect(() => {
     if (!organization?.id || !isOrgSelectedManually || bootstrapped.current)
       return;
@@ -109,20 +147,229 @@ export default function OrganizationSwitcherPage() {
     return <LoadingPage />;
   }
 
+  const displayName =
+    (user?.fullName && user.fullName.trim()) ||
+    user?.username ||
+    [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
+    user?.primaryEmailAddress?.emailAddress ||
+    user?.id ||
+    "";
+
+  const emailAddress =
+    user?.primaryEmailAddress?.emailAddress ||
+    user?.emailAddresses?.[0]?.emailAddress ||
+    "";
+
+  const avatarUrl = user?.imageUrl;
+  const initials = (
+    (user?.firstName?.[0] || "") + (user?.lastName?.[0] || user?.firstName?.[1] || "")
+  ).toUpperCase();
+
   return (
     <div
       style={{
         display: "flex",
         justifyContent: "center",
-        alignItems: "center",
-        minHeight: "100vh",
+        alignItems: "flex-start",
+        minHeight: "100dvh",
+        width: "100%",
+        padding: "2.5rem 1.5rem",
+        boxSizing: "border-box",
+        backgroundColor: "#f8fafc",
+        overflowY: "auto",
       }}
     >
-      <OrganizationList
-        hidePersonal
-        afterCreateOrganizationUrl="/organization?selected=true"
-        afterSelectOrganizationUrl="/organization?selected=true"
-      />
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "38rem",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "stretch",
+          gap: "1.5rem",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+          }}
+        >
+          <button
+            type="button"
+            aria-label="Visual AI Agent Builder"
+            style={{
+              alignItems: "center",
+              alignSelf: "center",
+              backgroundColor: "var(--clerk-color-background, #ffffff)",
+              border: "1px solid rgba(99, 102, 241, 0.35)",
+              borderRadius: "9999px",
+              boxShadow: "0 10px 28px rgba(15, 23, 42, 0.08)",
+              display: "inline-flex",
+              gap: "0.5rem",
+              justifyContent: "center",
+              minHeight: "1.75rem",
+              padding: "0.375rem 1.25rem",
+              width: "min(50%, 14rem)",
+            }}
+          >
+            <span
+              style={{
+                background: "linear-gradient(90deg, #4f46e5 0%, #38bdf8 100%)",
+                WebkitBackgroundClip: "text",
+                color: "transparent",
+                fontSize: "1rem",
+                fontWeight: 700,
+                letterSpacing: "0.01em",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Visual AI Agent Builder
+            </span>
+          </button>
+        </div>
+
+        <div
+          style={{
+            alignItems: "center",
+            alignSelf: "stretch",
+            backgroundColor: "var(--clerk-color-background, #ffffff)",
+            border: "1px solid rgba(15, 23, 42, 0.08)",
+            borderRadius: "1rem",
+            boxShadow: "0 12px 32px rgba(15, 23, 42, 0.06)",
+            boxSizing: "border-box",
+            display: "flex",
+            gap: "0.75rem",
+            minHeight: "3.5rem",
+            padding: "0.875rem 1.25rem",
+            width: "100%",
+          }}
+        >
+            <div
+              style={{
+                width: "2.75rem",
+                height: "2.75rem",
+                borderRadius: "9999px",
+                overflow: "hidden",
+                border: "2px solid rgba(99, 102, 241, 0.35)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background:
+                  "linear-gradient(135deg, rgba(99,102,241,0.16), rgba(129,140,248,0.22))",
+              }}
+            >
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt={displayName || "Current user"}
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              ) : (
+                <span
+                  style={{
+                    color: "#312e81",
+                    fontSize: "1.5rem",
+                    fontWeight: 600,
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  {initials || (displayName?.[0]?.toUpperCase() ?? "U")}
+                </span>
+              )}
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                flex: 1,
+                flexDirection: "column",
+                gap: "0.15rem",
+                justifyContent: "center",
+                minWidth: 0,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "1rem",
+                  fontWeight: 600,
+                  color: "#1e293b",
+                  lineHeight: 1.3,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+                title={displayName || undefined}
+              >
+                {displayName || "Current member"}
+              </div>
+              <div
+                style={{
+                  color: "#475569",
+                  fontSize: "1rem",
+                  lineHeight: 1.3,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+                title={emailAddress || undefined}
+              >
+                {emailAddress || "Signed in user"}
+              </div>
+            </div>
+        </div>
+
+        {shouldShowEnterpriseEmptyState ? (
+          <div
+            style={{
+              maxWidth: "32rem",
+              textAlign: "center",
+              display: "flex",
+              flexDirection: "column",
+              gap: "0.75rem",
+              margin: "0 auto",
+            }}
+          >
+            <h1 style={{ fontSize: "1.5rem", fontWeight: 600 }}>
+              You&apos;re signed in with enterprise SSO
+            </h1>
+            <p style={{ color: "#4b5563", lineHeight: 1.5 }}>
+              Your account is managed by your organization, so creating new
+              organizations is disabled. Please contact your administrator if
+              you need a new organization to be set up for you.
+            </p>
+          </div>
+        ) : (
+          <div
+            style={{
+              backgroundColor: "var(--clerk-color-background, #ffffff)",
+              borderRadius: "1.25rem",
+              padding: "1.25rem 1.5rem",
+              boxShadow: "0 12px 35px rgba(15, 23, 42, 0.08)",
+              border: "1px solid rgba(15, 23, 42, 0.08)",
+              boxSizing: "border-box",
+              width: "100%",
+            }}
+          >
+            <OrganizationList
+              hidePersonal
+              afterCreateOrganizationUrl="/organization?selected=true"
+              afterSelectOrganizationUrl="/organization?selected=true"
+              appearance={
+                isEnterpriseUser
+                  ? {
+                      elements: {
+                        organizationListCreateOrganizationActionButton: {
+                          display: "none",
+                        },
+                      },
+                    }
+                  : undefined
+              }
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
