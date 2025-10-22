@@ -19,8 +19,7 @@ import useAuthStore from "@/stores/authStore";
 
 export function AppInitPage() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const location = useLocation();
-  const { pathname } = location;
+  const { pathname } = useLocation();
 
   const refreshStars = useDarkStore((state) => state.refreshStars);
   const refreshDiscordCount = useDarkStore((state) => state.refreshDiscordCount);
@@ -36,7 +35,7 @@ export function AppInitPage() {
 
   // Skip the initialization queries when unauthenticated visitors load the
   // unauthenticated marketing landing page rendered at the root route.
-  const skipAppInit = !isAuthenticated && pathname === "/";
+  const skipAppInit = !isAuthenticated && pathname === "/";  
 
   const { isFetched, refetch } = useGetAutoLogin({
     enabled: isLoaded && !shouldSkip && !skipAppInit,

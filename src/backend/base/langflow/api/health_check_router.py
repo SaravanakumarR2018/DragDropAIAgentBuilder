@@ -41,7 +41,7 @@ async def health_check(
     session: DbNoOrgSession,
 ) -> HealthResponse:
     response = HealthResponse()
-    # use a fixed valid UUID that UUID collision is very unlikely
+    # use a fixed valid UUId that UUID collision is very unlikely
     user_id = "da93c2bd-c857-4b10-8c8c-60988103320f"
     try:
         # Check database to query a bogus flow

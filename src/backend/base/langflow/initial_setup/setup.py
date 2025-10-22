@@ -905,12 +905,21 @@ async def find_existing_flow(session, flow_id, flow_endpoint_name):
 async def create_or_update_starter_projects(
     all_types_dict: dict,
     *,
-    do_create: bool = True,
+    _do_create: bool = True,
     use_organisation: bool = False
 ) -> None:
-    """Create or update starter projects."""
-    settings = get_settings_service().settings
-    if not settings.create_starter_projects:
+    """Create or update starter projects.
+
+    Args:
+        all_types_dict (dict): Dictionary containing all component types and their templates
+        do_create (bool, optional): Whether to create new projects. Defaults to True.
+        use_organisation (bool, optional): Whether to use organisation-scoped database sessions.
+            Defaults to False.
+    """
+    if not get_settings_service().settings.create_starter_projects:
+        # no-op for environments that don't want to create starter projects.
+        # note that this doesn't check if the starter projects are already loaded in the db;
+        # this is intended to be used to skip all startup project logic.
         await logger.adebug("Skipping starter project creation (disabled in settings).")
         return
 
@@ -918,12 +927,14 @@ async def create_or_update_starter_projects(
         new_folder = await get_or_create_starter_folder(session)
         starter_projects = await load_starter_projects()
 
-        if settings.update_starter_projects:
+        if get_settings_service().settings.update_starter_projects:
             await logger.adebug("Updating starter projects")
+            # 1. Delete all existing starter projects
+            successfully_updated_projects = 0
             await delete_starter_projects(session, new_folder.id)
             await copy_profile_pictures()
 
-            successfully_updated_projects = 0
+            # 2. Update all starter projects with the latest component versions (this modifies the actual file data)
             for project_path, project in starter_projects:
                 (
                     project_name,
@@ -945,6 +956,7 @@ async def create_or_update_starter_projects(
                     project_data = updated_project_data
 
                 try:
+                    # Create the updated starter project
                     create_new_project(
                         session=session,
                         project_name=project_name,
@@ -958,17 +970,17 @@ async def create_or_update_starter_projects(
                         project_tags=project_tags,
                         new_folder_id=new_folder.id,
                     )
-                    successfully_updated_projects += 1
                 except Exception:  # noqa: BLE001
                     await logger.aexception(f"Error while creating starter project {project_name}")
 
+                successfully_updated_projects += 1
             await logger.adebug(f"Successfully updated {successfully_updated_projects} starter projects")
         else:
+            # Even if we're not updating starter projects, we still need to create any that don't exist
             await logger.adebug("Creating new starter projects")
             successfully_created_projects = 0
             existing_flows = await get_all_flows_similar_to_project(session, new_folder.id)
             existing_flow_names = [existing_flow.name for existing_flow in existing_flows]
-
             for _, project in starter_projects:
                 (
                     project_name,
@@ -996,10 +1008,9 @@ async def create_or_update_starter_projects(
                             project_tags=project_tags,
                             new_folder_id=new_folder.id,
                         )
-                        successfully_created_projects += 1
                     except Exception:  # noqa: BLE001
                         await logger.aexception(f"Error while creating starter project {project_name}")
-
+                    successfully_created_projects += 1
             await logger.adebug(f"Successfully created {successfully_created_projects} starter projects")
 
 
@@ -1131,8 +1142,8 @@ async def sync_flows_from_fs():
             except (sa.exc.OperationalError, ValueError) as e:
                 if "no active connection" in str(e) or "connection is closed" in str(e):
                     await logger.adebug("Database connection lost, assuming shutdown")
-                    break
-                raise
+                    break  # Exit gracefully, don't error
+                raise  # Re-raise if it's a real connection problem
             except Exception:  # noqa: BLE001
                 await logger.aexception("Error while syncing flows from database")
                 break
