@@ -873,7 +873,7 @@ async def find_existing_flow(session, flow_id, flow_endpoint_name):
 async def create_or_update_starter_projects(
     all_types_dict: dict,
     *,
-    _do_create: bool = True,
+    do_create: bool = True,
     use_organisation: bool = False
 ) -> None:
     """Create or update starter projects.
@@ -911,7 +911,7 @@ async def create_or_update_starter_projects(
                     project_data = updated_project_data
                     # We also need to update the project data in the file
                     await update_project_file(project_path, project, updated_project_data)
-            if _do_create and project_name and project_data:
+            if do_create and project_name and project_data:
                 existing_flows = await get_all_flows_similar_to_project(session, new_folder.id)
                 for existing_project in existing_flows:
                     await session.delete(existing_project)
