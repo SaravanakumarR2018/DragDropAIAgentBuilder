@@ -870,13 +870,18 @@ async def find_existing_flow(session, flow_id, flow_endpoint_name):
     return None
 
 
-async def create_or_update_starter_projects(all_types_dict: dict, *, do_create: bool = True, use_organisation: bool = False) -> None:
+async def create_or_update_starter_projects(
+    all_types_dict: dict,
+    *,
+    _do_create: bool = True,
+    use_organisation: bool = False
+) -> None:
     """Create or update starter projects.
 
     Args:
         all_types_dict (dict): Dictionary containing all component types and their templates
         do_create (bool, optional): Whether to create new projects. Defaults to True.
-    use_organisation (bool, optional): Whether to use organisation-scoped database sessions.
+        use_organisation (bool, optional): Whether to use organisation-scoped database sessions.
             Defaults to False.
     """
     async with session_scope(use_organisation=use_organisation) as session:
@@ -906,7 +911,7 @@ async def create_or_update_starter_projects(all_types_dict: dict, *, do_create: 
                     project_data = updated_project_data
                     # We also need to update the project data in the file
                     await update_project_file(project_path, project, updated_project_data)
-            if do_create and project_name and project_data:
+            if _do_create and project_name and project_data:
                 existing_flows = await get_all_flows_similar_to_project(session, new_folder.id)
                 for existing_project in existing_flows:
                     await session.delete(existing_project)
