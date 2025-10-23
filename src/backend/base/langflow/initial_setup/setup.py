@@ -905,7 +905,6 @@ async def find_existing_flow(session, flow_id, flow_endpoint_name):
 async def create_or_update_starter_projects(
     all_types_dict: dict,
     *,
-    _do_create: bool = True,
     use_organisation: bool = False
 ) -> None:
     """Create or update starter projects.
@@ -952,8 +951,8 @@ async def create_or_update_starter_projects(
                 )
                 updated_project_data = update_edges_with_latest_component_versions(updated_project_data)
                 if updated_project_data != project_data:
-                    await update_project_file(project_path, project, updated_project_data)
                     project_data = updated_project_data
+                    await update_project_file(project_path, project, updated_project_data)
 
                 try:
                     # Create the updated starter project
