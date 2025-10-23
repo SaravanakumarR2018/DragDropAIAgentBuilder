@@ -108,7 +108,7 @@ jobs:
           docker system prune -af
           df -h
 
-      - name: Build Docker Image (for staging)
+      - name: Build Docker Image (staging)
         if: ${{ github.event.inputs.environment == 'staging' }}
         run: |
           COMMIT_ID=${{ steps.commit.outputs.commit_id }}
@@ -125,8 +125,15 @@ jobs:
 
           docker tag langflow:staging-$BRANCH_NAME-$COMMIT_ID forwardemailforaifirstdesk/langflow:staging-$BRANCH_NAME-$COMMIT_ID
           docker push forwardemailforaifirstdesk/langflow:staging-$BRANCH_NAME-$COMMIT_ID
+          
+      - name: Build Docker Image (production)
+        if: ${{ github.event.inputs.environment == 'prod' }}
+        run: |
+          COMMIT_ID=${{ steps.commit.outputs.commit_id }}
+          BRANCH_NAME=${{ steps.branch.outputs.branch_name }}
+          echo "Using branch=$BRANCH_NAME commit=$COMMIT_ID"
 
-          echo "=== Building Prod Image ==="
+          echo "=== Building Production Image ==="
           DOCKER_BUILDKIT=1 \
           VITE_AUTO_LOGIN=false \
           VITE_CLERK_AUTH_ENABLED=true \
