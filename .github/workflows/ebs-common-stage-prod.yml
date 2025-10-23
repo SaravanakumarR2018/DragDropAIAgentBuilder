@@ -251,6 +251,9 @@ jobs:
               --db-password "$DB_PASSWORD" \
               --db-name "$DB_NAME" \
               --volume-name "$VOLUME_NAME"
+
+          command_timeout: 20m
+
       - name: Copy deploy_status.env from VM
         run: |
           sshpass -p "${{ secrets.VM_PASSWORD }}" scp -o StrictHostKeyChecking=no \
