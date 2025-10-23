@@ -105,7 +105,7 @@ jobs:
         run: |
           echo "=== Cleaning up space for Docker build ==="
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
-          docker system prune -af
+          docker builder prune -f
           df -h
 
       - name: Build Docker Image (staging)
