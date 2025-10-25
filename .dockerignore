@@ -1,0 +1,33 @@
+# Exclude version control and GitHub metadata
+.git
+.gitignore
+.gitattributes
+.github
+
+# Documentation and test artifacts
+/docs
+/test-results
+/docker_example
+/scripts
+/deploy
+
+# Local development and editor files
+.vscode
+.devcontainer
+
+# Environment files and samples
+.env
+.env.*
+.env-file
+*.env
+*.example
+
+# Dependency directories and caches
+**/node_modules
+**/__pycache__
+*.py[cod]
+src/frontend/build
+.venv
+
+# Logs
+*.log
