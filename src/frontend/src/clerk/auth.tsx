@@ -332,7 +332,7 @@ export function ClerkAuthAdapter() {
   useEffect(() => {
     const unsubscribe = clerk.addListener(async ({ session }) => {
       console.debug("[ClerkAuthAdapter] Token update event received");
-      const token = await session?.getToken();
+      const token = await session?.getToken({ skipCache: true });
       const orgSelected = sessionStorage.getItem("isOrgSelected") === "true";
 
       if (!orgSelected) {
