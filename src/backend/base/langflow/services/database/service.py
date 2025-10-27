@@ -48,6 +48,9 @@ class DatabaseService(Service):
         self.database_url: str = settings_service.settings.database_url
         self._sanitize_database_url()
 
+        self._legacy_cleanup_lock = asyncio.Lock()
+        self._legacy_cleanup_done = False
+
         # This file is in langflow.services.database.manager.py
         # the ini is in langflow
         langflow_dir = Path(__file__).parent.parent.parent
@@ -186,8 +189,10 @@ class DatabaseService(Service):
     @asynccontextmanager
     async def with_session(self):
         if self.settings_service.settings.use_noop_database:
+            self._legacy_cleanup_done = True
             yield NoopSession()
         else:
+            await self._ensure_legacy_context_cleanup()
             async with AsyncSession(self.engine, expire_on_commit=False) as session:
                 # Start of Selection
                 try:
@@ -245,6 +250,48 @@ class DatabaseService(Service):
             # Commit changes
             await session.commit()
             await logger.adebug("Successfully assigned orphaned flows to the default superuser")
+
+    async def drop_legacy_message_context_id(self) -> None:
+        """Remove the legacy ``context_id`` column from the ``message`` table if it exists."""
+
+        async with self._legacy_cleanup_lock:
+            if self._legacy_cleanup_done:
+                return
+
+            if self.settings_service.settings.use_noop_database:
+                self._legacy_cleanup_done = True
+                return
+
+            async with self.engine.begin() as conn:
+                await conn.run_sync(self._drop_legacy_message_context_id)
+
+            self._legacy_cleanup_done = True
+
+    @staticmethod
+    def _drop_legacy_message_context_id(connection) -> None:
+        inspector = inspect(connection)
+        table_names = inspector.get_table_names()
+
+        if "message" not in table_names:
+            return
+
+        column_names = {column["name"] for column in inspector.get_columns("message")}
+        if "context_id" not in column_names:
+            return
+
+        logger.info("Removing legacy context_id column from message table")
+
+        try:
+            connection.execute(text('ALTER TABLE "message" DROP COLUMN context_id'))
+        except Exception:  # noqa: BLE001
+            logger.exception("Failed to drop legacy context_id column from message table")
+            raise
+
+    async def _ensure_legacy_context_cleanup(self) -> None:
+        if self._legacy_cleanup_done:
+            return
+
+        await self.drop_legacy_message_context_id()
 
     @staticmethod
     def _generate_unique_flow_name(original_name: str, existing_names: set[str]) -> str:
