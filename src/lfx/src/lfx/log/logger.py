@@ -334,7 +334,8 @@ def configure(
                     pass
         else:
             max_bytes = 10 * 1024 * 1024  # Default 10MB
-
+        
+        log_file.parent.mkdir(parents=True, exist_ok=True)
         # Since structlog doesn't have built-in rotation, we'll use stdlib logging for file output
         file_handler = logging.handlers.RotatingFileHandler(
             log_file,
