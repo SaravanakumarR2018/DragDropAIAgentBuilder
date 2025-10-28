@@ -5,7 +5,6 @@ export const checkLucideIcons =async (iconName: string):Promise<boolean> => {
     import("lucide-react"),
     import("lucide-react/dynamicIconImports").then((mod) => mod.default),
   ]);
-
   return (
     !!lucideIcons[iconName] ||
     !!dynamicIconImports[iconName] ||
