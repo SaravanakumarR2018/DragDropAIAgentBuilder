@@ -32,9 +32,9 @@ async def initialize_database(*, fix_migration: bool = False) -> None:
             await logger.aexception(msg)
             raise RuntimeError(msg) from exc
     try:
-        await database_service.drop_legacy_message_context_id()
+        await database_service.run_runtime_migrations()
     except Exception as exc:  # noqa: BLE001
-        msg = "Error dropping legacy context_id column"
+        msg = "Error applying runtime database migrations"
         await logger.aexception(msg)
         raise RuntimeError(msg) from exc
     try:
