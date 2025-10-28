@@ -200,6 +200,20 @@ code {
   margin: 0;
 }
 
+.landing-arrow {
+  animation: landing-arrow 1.6s ease-in-out infinite;
+}
+
+@keyframes landing-arrow {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(4px);
+  }
+}
+
 .ag-large-text-input.ag-text-area.ag-input-field {
   background-color: hsl(var(--background)) !important;
 }
