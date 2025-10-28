@@ -42,13 +42,26 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: "build",
       rollupOptions: {
+        input: {
+          landing: path.resolve(__dirname, "index.html"),
+          app: path.resolve(__dirname, "app.html"),
+        },
         output: {
           // Add hash to filenames for cache busting
           entryFileNames: `assets/[name].[hash].js`,
           chunkFileNames: `assets/[name].[hash].js`,
-          assetFileNames: `assets/[name].[hash].[ext]`
-        }
-      }
+          assetFileNames: `assets/[name].[hash].[ext]`,
+          manualChunks(id) {
+            if (id.includes("node_modules")) {
+              if (id.includes("@clerk") || id.includes("zustand")) {
+                return "app-vendor";
+              }
+
+              return "vendor";
+            }
+          },
+        },
+      },
     },
     define: {
       "process.env.BACKEND_URL": JSON.stringify(
