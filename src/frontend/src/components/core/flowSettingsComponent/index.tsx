@@ -4,6 +4,7 @@ import useAlertStore from "@/stores/alertStore";
 import useFlowsManagerStore from "@/stores/flowsManagerStore";
 import useFlowStore from "@/stores/flowStore";
 import { FlowType } from "@/types/flow";
+import { cloneDeep } from "lodash";
 import { useEffect, useState } from "react";
 import EditFlowSettings from "../editFlowSettingsComponent";
 
@@ -33,10 +34,9 @@ export default function FlowSettingsComponent({
     setDescription(flow?.description ?? "");
   }, [flow?.name, flow?.description, flow?.endpoint_name, open]);
 
-  async function handleClick(): Promise<void> {
+  function handleClick(): void {
     setIsSaving(true);
     if (!flow) return;
-    const { default: cloneDeep } = await import("lodash");
     const newFlow = cloneDeep(flow);
     newFlow.name = name;
     newFlow.description = description;
