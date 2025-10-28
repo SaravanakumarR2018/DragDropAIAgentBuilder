@@ -28,7 +28,7 @@ from langflow.services.base import Service
 from langflow.services.database import models
 from langflow.services.database.models.user.crud import get_user_by_username
 from langflow.services.database.session import NoopSession
-from langflow.services.database.runtime_migrations import apply_runtime_migrations
+from langflow.services.database.runtime_migrations import ensure_runtime_migrations
 from langflow.services.database.utils import Result, TableResults
 from langflow.services.deps import get_settings_service
 from langflow.services.utils import teardown_superuser
@@ -48,9 +48,6 @@ class DatabaseService(Service):
             raise ValueError(msg)
         self.database_url: str = settings_service.settings.database_url
         self._sanitize_database_url()
-
-        self._runtime_migration_lock = asyncio.Lock()
-        self._runtime_migration_done = False
 
         # This file is in langflow.services.database.manager.py
         # the ini is in langflow
@@ -190,10 +187,9 @@ class DatabaseService(Service):
     @asynccontextmanager
     async def with_session(self):
         if self.settings_service.settings.use_noop_database:
-            self._runtime_migration_done = True
             yield NoopSession()
         else:
-            await self._ensure_runtime_migrations()
+            await self.run_runtime_migrations()
             async with AsyncSession(self.engine, expire_on_commit=False) as session:
                 # Start of Selection
                 try:
@@ -253,30 +249,10 @@ class DatabaseService(Service):
             await logger.adebug("Successfully assigned orphaned flows to the default superuser")
 
     async def run_runtime_migrations(self) -> None:
-        """Execute the runtime migration plan once for this service."""
-
-        async with self._runtime_migration_lock:
-            if self._runtime_migration_done:
-                return
-
-            if self.settings_service.settings.use_noop_database:
-                self._runtime_migration_done = True
-                return
-
-            async with self.engine.begin() as conn:
-                await conn.run_sync(self._apply_runtime_migrations)
-
-            self._runtime_migration_done = True
-
-    @staticmethod
-    def _apply_runtime_migrations(connection) -> None:
-        apply_runtime_migrations(connection)
-
-    async def _ensure_runtime_migrations(self) -> None:
-        if self._runtime_migration_done:
-            return
-
-        await self.run_runtime_migrations()
+        await ensure_runtime_migrations(
+            self.engine,
+            use_noop_database=self.settings_service.settings.use_noop_database,
+        )
 
     @staticmethod
     def _generate_unique_flow_name(original_name: str, existing_names: set[str]) -> str:
