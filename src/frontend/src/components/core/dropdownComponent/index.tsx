@@ -10,7 +10,6 @@ import {
 } from "@/utils/stringManipulation";
 import { PopoverAnchor } from "@radix-ui/react-popover";
 import Fuse from "fuse.js";
-import { cloneDeep } from "lodash";
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 import { DropDownComponent } from "../../../types/components";
 import {

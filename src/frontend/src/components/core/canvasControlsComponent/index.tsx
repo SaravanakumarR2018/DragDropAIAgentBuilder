@@ -12,7 +12,6 @@ import {
   useStoreApi,
   type ReactFlowState,
 } from "@xyflow/react";
-import { cloneDeep } from "lodash";
 import { useCallback, useEffect } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { shallow } from "zustand/shallow";
@@ -88,9 +87,10 @@ const CanvasControls = ({ children }) => {
     });
   }, [isLocked]);
 
-  const handleSaveFlow = useCallback(() => {
+  const handleSaveFlow = useCallback(async () => {
     const currentFlow = useFlowStore.getState().currentFlow;
     if (!currentFlow) return;
+    const { default: cloneDeep } = await import("lodash");
     const newFlow = cloneDeep(currentFlow);
     newFlow.locked = isInteractive;
     if (autoSaving) {
