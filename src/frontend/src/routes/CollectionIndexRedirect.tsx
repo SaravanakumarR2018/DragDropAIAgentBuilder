@@ -1,10 +1,7 @@
 import { IS_CLERK_AUTH } from "@/clerk/auth";
 import { CustomNavigate } from "@/customization/components/custom-navigate";
 import authStore from "@/stores/authStore";
-import { lazy, Suspense } from "react";
-import { LoadingPage } from "@/pages/LoadingPage";
-
-const LandingPage = lazy(() => import("@/pages/LandingPage"));
+import { Navigate } from "react-router-dom";
 
 const hasSelectedOrganization = () =>
   typeof window !== "undefined" &&
@@ -20,13 +17,9 @@ export function CollectionIndexRedirect() {
     Boolean(isOrgSelected) ||
     (IS_CLERK_AUTH && hasSelectedOrganization());
 
-  // Unauthenticated users: Show the public Landing Page
+  // Unauthenticated users: redirect to the public landing page
   if (!isAuthenticated) {
-    return (
-      <Suspense fallback={<LoadingPage />}>
-        <LandingPage />
-      </Suspense>
-    );
+    return <Navigate replace to="/" />;
   }
 
   // Authenticated but no org selected: go to organization selection
@@ -35,5 +28,5 @@ export function CollectionIndexRedirect() {
   }
 
   // Authenticated with org: go to flows
-  return <CustomNavigate replace to="flows" />;
+  return <CustomNavigate replace to="/app/flows" />;
 }

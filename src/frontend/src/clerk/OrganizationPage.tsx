@@ -112,9 +112,9 @@ export default function OrganizationSwitcherPage() {
         setStoredActiveOrgId(activeOrgId);
         console.debug("[OrgSwitcherPage] Org selection state marked");
 
-        // Step 6: Navigate to /flows
-        console.debug("[OrgSwitcherPage] Redirecting to /flows");
-        navigate("/flows", { replace: true });
+        // Step 6: Navigate to /app/flows
+        console.debug("[OrgSwitcherPage] Redirecting to /app/flows");
+        navigate("/app/flows", { replace: true });
       } catch (err) {
         if (!justLoggedIn.current) {
           console.error("[OrgSwitcherPage] Error during bootstrap", err);
