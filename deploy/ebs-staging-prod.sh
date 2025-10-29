@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 #############################################
 # Stop-First Docker Deploy w/ Nginx + TLS
 # - Minimizes CPU/RAM: only one app container at a time
@@ -189,6 +191,33 @@ human_readable_file_size() {
   fi
 }
 
+bytes_for_path() {
+  local path="$1"
+  if [[ -e "$path" ]]; then
+    du -sb "$path" 2>/dev/null | awk '{print $1}'
+  else
+    echo ""
+  fi
+}
+
+humanize_bytes() {
+  local bytes="$1"
+  if [[ -z "$bytes" ]]; then
+    echo "missing"
+    return
+  fi
+  numfmt --to=iec --suffix=B "$bytes" 2>/dev/null || echo "${bytes}B"
+}
+
+json_escape() {
+  local str="$1"
+  str="${str//\\/\\\\}"
+  str="${str//\"/\\\"}"
+  str="${str//$'\n'/\\n}"
+  str="${str//$'\r'/}"
+  echo "$str"
+}
+
 collect_storage_metrics() {
   local context="${1:-Storage usage snapshot}"
   local quiet="0"
@@ -196,207 +225,168 @@ collect_storage_metrics() {
     quiet="1"
   fi
 
-  local python_output
-  python_output=$(BACKUP_DIR="${BACKUP_DIR}" python - <<'PY'
-import datetime
-import json
-import os
-import subprocess
-import sys
-from pathlib import Path
+  local ebsstorage_path="/app/ebsstorage"
+  local ebstorage_path="/app/ebstorage"
+  local backup_path="${BACKUP_DIR}"
 
-backup_dir = os.environ.get("BACKUP_DIR", "/app/ebsstorage/postgres_backups")
+  local ebsstorage_bytes="$(bytes_for_path "$ebsstorage_path")"
+  local ebstorage_bytes="$(bytes_for_path "$ebstorage_path")"
+  local backup_dir_bytes="$(bytes_for_path "$backup_path")"
 
-def safe_du(path):
-    try:
-        out = subprocess.check_output(["du", "-sb", path], stderr=subprocess.DEVNULL)
-        return int(out.split()[0])
-    except Exception:
-        return None
+  local ebsstorage_bytes_json="null"
+  local ebstorage_bytes_json="null"
+  local backup_dir_bytes_json="null"
 
-def human(size):
-    if size is None:
-        return "missing"
-    units = ["B", "KB", "MB", "GB", "TB", "PB"]
-    idx = 0
-    value = float(size)
-    while value >= 1024 and idx < len(units) - 1:
-        value /= 1024
-        idx += 1
-    if idx == 0:
-        return f"{int(value)}B"
-    return f"{value:.2f}{units[idx]}"
+  [[ -n "$ebsstorage_bytes" ]] && ebsstorage_bytes_json="$ebsstorage_bytes"
+  [[ -n "$ebstorage_bytes" ]] && ebstorage_bytes_json="$ebstorage_bytes"
+  [[ -n "$backup_dir_bytes" ]] && backup_dir_bytes_json="$backup_dir_bytes"
 
-def describe_directory(path, include_children=False):
-    info = {
-        "path": path,
-        "size_bytes": None,
-        "size_human": "missing",
-    }
-    if not os.path.exists(path):
-        return info
-    size = safe_du(path)
-    info["size_bytes"] = size
-    info["size_human"] = human(size)
-    if include_children:
-        sub = []
-        try:
-            for child in sorted(Path(path).iterdir(), key=lambda p: p.name):
-                if child.is_dir():
-                    c_size = safe_du(str(child))
-                    sub.append({
-                        "path": str(child),
-                        "name": child.name,
-                        "size_bytes": c_size,
-                        "size_human": human(c_size),
-                    })
-        except Exception:
-            sub = []
-        info["subfolders"] = sub
-    return info
+  local ebsstorage_human="$(humanize_bytes "$ebsstorage_bytes")"
+  local ebstorage_human="$(humanize_bytes "$ebstorage_bytes")"
+  local backup_dir_human="$(humanize_bytes "$backup_dir_bytes")"
 
-def describe_backups(path):
-    info = {
-        "path": path,
-        "size_bytes": None,
-        "size_human": "missing",
-        "files": [],
-        "latest": None,
-    }
-    if not os.path.exists(path):
-        return info
-    size = safe_du(path)
-    info["size_bytes"] = size
-    info["size_human"] = human(size)
-    backups = []
-    try:
-        paths = sorted(Path(path).glob("*.sql.gz"), key=lambda p: p.stat().st_mtime, reverse=True)
-        for entry in paths:
-            try:
-                size_bytes = safe_du(str(entry))
-                mtime = datetime.datetime.fromtimestamp(entry.stat().st_mtime).isoformat()
-            except Exception:
-                size_bytes = None
-                mtime = None
-            backups.append({
-                "path": str(entry),
-                "name": entry.name,
-                "size_bytes": size_bytes,
-                "size_human": human(size_bytes),
-                "modified": mtime,
-            })
-    except Exception:
-        backups = []
-    info["files"] = backups
-    info["latest"] = backups[0] if backups else None
-    return info
+  local -a ebstorage_sub_entries=()
+  local -a ebstorage_pretty_entries=()
+  if [[ -d "$ebstorage_path" ]]; then
+    local -a subdirs=()
+    mapfile -t subdirs < <(find "$ebstorage_path" -mindepth 1 -maxdepth 1 -type d -print 2>/dev/null | sort)
+    local dir
+    for dir in "${subdirs[@]}"; do
+      [[ -n "$dir" ]] || continue
+      local dir_bytes="$(bytes_for_path "$dir")"
+      local dir_bytes_json="null"
+      [[ -n "$dir_bytes" ]] && dir_bytes_json="$dir_bytes"
+      local dir_human="$(humanize_bytes "$dir_bytes")"
+      local dir_name="$(basename "$dir")"
+      local escaped_path="$(json_escape "$dir")"
+      local escaped_name="$(json_escape "$dir_name")"
+      local escaped_human="$(json_escape "$dir_human")"
+      ebstorage_sub_entries+=("{\"path\":\"${escaped_path}\",\"name\":\"${escaped_name}\",\"size_bytes\":${dir_bytes_json},\"size_human\":\"${escaped_human}\"}")
+      ebstorage_pretty_entries+=("      {\n        \"path\": \"${escaped_path}\",\n        \"name\": \"${escaped_name}\",\n        \"size_bytes\": ${dir_bytes_json},\n        \"size_human\": \"${escaped_human}\"\n      }")
+    done
+  fi
 
-ebsstorage = describe_directory("/app/ebsstorage")
-ebstorage = describe_directory("/app/ebstorage", include_children=True)
-backups = describe_backups(backup_dir)
+  local ebstorage_subfolders_json="[]"
+  if [[ ${#ebstorage_sub_entries[@]} -gt 0 ]]; then
+    local IFS=,
+    ebstorage_subfolders_json="[${ebstorage_sub_entries[*]}]"
+  fi
 
-data = {
-    "ebsstorage": ebsstorage,
-    "ebstorage": ebstorage,
-    "postgres_backups": backups,
+  local pretty_subfolders=""
+  if [[ ${#ebstorage_pretty_entries[@]} -gt 0 ]]; then
+    local idx
+    for idx in "${!ebstorage_pretty_entries[@]}"; do
+      pretty_subfolders+="${ebstorage_pretty_entries[idx]}"
+      if (( idx < ${#ebstorage_pretty_entries[@]} - 1 )); then
+        pretty_subfolders+=$',\n'
+      else
+        pretty_subfolders+=$'\n'
+      fi
+    done
+  fi
+
+  local -a backup_entries=()
+  local -a backup_pretty_entries=()
+  local latest_entry_json="null"
+  local latest_pretty="      null\n"
+  local latest_path=""
+  local latest_human="missing"
+  if [[ -d "$backup_path" ]]; then
+    local -a backup_paths=()
+    mapfile -t backup_paths < <(find "$backup_path" -maxdepth 1 -type f -name '*.sql.gz' -printf '%T@ %p\n' 2>/dev/null | sort -nr | awk '{print $2}')
+    local backup
+    for backup in "${backup_paths[@]}"; do
+      [[ -n "$backup" ]] || continue
+      local backup_bytes="$(bytes_for_path "$backup")"
+      local backup_bytes_json="null"
+      [[ -n "$backup_bytes" ]] && backup_bytes_json="$backup_bytes"
+      local backup_human="$(humanize_bytes "$backup_bytes")"
+      local backup_name="$(basename "$backup")"
+      local mtime_epoch="$(stat -c %Y "$backup" 2>/dev/null || echo "")"
+      local mtime_iso=""
+      if [[ -n "$mtime_epoch" ]]; then
+        mtime_iso="$(date -u -d "@${mtime_epoch}" '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null || echo "")"
+      fi
+      local mtime_json="null"
+      local escaped_iso=""
+      if [[ -n "$mtime_iso" ]]; then
+        escaped_iso="$(json_escape "$mtime_iso")"
+        mtime_json="\"${escaped_iso}\""
+      fi
+      local escaped_path="$(json_escape "$backup")"
+      local escaped_name="$(json_escape "$backup_name")"
+      local escaped_human="$(json_escape "$backup_human")"
+      local entry="{\"path\":\"${escaped_path}\",\"name\":\"${escaped_name}\",\"size_bytes\":${backup_bytes_json},\"size_human\":\"${escaped_human}\",\"modified\":${mtime_json}}"
+      backup_entries+=("${entry}")
+      local pretty_entry="      {\n        \"path\": \"${escaped_path}\",\n        \"name\": \"${escaped_name}\",\n        \"size_bytes\": ${backup_bytes_json},\n        \"size_human\": \"${escaped_human}\",\n        \"modified\": ${mtime_json}\n      }"
+      backup_pretty_entries+=("${pretty_entry}")
+      if [[ -z "$latest_entry_json" || "$latest_entry_json" == "null" ]]; then
+        latest_entry_json="${entry}"
+        latest_pretty="      {\n        \"path\": \"${escaped_path}\",\n        \"name\": \"${escaped_name}\",\n        \"size_bytes\": ${backup_bytes_json},\n        \"size_human\": \"${escaped_human}\",\n        \"modified\": ${mtime_json}\n      }\n"
+        latest_path="$backup"
+        latest_human="$backup_human"
+      fi
+    done
+  fi
+
+  local backups_files_json="[]"
+  if [[ ${#backup_entries[@]} -gt 0 ]]; then
+    local IFS=,
+    backups_files_json="[${backup_entries[*]}]"
+  fi
+
+  local pretty_backups=""
+  if [[ ${#backup_pretty_entries[@]} -gt 0 ]]; then
+    local idx
+    for idx in "${!backup_pretty_entries[@]}"; do
+      pretty_backups+="${backup_pretty_entries[idx]}"
+      if (( idx < ${#backup_pretty_entries[@]} - 1 )); then
+        pretty_backups+=$',\n'
+      else
+        pretty_backups+=$'\n'
+      fi
+    done
+  fi
+
+  [[ -z "$latest_entry_json" ]] && latest_entry_json="null"
+
+  local ebsstorage_json="{\"path\":\"$(json_escape "$ebsstorage_path")\",\"size_bytes\":${ebsstorage_bytes_json},\"size_human\":\"$(json_escape "$ebsstorage_human")\"}"
+  local ebstorage_json="{\"path\":\"$(json_escape "$ebstorage_path")\",\"size_bytes\":${ebstorage_bytes_json},\"size_human\":\"$(json_escape "$ebstorage_human")\",\"subfolders\":${ebstorage_subfolders_json}}"
+  local backups_json="{\"path\":\"$(json_escape "$backup_path")\",\"size_bytes\":${backup_dir_bytes_json},\"size_human\":\"$(json_escape "$backup_dir_human")\",\"files\":${backups_files_json},\"latest\":${latest_entry_json}}"
+
+  STORAGE_METRICS_JSON="{\"ebsstorage\":${ebsstorage_json},\"ebstorage\":${ebstorage_json},\"postgres_backups\":${backups_json}}"
+
+  local pretty="{
+  \"ebsstorage\": {
+    \"path\": \"$(json_escape "$ebsstorage_path")\",
+    \"size_bytes\": ${ebsstorage_bytes_json},
+    \"size_human\": \"$(json_escape "$ebsstorage_human")\"
+  },
+  \"ebstorage\": {
+    \"path\": \"$(json_escape "$ebstorage_path")\",
+    \"size_bytes\": ${ebstorage_bytes_json},
+    \"size_human\": \"$(json_escape "$ebstorage_human")\",
+    \"subfolders\": [
+$( [[ -n "$pretty_subfolders" ]] && printf '%s' "$pretty_subfolders" || printf '      ' )    ]
+  },
+  \"postgres_backups\": {
+    \"path\": \"$(json_escape "$backup_path")\",
+    \"size_bytes\": ${backup_dir_bytes_json},
+    \"size_human\": \"$(json_escape "$backup_dir_human")\",
+    \"files\": [
+$( [[ -n "$pretty_backups" ]] && printf '%s' "$pretty_backups" || printf '      ' )    ],
+    \"latest\":
+$(printf '%s' "$latest_pretty")  }
 }
+"
 
-print("COMPACT_JSON_BEGIN")
-print(json.dumps(data, separators=(",", ":")))
-print("COMPACT_JSON_END")
-print("PRETTY_JSON_BEGIN")
-print(json.dumps(data, indent=2))
-print("PRETTY_JSON_END")
+  STORAGE_METRICS_PRETTY="${pretty%$'\n'}"
 
-def meta_value(value):
-    if value is None:
-        return ""
-    return str(value)
-
-latest = backups.get("latest") or {}
-
-print(f"META_EBSSTORAGE_HUMAN={meta_value(ebsstorage['size_human'])}")
-print(f"META_EBSSTORAGE_BYTES={meta_value(ebsstorage['size_bytes'])}")
-print(f"META_EBSTORAGE_HUMAN={meta_value(ebstorage['size_human'])}")
-print(f"META_EBSTORAGE_BYTES={meta_value(ebstorage['size_bytes'])}")
-print(f"META_BACKUP_DIR_HUMAN={meta_value(backups['size_human'])}")
-print(f"META_BACKUP_DIR_BYTES={meta_value(backups['size_bytes'])}")
-print(f"META_LATEST_BACKUP_FILE={meta_value(latest.get('path'))}")
-print(f"META_LATEST_BACKUP_NAME={meta_value(latest.get('name'))}")
-print(f"META_LATEST_BACKUP_SIZE_HUMAN={meta_value(latest.get('size_human'))}")
-print(f"META_LATEST_BACKUP_SIZE_BYTES={meta_value(latest.get('size_bytes'))}")
-PY
-)
-
-  local line
-  local reading_compact=0
-  local reading_pretty=0
-  local compact_json=""
-  local pretty_json=""
-  while IFS= read -r line; do
-    case "$line" in
-      COMPACT_JSON_BEGIN)
-        reading_compact=1
-        continue
-        ;;
-      COMPACT_JSON_END)
-        reading_compact=0
-        continue
-        ;;
-      PRETTY_JSON_BEGIN)
-        reading_pretty=1
-        continue
-        ;;
-      PRETTY_JSON_END)
-        reading_pretty=0
-        continue
-        ;;
-      META_EBSSTORAGE_HUMAN=*)
-        EBSSTORAGE_SIZE="${line#*=}"
-        continue
-        ;;
-      META_EBSSTORAGE_BYTES=*)
-        continue
-        ;;
-      META_EBSTORAGE_HUMAN=*)
-        EBSTORAGE_SIZE="${line#*=}"
-        continue
-        ;;
-      META_EBSTORAGE_BYTES=*)
-        continue
-        ;;
-      META_BACKUP_DIR_HUMAN=*)
-        BACKUP_DIR_SIZE="${line#*=}"
-        continue
-        ;;
-      META_BACKUP_DIR_BYTES=*)
-        continue
-        ;;
-      META_LATEST_BACKUP_FILE=*)
-        LATEST_BACKUP_FILE="${line#*=}"
-        continue
-        ;;
-      META_LATEST_BACKUP_NAME=*)
-        continue
-        ;;
-      META_LATEST_BACKUP_SIZE_HUMAN=*)
-        LATEST_BACKUP_SIZE="${line#*=}"
-        continue
-        ;;
-      META_LATEST_BACKUP_SIZE_BYTES=*)
-        continue
-        ;;
-    esac
-
-    if [[ "$reading_compact" -eq 1 ]]; then
-      compact_json+="$line"
-    elif [[ "$reading_pretty" -eq 1 ]]; then
-      pretty_json+="$line"$'\n'
-    fi
-  done <<< "$python_output"
-
-  STORAGE_METRICS_JSON="$compact_json"
-  STORAGE_METRICS_PRETTY="${pretty_json%$'\n'}"
+  EBSSTORAGE_SIZE="$ebsstorage_human"
+  EBSTORAGE_SIZE="$ebstorage_human"
+  BACKUP_DIR_SIZE="$backup_dir_human"
+  LATEST_BACKUP_FILE="$latest_path"
+  LATEST_BACKUP_SIZE="$latest_human"
 
   if [[ "${quiet}" -ne 1 ]]; then
     log "${context}" || true
@@ -847,85 +837,13 @@ enable_maintenance_page() {
   step "Enabling maintenance page"
   mkdir -p "${MAINTENANCE_ROOT}"
 
-  cat > "${MAINTENANCE_ROOT}/index.html" <<'EOF'
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="refresh" content="15" />
-    <title>Updates in Progress</title>
-    <style>
-      :root {
-        color-scheme: light dark;
-        --bg: #0f172a;
-        --card: #1e293b;
-        --text: #e2e8f0;
-        --accent: #38bdf8;
-      }
-      body {
-        margin: 0;
-        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: var(--bg);
-        color: var(--text);
-        display: grid;
-        place-items: center;
-        min-height: 100vh;
-      }
-      .card {
-        text-align: center;
-        padding: 3rem clamp(2rem, 4vw, 5rem);
-        border-radius: 24px;
-        background: linear-gradient(145deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95));
-        box-shadow: 0 20px 60px rgba(15, 23, 42, 0.6);
-        max-width: min(90vw, 520px);
-      }
-      h1 {
-        font-size: clamp(1.8rem, 4vw, 2.5rem);
-        margin-bottom: 1rem;
-      }
-      p {
-        font-size: clamp(1rem, 2.5vw, 1.15rem);
-        margin-bottom: 2rem;
-        line-height: 1.6;
-        opacity: 0.85;
-      }
-      .progress {
-        width: 100%;
-        height: 14px;
-        border-radius: 999px;
-        background: rgba(148, 163, 184, 0.25);
-        overflow: hidden;
-        position: relative;
-      }
-      .progress::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background: linear-gradient(90deg, rgba(56, 189, 248, 0.2), var(--accent), rgba(56, 189, 248, 0.2));
-        animation: shimmer 2.4s infinite;
-      }
-      @keyframes shimmer {
-        0% { transform: translateX(-100%); }
-        50% { transform: translateX(0%); }
-        100% { transform: translateX(100%); }
-      }
-      .note {
-        margin-top: 1.75rem;
-        font-size: 0.95rem;
-        opacity: 0.7;
-      }
-    </style>
-  </head>
-  <body>
-    <main class="card" role="status" aria-live="polite">
-      <h1>We&rsquo;re shipping new features</h1>
-      <p>Our team is deploying updates right now. Thanks for your patience—this won&rsquo;t take long.</p>
-      <div class="progress" aria-hidden="true"></div>
-      <p class="note">This page refreshes automatically when we&rsquo;re back.</p>
-    </main>
-  </body>
-</html>
-EOF
+  local maintenance_source="${SCRIPT_DIR}/maintenance-page.html"
+  if [[ ! -f "${maintenance_source}" ]]; then
+    err "Maintenance page source not found: ${maintenance_source}"
+    exit 1
+  fi
+
+  install -m 644 "${maintenance_source}" "${MAINTENANCE_ROOT}/index.html"
 
   local have_cert=0
   [[ -f "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" ]] && have_cert=1
