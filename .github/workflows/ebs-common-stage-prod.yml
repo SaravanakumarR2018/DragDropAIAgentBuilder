@@ -256,9 +256,17 @@ jobs:
 
       - name: Copy deploy_status.env from VM
         run: |
-          sshpass -p "${{ secrets.VM_PASSWORD }}" scp -o StrictHostKeyChecking=no \
-            root@staging.visualaiagentsbuilder.com:/root/deploy_status.env \
-            $GITHUB_WORKSPACE/deploy_status.env
+          if [ "${{ github.event.inputs.environment }}" = "staging" ]; then
+            HOST="${{ env.STAGING_HOST }}"
+            PASS="${{ secrets.VM_PASSWORD }}"
+          else
+            HOST="${{ env.PROD_HOST }}"
+            PASS="${{ secrets.PROD_VM_PASSWORD }}"
+          fi
+
+          sshpass -p "$PASS" scp -o StrictHostKeyChecking=no \
+            "root@${HOST}:/root/deploy_status.env" \
+            "$GITHUB_WORKSPACE/deploy_status.env"
 
       - name: Update GitHub Deployment Status with Docker info
         if: always()
