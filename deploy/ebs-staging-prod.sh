@@ -157,6 +157,22 @@ docker_safe_rm() { docker rm -f "$1" >/dev/null 2>&1 || true; }
 docker_exists()  { docker ps -a --format '{{.Names}}' | grep -Fxq "$1"; }
 docker_running() { docker ps --format '{{.Names}}' | grep -Fxq "$1"; }
 
+disable_restart_policy() {
+  local cname="$1"
+  if docker_exists "$cname"; then
+    log "Disabling restart policy for ${cname}"
+    docker update --restart=no "$cname" >/dev/null 2>&1 || warn "Could not disable restart policy for ${cname}"
+  fi
+}
+
+enable_restart_policy() {
+  local cname="$1"
+  if docker_exists "$cname"; then
+    log "Restoring restart policy for ${cname}"
+    docker update --restart=unless-stopped "$cname" >/dev/null 2>&1 || warn "Could not re-enable restart policy for ${cname}"
+  fi
+}
+
 http_ok() {
   local url="$1"
   local code
@@ -815,23 +831,41 @@ ensure_ebs_volume() {
 
 
 # Paths used by Nginx toggling
-NGINX_SITE="/etc/nginx/sites-available/${APP_NAME}.conf"
-NGINX_SITE_LINK="/etc/nginx/sites-enabled/${APP_NAME}.conf"
+NGINX_SITES_ENABLED="/etc/nginx/sites-enabled"
+NGINX_SITES_AVAILABLE="/etc/nginx/sites-available"
+APP_CONF="${APP_NAME}.conf"
+MAINT_CONF="${APP_NAME}-maintenance.conf"
+DEFAULT_LINK="${NGINX_SITES_ENABLED}/${APP_CONF}"
+NGINX_SITE="${NGINX_SITES_AVAILABLE}/${APP_CONF}"
+NGINX_SITE_LINK="${DEFAULT_LINK}"
 SNIPPETS_DIR="/etc/nginx/snippets"
 UP_BLUE="${SNIPPETS_DIR}/${APP_NAME}-upstream-blue.conf"
 UP_GREEN="${SNIPPETS_DIR}/${APP_NAME}-upstream-green.conf"
 UP_ACTIVE="${SNIPPETS_DIR}/${APP_NAME}-upstream-active.conf"
 PROXY_SNIPPET="${SNIPPETS_DIR}/${APP_NAME}-proxy.conf"
 CERT_ROOT="/var/www/certbot"
-MAINTENANCE_SITE="/etc/nginx/sites-available/${APP_NAME}-maintenance.conf"
+MAINTENANCE_SITE="${NGINX_SITES_AVAILABLE}/${MAINT_CONF}"
 MAINTENANCE_ROOT="/var/www/${APP_NAME}-maintenance"
 
 ACTIVE_FILE="/var/run/${APP_NAME}-active-color" # stores "blue" or "green"
 
+reload_nginx_safely() {
+  log "Reloading Nginx"
+  if ! nginx -t >/dev/null 2>&1; then
+    err "Nginx config test failed"
+    return 1
+  fi
+  if ! systemctl reload nginx >/dev/null 2>&1; then
+    nginx -s reload >/dev/null 2>&1 || { err "Failed to reload Nginx"; return 1; }
+  fi
+  sleep 2
+  ok "Nginx reload complete"
+}
+
 enable_maintenance_page() {
   if [[ "${MAINTENANCE_ENABLED}" -eq 1 ]]; then
     ok "Maintenance page already enabled"
-    return
+    return 0
   fi
 
   step "Enabling maintenance page"
@@ -873,22 +907,36 @@ server {
 EOF
   fi
 
-  ln -sf "${MAINTENANCE_SITE}" "${NGINX_SITE_LINK}"
-  nginx -t
-  systemctl reload nginx
+  ln -sf "${MAINTENANCE_SITE}" "${DEFAULT_LINK}"
+  reload_nginx_safely || { err "Failed to reload Nginx during maintenance enable"; return 1; }
+  if curl -sf --max-time 5 http://127.0.0.1 | grep -qi "maintenance"; then
+    ok "Maintenance page active"
+  else
+    warn "Maintenance page not detected — check Nginx config"
+  fi
   MAINTENANCE_ENABLED=1
-  ok "Maintenance page enabled"
 }
 
 disable_maintenance_page() {
   if [[ "${MAINTENANCE_ENABLED}" -ne 1 ]]; then
-    return
+    return 0
   fi
 
   step "Disabling maintenance page"
-  ensure_nginx
-  MAINTENANCE_ENABLED=0
-  ok "Maintenance page disabled"
+  ln -sf "${NGINX_SITE}" "${DEFAULT_LINK}"
+  reload_nginx_safely || { err "Failed to reload Nginx during maintenance disable"; return 1; }
+  local retries=5
+  while (( retries-- > 0 )); do
+    if curl -sf --max-time 5 "http://127.0.0.1${HEALTH_PATH}" | grep -qi "ok"; then
+      ok "App health OK, maintenance disabled"
+      MAINTENANCE_ENABLED=0
+      return 0
+    fi
+    warn "Waiting for app to respond..."
+    sleep 3
+  done
+  warn "App not responding post-maintenance; check container logs"
+  return 1
 }
 
 # ---------- Install system deps (idempotent) ----------
@@ -1319,6 +1367,7 @@ stop_active_container() {
   if [[ "${HAD_ACTIVE}" -eq 1 ]]; then
     if docker_running "${ACTIVE_NAME}"; then
       step "Stopping active container ${ACTIVE_NAME}"
+      disable_restart_policy "${ACTIVE_NAME}"
       docker stop "${ACTIVE_NAME}" >/dev/null
       STOPPED_ACTIVE=1
       ok "Stopped ${ACTIVE_NAME}"
@@ -1398,6 +1447,7 @@ wait_for_container_health() {
 wait_until_healthy() {
   step "Health-checking ${TARGET_NAME}"
   wait_for_container_health "${TARGET_NAME}" "${TARGET_PORT}" "target container"
+  enable_restart_policy "${TARGET_NAME}"
 }
 
 # ---------- Cleanup on failure / interrupt ----------
@@ -1421,8 +1471,9 @@ cleanup_on_failure() {
   local restarted_previous=0
   local previous_healthy=0
   if [[ "${STOPPED_ACTIVE}" -eq 1 && "${HAD_ACTIVE}" -eq 1 ]]; then
+    enable_restart_policy "${ACTIVE_NAME}"
     if docker_running "${ACTIVE_NAME}"; then
-      ok "Previous container ${ACTIVE_NAME} was still running"
+      ok "Previous container ${ACTIVE_NAME} already running — skipping restart"
       restarted_previous=1
     else
       warn "Restarting previous active container ${ACTIVE_NAME}"
