@@ -64,6 +64,62 @@ jobs:
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass
 
+      - name: Set deployment image variables
+        id: image_vars
+        run: |
+          BRANCH_NAME="${{ steps.branch.outputs.branch_name }}"
+          COMMIT_ID="${{ steps.commit.outputs.commit_id }}"
+          ENVIRONMENT="${{ github.event.inputs.environment }}"
+
+          if [ "$ENVIRONMENT" = "staging" ]; then
+            HOST="${{ env.STAGING_HOST }}"
+            PASS="${{ secrets.VM_PASSWORD }}"
+            CLERK_KEY="${{ secrets.CLERK_PUBLISHABLE_KEY }}"
+            CLERK_FRONTEND="${{ vars.STAGING_CLERK_FRONTEND_API }}"
+            IMAGE_TAG="staging-$BRANCH_NAME-$COMMIT_ID"
+          else
+            HOST="${{ env.PROD_HOST }}"
+            PASS="${{ secrets.PROD_VM_PASSWORD }}"
+            CLERK_KEY="${{ secrets.PROD_CLERK_PUBLISHABLE_KEY }}"
+            CLERK_FRONTEND="${{ vars.PROD_CLERK_FRONTEND_API }}"
+            IMAGE_TAG="prod-$BRANCH_NAME-$COMMIT_ID"
+          fi
+
+          echo "host=$HOST" >> "$GITHUB_OUTPUT"
+          echo "image_tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+          echo "image=forwardemailforaifirstdesk/langflow:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+          {
+            echo "REMOTE_HOST=$HOST"
+            echo "REMOTE_PASS=$PASS"
+            echo "IMAGE_NAME=forwardemailforaifirstdesk/langflow:$IMAGE_TAG"
+            echo "LOCAL_IMAGE_TAG=$IMAGE_TAG"
+            echo "LOCAL_IMAGE_REF=langflow:$IMAGE_TAG"
+            echo "CLERK_PUBLISHABLE_KEY=$CLERK_KEY"
+            echo "CLERK_FRONTEND_API=$CLERK_FRONTEND"
+          } >> "$GITHUB_ENV"
+
+      - name: Check if Docker image already exists on VM
+        id: remote_image
+        run: |
+          echo "🔍 Checking for existing image $IMAGE_NAME on $REMOTE_HOST"
+
+          REMOTE_INFO=$(sshpass -p "$REMOTE_PASS" ssh -o StrictHostKeyChecking=no \
+            "root@${REMOTE_HOST}" "docker image inspect '$IMAGE_NAME' --format '{{.Id}} {{.Size}}'" 2>/dev/null || true)
+
+          if [ -n "$REMOTE_INFO" ]; then
+            IMAGE_SIZE=$(echo "$REMOTE_INFO" | awk '{print $2}')
+            if [ -n "$IMAGE_SIZE" ] && [ "$IMAGE_SIZE" -gt 0 ]; then
+              echo "✅ Image already present on VM with size ${IMAGE_SIZE} bytes"
+              echo "exists=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "⚠️  Image metadata incomplete on VM, rebuilding"
+              echo "exists=false" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "ℹ️ Image not found on VM"
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create GitHub Deployment
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -93,59 +149,45 @@ jobs:
             -F description="Deployment started and is in progress"    
 
       - name: Set up Docker Buildx
+        if: ${{ steps.remote_image.outputs.exists != 'true' }}
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to Docker Hub
+        if: ${{ steps.remote_image.outputs.exists != 'true' }}
         uses: docker/login-action@v3
         with:
           username: forwardemailforaifirstdesk
-          password: ${{ secrets.DOCKERHUB_TOKEN }}  
-      
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Free up disk space
+        if: ${{ steps.remote_image.outputs.exists != 'true' }}
         run: |
           echo "=== Cleaning up space for Docker build ==="
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
           docker builder prune -f
           df -h
 
-      - name: Build Docker Image (staging)
-        if: ${{ github.event.inputs.environment == 'staging' }}
+      - name: Build Docker Image
+        if: ${{ steps.remote_image.outputs.exists != 'true' }}
         run: |
           COMMIT_ID=${{ steps.commit.outputs.commit_id }}
           BRANCH_NAME=${{ steps.branch.outputs.branch_name }}
-          echo "Using branch=$BRANCH_NAME commit=$COMMIT_ID"
+          ENVIRONMENT=${{ github.event.inputs.environment }}
+          echo "Using environment=$ENVIRONMENT branch=$BRANCH_NAME commit=$COMMIT_ID"
 
-          echo "=== Building Staging Image ==="
+          echo "=== Building Docker Image ==="
           DOCKER_BUILDKIT=1 \
           VITE_AUTO_LOGIN=false \
           VITE_CLERK_AUTH_ENABLED=true \
-          VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.CLERK_PUBLISHABLE_KEY }} \
-          VITE_CLERK_FRONTEND_API=${{ vars.STAGING_CLERK_FRONTEND_API }} \
-          make docker_build TAG=langflow:staging-$BRANCH_NAME-$COMMIT_ID DOCKER=docker
+          VITE_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY \
+          VITE_CLERK_FRONTEND_API=$CLERK_FRONTEND_API \
+          make docker_build TAG=$LOCAL_IMAGE_REF DOCKER=docker
 
-          docker tag langflow:staging-$BRANCH_NAME-$COMMIT_ID forwardemailforaifirstdesk/langflow:staging-$BRANCH_NAME-$COMMIT_ID
-          docker push forwardemailforaifirstdesk/langflow:staging-$BRANCH_NAME-$COMMIT_ID
-          
-      - name: Build Docker Image (production)
-        if: ${{ github.event.inputs.environment == 'prod' }}
-        run: |
-          COMMIT_ID=${{ steps.commit.outputs.commit_id }}
-          BRANCH_NAME=${{ steps.branch.outputs.branch_name }}
-          echo "Using branch=$BRANCH_NAME commit=$COMMIT_ID"
-
-          echo "=== Building Production Image ==="
-          DOCKER_BUILDKIT=1 \
-          VITE_AUTO_LOGIN=false \
-          VITE_CLERK_AUTH_ENABLED=true \
-          VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.PROD_CLERK_PUBLISHABLE_KEY }} \
-          VITE_CLERK_FRONTEND_API=${{ vars.PROD_CLERK_FRONTEND_API }} \
-          make docker_build TAG=langflow:prod-$BRANCH_NAME-$COMMIT_ID DOCKER=docker
-
-          docker tag langflow:prod-$BRANCH_NAME-$COMMIT_ID forwardemailforaifirstdesk/langflow:prod-$BRANCH_NAME-$COMMIT_ID
-          docker push forwardemailforaifirstdesk/langflow:prod-$BRANCH_NAME-$COMMIT_ID
+          docker tag "$LOCAL_IMAGE_REF" "$IMAGE_NAME"
+          docker push "$IMAGE_NAME"
 
       - name: Cleanup old Docker Hub tags (skip for prod)
-        if: ${{ github.event.inputs.environment == 'staging' }}
+        if: ${{ github.event.inputs.environment == 'staging' && steps.remote_image.outputs.exists != 'true' }}
         run: |
           #!/usr/bin/env bash
           set -euo pipefail
