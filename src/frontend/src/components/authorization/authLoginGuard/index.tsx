@@ -49,7 +49,7 @@ export const ProtectedLoginRoute = ({ children }) => {
     if (redirectPath) {
       return <CustomNavigate to={redirectPath} replace />;
     }
-    return <CustomNavigate to="/flows" replace />;
+    return <CustomNavigate to="/app/flows" replace />;
   }
   return children;
 };

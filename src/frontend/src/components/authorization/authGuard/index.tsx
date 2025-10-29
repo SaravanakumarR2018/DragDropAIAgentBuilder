@@ -31,7 +31,7 @@ export const ProtectedRoute = ({ children }) => {
   const isLoginPage = currentPath.includes("login");
   const isOrgPage = currentPath.includes("organization");
   const isRootPage = currentPath === "/";
-  const isFlowsPage = currentPath.includes("/flows");
+  const isFlowsPage = currentPath.includes("/app/flows");
 
   // ✅ Root path "/" is PUBLIC - don't redirect unauthenticated users
   if (isRootPage) {
@@ -54,7 +54,7 @@ export const ProtectedRoute = ({ children }) => {
     !isOrgPage &&
     !isLoginPage;
 
-  // ✅ 3️⃣ DO NOT redirect "/" to "/flows" - authenticated users should stay on landing page
+  // ✅ 3️⃣ DO NOT redirect "/" to "/app/flows" - authenticated users should stay on landing page
   const shouldRedirectHome = false;
 
   // 🔄 Setup token refresh
@@ -96,9 +96,9 @@ export const ProtectedRoute = ({ children }) => {
     return <CustomNavigate to="/organization" replace />;
   }
 
-  // 🔹 Redirect "/" to "/flows" only if safe
+  // 🔹 Redirect "/" to "/app/flows" only if safe
   if (shouldRedirectHome) {
-    return <CustomNavigate to="/flows" replace />;
+    return <CustomNavigate to="/app/flows" replace />;
   }
 
   // ✅ Otherwise render the page

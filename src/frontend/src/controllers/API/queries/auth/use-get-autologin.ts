@@ -83,7 +83,11 @@ export const useGetAutoLogin: useQueryFunctionType<undefined, undefined> = (
     if (manualLoginNotAuthenticated) {
       await mutationLogout();
       const currentPath = window.location.pathname;
-      const isHomePath = currentPath === "/" || currentPath === "/flows";
+      const isHomePath =
+        currentPath === "/" ||
+        currentPath.endsWith("/app") ||
+        currentPath.endsWith("/app/") ||
+        currentPath.includes("/app/flows");
       navigate(
         "/login" +
           (!isHomePath && !isLoginPage ? "?redirect=" + currentPath : ""),

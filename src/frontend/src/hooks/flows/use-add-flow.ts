@@ -100,7 +100,7 @@ const useAddFlow = () => {
               title: FOLDER_NOT_FOUND_ERROR,
             });
             setTimeout(() => {
-              window.location.href = `/flows`;
+              window.location.href = `/app/flows`;
             }, REDIRECT_DELAY);
 
             return;

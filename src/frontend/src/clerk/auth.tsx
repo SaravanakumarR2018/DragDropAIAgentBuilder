@@ -314,10 +314,10 @@ export function ClerkAuthAdapter() {
     }
 
     console.debug(
-      "[ClerkAuthAdapter] Redirecting initialized tab to /flows",
+      "[ClerkAuthAdapter] Redirecting initialized tab to /app/flows",
       currentPath,
     );
-    navigate("/flows", { replace: true });
+    navigate("/app/flows", { replace: true });
   }, [
     currentPath,
     isSignedIn,

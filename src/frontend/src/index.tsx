@@ -1,25 +1,25 @@
-import ReactDOM from "react-dom/client";
-import reportWebVitals from "./reportWebVitals";
+import { BASENAME } from "./customization/config-constants";
 
-import "./style/classes.css";
-// @ts-ignore
-import "./style/index.css";
-// @ts-ignore
-import "./App.css";
-import "./style/applies.css";
+const rootElement = document.getElementById("root") as HTMLElement;
 
-// @ts-ignore
+if (!rootElement) {
+  throw new Error("Root element not found");
+}
 
-import AppWithProvider from "./clerk/auth";
-import CustomApp from "./customization/custom-App";
+const path = window.location.pathname;
+const normalizedPath = BASENAME && path.startsWith(BASENAME)
+  ? path.slice(BASENAME.length) || "/"
+  : path;
+const isLandingRoute = normalizedPath === "/";
 
-const root = ReactDOM.createRoot(
-  document.getElementById("root") as HTMLElement,
-);
+async function bootstrap() {
+  if (isLandingRoute) {
+    const { mountLanding } = await import("./entry/landing-root");
+    mountLanding(rootElement);
+  } else {
+    const { mountApp } = await import("./entry/app-root");
+    mountApp(rootElement);
+  }
+}
 
-root.render(
-  <AppWithProvider>
-    <CustomApp />
-  </AppWithProvider>,
-);
-reportWebVitals();
+void bootstrap();
