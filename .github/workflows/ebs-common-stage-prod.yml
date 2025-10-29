@@ -210,7 +210,7 @@ jobs:
           host: ${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
           username: root
           password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
-          source: "./deploy/ebs-staging-prod.sh,./.env-file"
+          source: "./deploy/ebs-staging-prod.sh,./deploy/maintenance-page.html,./.env-file"
           target: /root/
 
       - name: Run deployment script on VM
