@@ -57,9 +57,57 @@ def _drop_legacy_message_context_id(connection: Connection) -> None:
         logger.exception("Failed to drop legacy context_id column from message table")
         raise
 
+def _ensure_folder_auth_settings_column(connection: Connection) -> None:
+    """
+    Ensure the `folder.auth_settings` column matches the ORM model definition.
+
+    - If the Folder model defines `auth_settings` and the column is missing,
+      it will be added with type JSON and default NULL.
+    - If the Folder model no longer defines `auth_settings` but it exists
+      in the table, it will be dropped.
+    - Safe to run multiple times (idempotent).
+    """
+
+    # Import your Folder ORM model — adjust path if needed
+    try:
+        from langflow.services.database.models.folder.model import Folder  # <-- change if your Folder model lives elsewhere
+    except ImportError:
+        logger.warning("Folder model could not be imported; skipping folder schema sync")
+        return
+
+    inspector = inspect(connection)
+
+    # Skip if folder table doesn't exist
+    if "folder" not in inspector.get_table_names():
+        return
+
+    # Check current DB columns
+    existing_columns = {col["name"] for col in inspector.get_columns("folder")}
+    has_auth_settings_in_db = "auth_settings" in existing_columns
+
+    # Check if ORM model expects the column
+    expected_by_model = any(c.name == "auth_settings" for c in Folder.__table__.columns)
+
+    try:
+        if expected_by_model and not has_auth_settings_in_db:
+            logger.info("Adding missing auth_settings column to folder table (model expects it)")
+            connection.execute(
+                text('ALTER TABLE "folder" ADD COLUMN auth_settings JSON DEFAULT NULL')
+            )
+
+        elif not expected_by_model and has_auth_settings_in_db:
+            logger.info("Dropping extra auth_settings column from folder table (model no longer defines it)")
+            connection.execute(
+                text('ALTER TABLE "folder" DROP COLUMN IF EXISTS auth_settings')
+            )
+
+    except Exception:
+        logger.exception("Failed to sync auth_settings column in folder table")
+        raise
 
 _RUNTIME_MIGRATIONS: Final[tuple[RuntimeMigration, ...]] = (
     _drop_legacy_message_context_id,
+    _ensure_folder_auth_settings_column,
 )
 
 
