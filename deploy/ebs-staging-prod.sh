@@ -34,6 +34,7 @@ STORAGE_METRICS_JSON=""
 STORAGE_METRICS_PRETTY=""
 ALEMBIC_CHANGES_REQUIRED=0
 ALEMBIC_MIGRATIONS_APPLIED=0
+RESTORE_POSTGRES_ON_ROLLBACK=0
 
 # ---------- Deploy status history rotation ----------
 DEPLOY_ENV="/root/deploy_status.env"
@@ -678,6 +679,7 @@ run_alembic_migrations() {
     ok "Migrations applied for ${db}"
   done
   ALEMBIC_MIGRATIONS_APPLIED=1
+  RESTORE_POSTGRES_ON_ROLLBACK=1
 }
 
 prepare_langflow_env() {
@@ -1477,13 +1479,14 @@ cleanup_on_failure() {
       restarted_previous=1
     else
       warn "Restarting previous active container ${ACTIVE_NAME}"
-      if [[ "${ALEMBIC_MIGRATIONS_APPLIED}" -eq 1 ]]; then
+      if [[ "${RESTORE_POSTGRES_ON_ROLLBACK}" -eq 1 ]]; then
         if [[ -n "${BACKUP_FILE}" && -f "${BACKUP_FILE}" ]]; then
           warn "Restoring PostgreSQL backup captured before migrations"
           if ! restore_postgres_backup "${BACKUP_FILE}"; then
             warn "PostgreSQL restore failed; proceeding to restart container with migrated schema"
           else
             ok "PostgreSQL state restored prior to restarting ${ACTIVE_NAME}"
+            RESTORE_POSTGRES_ON_ROLLBACK=0
           fi
         else
           warn "No backup file available to restore before restarting ${ACTIVE_NAME}"
