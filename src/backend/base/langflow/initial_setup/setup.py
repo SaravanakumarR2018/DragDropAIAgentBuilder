@@ -905,6 +905,8 @@ async def find_existing_flow(session, flow_id, flow_endpoint_name):
 async def create_or_update_starter_projects(
     all_types_dict: dict,
     *,
+
+    do_create: bool = True,
     use_organisation: bool = False
 ) -> None:
     """Create or update starter projects.

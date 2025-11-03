@@ -1,4 +1,4 @@
-name: EBS Common - Staging/Prod Deploy
+name: EBS Storage - Staging/Prod
 
 on:
   workflow_dispatch:
@@ -100,15 +100,8 @@ jobs:
         with:
           username: forwardemailforaifirstdesk
           password: ${{ secrets.DOCKERHUB_TOKEN }}  
-    
-      - name: Free up disk space
-        run: |
-          echo "=== Cleaning up space for Docker build ==="
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
-          docker builder prune -f
-          df -h
 
-      - name: Build Docker Image (staging)
+      - name: Build Docker Image (for staging)
         if: ${{ github.event.inputs.environment == 'staging' }}
         run: |
           COMMIT_ID=${{ steps.commit.outputs.commit_id }}
@@ -120,21 +113,6 @@ jobs:
           VITE_AUTO_LOGIN=false \
           VITE_CLERK_AUTH_ENABLED=true \
           VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.CLERK_PUBLISHABLE_KEY }} \
-          VITE_CLERK_FRONTEND_API=${{ vars.STAGING_CLERK_FRONTEND_API }} \
-
-          make docker_build TAG=langflow:staging-$BRANCH_NAME-$COMMIT_ID DOCKER=docker
-
-          docker tag langflow:staging-$BRANCH_NAME-$COMMIT_ID forwardemailforaifirstdesk/langflow:staging-$BRANCH_NAME-$COMMIT_ID
-          docker push forwardemailforaifirstdesk/langflow:staging-$BRANCH_NAME-$COMMIT_ID
-          
-      - name: Build Docker Image (production)
-        if: ${{ github.event.inputs.environment == 'prod' }}
-        run: |
-          COMMIT_ID=${{ steps.commit.outputs.commit_id }}
-          BRANCH_NAME=${{ steps.branch.outputs.branch_name }}
-          echo "Using branch=$BRANCH_NAME commit=$COMMIT_ID"
-
-          echo "=== Building Production Image ==="
           make docker_build TAG=langflow:staging-$BRANCH_NAME-$COMMIT_ID
 
           docker tag langflow:staging-$BRANCH_NAME-$COMMIT_ID forwardemailforaifirstdesk/langflow:staging-$BRANCH_NAME-$COMMIT_ID
@@ -145,11 +123,8 @@ jobs:
           VITE_AUTO_LOGIN=false \
           VITE_CLERK_AUTH_ENABLED=true \
           VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.PROD_CLERK_PUBLISHABLE_KEY }} \
-          VITE_CLERK_FRONTEND_API=${{ vars.PROD_CLERK_FRONTEND_API }} \
-          make docker_build TAG=langflow:prod-$BRANCH_NAME-$COMMIT_ID DOCKER=docker
           make docker_build TAG=langflow:prod-$BRANCH_NAME-$COMMIT_ID
         
-
           docker tag langflow:prod-$BRANCH_NAME-$COMMIT_ID forwardemailforaifirstdesk/langflow:prod-$BRANCH_NAME-$COMMIT_ID
           docker push forwardemailforaifirstdesk/langflow:prod-$BRANCH_NAME-$COMMIT_ID
 
@@ -213,55 +188,63 @@ jobs:
 
           echo "Note: Docker Hub will automatically clean up unreferenced images within 24-48 hours"    
 
-      - name: Copy deployment files to VM
+      - name: If env is staging Move script to VM
+        if: ${{ github.event.inputs.environment == 'staging' }}
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
+          host: ${{env.STAGING_HOST}}
           username: root
-          password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
+          password: ${{ secrets.VM_PASSWORD }}
           source: "./deploy/ebs-staging-prod.sh,./.env-file"
           target: /root/
 
-      - name: Run deployment script on VM
+      - name: If env is prod Move script to VM
+        if: ${{ github.event.inputs.environment == 'prod' }}
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{env.PROD_HOST}}
+          username: root
+          password: ${{ secrets.PROD_VM_PASSWORD }}
+          source: "./deploy/ebs-staging-prod.sh,./.env-file"
+          target: /root/    
+
+      - name: If env is staging Run script on VM
+        if: ${{ github.event.inputs.environment == 'staging' }}
         uses: appleboy/ssh-action@v1.1.0
         with:
-          host: ${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
+          host: ${{env.STAGING_HOST}}
           username: root
-          password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
+          password: ${{ secrets.VM_PASSWORD }}
           script: |
             chmod +x /root/deploy/ebs-staging-prod.sh
-
-            if [ "${{ github.event.inputs.environment }}" = "staging" ]; then
-              IMAGE="forwardemailforaifirstdesk/langflow:staging-${{ steps.branch.outputs.branch_name }}-${{ steps.commit.outputs.commit_id }}"
-              DOMAIN="${{env.STAGING_HOST}}"
-              EMAIL="${{ github.event.inputs.email }}"
-              ENV_FILE="/root/.env-file"
-              DB_USER="${{ secrets.POSTGRES_USER }}"
-              DB_PASSWORD="${{ secrets.POSTGRES_PASSWD }}"
-              DB_NAME="${{ secrets.POSTGRES_DB }}"
-              VOLUME_NAME="${{ vars.STAGING_VOLUME_NAME }}"
-            else
-              IMAGE="forwardemailforaifirstdesk/langflow:prod-${{ steps.branch.outputs.branch_name }}-${{ steps.commit.outputs.commit_id }}"
-              DOMAIN="${{env.PROD_HOST}}"
-              EMAIL="${{ github.event.inputs.email }}"
-              ENV_FILE="/root/.env-file"
-              DB_USER="${{ secrets.PROD_POSTGRES_USER }}"
-              DB_PASSWORD="${{ secrets.PROD_POSTGRES_PASSWD }}"
-              DB_NAME="${{ secrets.PROD_POSTGRES_DB }}"
-              VOLUME_NAME="${{ vars.PROD_VOLUME_NAME }}"
-            fi
-
             /root/deploy/ebs-staging-prod.sh \
-              --image "$IMAGE" \
-              --domain "$DOMAIN" \
-              --email "$EMAIL" \
-              --env-file "$ENV_FILE" \
-              --db-user "$DB_USER" \
-              --db-password "$DB_PASSWORD" \
-              --db-name "$DB_NAME" \
-              --volume-name "$VOLUME_NAME"
+              --image forwardemailforaifirstdesk/langflow:staging-${{ steps.branch.outputs.branch_name }}-${{ steps.commit.outputs.commit_id }} \
+              --domain ${{env.STAGING_HOST}} \
+              --email ${{ github.event.inputs.email }} \
+              --env-file /root/.env-file \
+              --db-user ${{ secrets.POSTGRES_USER }} \
+              --db-password ${{ secrets.POSTGRES_PASSWD }} \
+              --db-name ${{ secrets.POSTGRES_DB }} \
+              --volume-name ${{ vars.STAGING_VOLUME_NAME }}
 
-          command_timeout: 20m
+      - name: If env is prod Run script on VM
+        if: ${{ github.event.inputs.environment == 'prod' }}
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{env.PROD_HOST}}
+          username: root
+          password: ${{ secrets.PROD_VM_PASSWORD }}
+          script: |
+            chmod +x /root/deploy/ebs-staging-prod.sh
+            /root/deploy/ebs-staging-prod.sh \
+              --image forwardemailforaifirstdesk/langflow:prod-${{ steps.branch.outputs.branch_name }}-${{ steps.commit.outputs.commit_id }} \
+              --domain ${{env.PROD_HOST}} \
+              --email ${{ github.event.inputs.email }} \
+              --env-file /root/.env-file \
+              --db-user ${{ secrets.PROD_POSTGRES_USER }} \
+              --db-password ${{ secrets.PROD_POSTGRES_PASSWD }} \
+              --db-name ${{ secrets.PROD_POSTGRES_DB }} \
+              --volume-name ${{ vars.PROD_VOLUME_NAME }}
 
       - name: Copy deploy_status.env from VM
         run: |
@@ -281,6 +264,4 @@ jobs:
           gh api repos/${{ github.repository }}/deployments/${{ env.DEPLOYMENT_ID }}/statuses \
             -F state=$FINAL_STATUS \
             -F description="$FINAL_DESCRIPTION" \
-            -F log_url="https://logs.${{ github.repository_owner }}.com/deploy/${{ env.DEPLOYMENT_ID }}?container=${CONTAINER_ENCODED}"
-
             -F log_url="https://logs.${{ github.repository_owner }}.com/deploy/${{ env.DEPLOYMENT_ID }}?container=${CONTAINER_ENCODED}"

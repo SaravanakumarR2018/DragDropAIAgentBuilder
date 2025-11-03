@@ -56,7 +56,6 @@ KEEP_OLD="1"              # keep old color container for quick rollback (1=yes, 
 DB_USER=""
 DB_PASSWORD=""
 DB_NAME=""
-VOLUME_NAME=""
 # ---------- Parse args ----------
 usage() {
   cat <<USAGE
@@ -66,7 +65,7 @@ Usage: $0 [--config <file>] [--image <repo:tag>] [--domain <domain>]
           [--blue-port <port>] [--green-port <port>]
           [--health-path </health>] [--email <you@domain>]
           [--db-user <user>] [--db-password <pass>] [--db-name <db>]
-          [--volume-name <volume>] [--app-name <name>] [--prune-old]
+          [--app-name <name>] [--prune-old]
 USAGE
   exit 1
 }
@@ -87,7 +86,6 @@ while [[ $# -gt 0 ]]; do
     --db-user)         DB_USER="${2:-}"; shift 2;;
     --db-password)     DB_PASSWORD="${2:-}"; shift 2;;
     --db-name)         DB_NAME="${2:-}"; shift 2;;
-    --volume-name)     VOLUME_NAME="${2:-}"; shift 2;;
     --app-name)         APP_NAME="${2:-}"; shift 2;;
     --prune-old)        KEEP_OLD="0"; shift 1;;
     -h|--help)          usage;;
@@ -111,7 +109,6 @@ fi
 # ---------- Validate required inputs ----------
 [[ -z "${DOCKER_IMAGE}" ]] && { err "--image (DOCKER_IMAGE) is required"; usage; }
 [[ -z "${DOMAIN}" ]] && { err "--domain (DOMAIN) is required"; usage; }
-[[ -z "${VOLUME_NAME}" ]] && { err "--volume-name is required"; usage; }
 [[ -z "${EMAIL}" ]] && EMAIL="admin@${DOMAIN#www.}"
 
 # ---------- Root check ----------
@@ -172,18 +169,6 @@ prepare_langflow_env() {
   if ! grep -q '^POSTGRES_IMAGE=' "$CONTAINER_ENV_FILE"; then
     echo "POSTGRES_IMAGE=$PG_IMAGE" >> "$CONTAINER_ENV_FILE"
   fi
-
-  if grep -q '^LANGFLOW_CONFIG_DIR=' "$CONTAINER_ENV_FILE"; then
-    sed -i "s|^LANGFLOW_CONFIG_DIR=.*|LANGFLOW_CONFIG_DIR=/app/langflow|" "$CONTAINER_ENV_FILE"
-  else
-    echo "LANGFLOW_CONFIG_DIR=/app/langflow" >> "$CONTAINER_ENV_FILE"
-  fi
-
-  if grep -q '^LANGFLOW_SAVE_DB_IN_CONFIG_DIR=' "$CONTAINER_ENV_FILE"; then
-    sed -i "s|^LANGFLOW_SAVE_DB_IN_CONFIG_DIR=.*|LANGFLOW_SAVE_DB_IN_CONFIG_DIR=false|" "$CONTAINER_ENV_FILE"
-  else
-    echo "LANGFLOW_SAVE_DB_IN_CONFIG_DIR=false" >> "$CONTAINER_ENV_FILE"
-  fi
 }
 
 # ---------- Docker cleanup (keep last 2 images only) ----------
@@ -219,77 +204,6 @@ cleanup_old_images() {
   else
     ok "No old images to remove"
   fi
-}
-
-# ---------- Ensure EBS Volume is Mounted ----------
-ensure_ebs_volume() {
-    step "Ensuring EBS volume is mounted and configured"
-
-    # 1️ Detect environment and pick correct volume
-    if [[ "$DOMAIN" == *"staging."* ]]; then
-        ENVIRONMENT="staging"
-    else
-        ENVIRONMENT="prod"
-    fi
-    ok "Detected environment: ${ENVIRONMENT}"
-
-    # 2 Define paths
-    local SYSTEM_MOUNT_POINT="/mnt/${VOLUME_NAME}"
-    local APP_MOUNT_POINT="/app/ebsstorage"
-    local VOLUME_DEVICE="/dev/disk/by-id/scsi-0DO_Volume_${VOLUME_NAME}"
-    local LANGFLOW_STORAGE_PATH="${APP_MOUNT_POINT}/langflowstorage"
-    local POSTGRES_STORAGE_PATH="${APP_MOUNT_POINT}/postgres"
-
-    # 3 Ensure system-level mount exists
-    if mountpoint -q "${SYSTEM_MOUNT_POINT}"; then
-        ok "Volume already mounted at ${SYSTEM_MOUNT_POINT}"
-    else
-        warn "Volume not mounted. Attempting to mount..."
-        mkdir -p "${SYSTEM_MOUNT_POINT}"
-        mount -o discard,defaults,noatime "${VOLUME_DEVICE}" "${SYSTEM_MOUNT_POINT}"
-        ok "Mounted ${VOLUME_DEVICE} → ${SYSTEM_MOUNT_POINT}"
-
-        # Ensure persistence after reboot
-        if ! grep -qs "${VOLUME_DEVICE}" /etc/fstab; then
-            echo "${VOLUME_DEVICE} ${SYSTEM_MOUNT_POINT} ext4 defaults,nofail,discard 0 0" >> /etc/fstab
-            ok "Added fstab entry for persistence"
-        else
-            ok "fstab entry already exists"
-        fi
-    fi
-
-    # 4️ Bind system mount to /app/ebsstorage
-    if mountpoint -q "${APP_MOUNT_POINT}"; then
-        ok "/app/ebsstorage already points to ${SYSTEM_MOUNT_POINT}"
-    else
-        mkdir -p "${APP_MOUNT_POINT}"
-        mount --bind "${SYSTEM_MOUNT_POINT}" "${APP_MOUNT_POINT}" || {
-            warn "Bind mount failed; creating symlink instead"
-            ln -sfn "${SYSTEM_MOUNT_POINT}" "${APP_MOUNT_POINT}"
-        }
-        ok "Linked ${SYSTEM_MOUNT_POINT} → ${APP_MOUNT_POINT}"
-    fi
-
-    # 5️ Verify subdirectories
-    for dir in "${LANGFLOW_STORAGE_PATH}" "${POSTGRES_STORAGE_PATH}"; do
-        if [ -d "$dir" ]; then
-            ok "Storage directory already exists: $dir"
-        else
-            mkdir -p "$dir"
-            ok "Created storage directory: $dir"
-        fi
-    done
-
-    # 6️ Detect container UID/GID if exists
-    local CONTAINER_UID=1000
-    local CONTAINER_GID=1000
-
-    # 7️ Apply correct permissions
-    chown -R "${CONTAINER_UID}:${CONTAINER_GID}" "${LANGFLOW_STORAGE_PATH}"
-    chown -R 999:999 "${POSTGRES_STORAGE_PATH}" # Postgres often runs as UID 999
-    ok "Permissions set for Docker (Langflow UID:${CONTAINER_UID}, Postgres UID:999)"
-
-    ok "✅ EBS volume ready and linked: ${SYSTEM_MOUNT_POINT} → ${APP_MOUNT_POINT}"
 }
 
 
@@ -666,58 +580,34 @@ cleanup_old_container() {
 
 # ---------- Ensure PostgreSQL and network ----------
 ensure_postgres() {
-  step "Ensuring PostgreSQL container"
-
-  # Ensure network exists
+  step "Ensuring langflow-net network"
   docker network inspect langflow-net >/dev/null 2>&1 || docker network create langflow-net
 
-  # Load image from env if missing
   if [[ -z "${POSTGRES_IMAGE:-}" ]]; then
     POSTGRES_IMAGE=$(grep '^POSTGRES_IMAGE=' "$CONTAINER_ENV_FILE" | cut -d= -f2-)
   fi
 
-  # Case 1: Container exists
-  if docker_exists "postgres"; then
-    if docker_running "postgres"; then
-      # Container is running — verify mount
-      local current_mount
-      current_mount=$(docker inspect -f '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql/data"}}{{.Source}}{{end}}{{end}}' postgres 2>/dev/null || true)
-
-      if [[ "${current_mount}" == "/app/ebsstorage/postgres" ]]; then
-        ok "PostgreSQL container already running with correct bind mount"
-        return 0
-      else
-        warn "Incorrect mount (${current_mount:-none}) detected — recreating container"
-      fi
-    else
-      # Container exists but not running — clean up before recreating
-      warn "PostgreSQL container exists but is stopped — removing stale container"
-    fi
-
-    # Stop & remove container safely
-    docker stop postgres >/dev/null 2>&1 || true
-    docker rm -f postgres >/dev/null 2>&1 || true
-
-    # Remove lingering named volume
-    if docker volume inspect langflow-postgres >/dev/null 2>&1; then
-      step "Removing old named volume 'langflow-postgres'"
-      docker volume rm -f langflow-postgres >/dev/null 2>&1 || true
-    fi
+  if docker_running "postgres"; then
+    ok "PostgreSQL container already running"
+    return 0
   fi
 
-  # Case 2: Start a fresh container
-  step "Starting PostgreSQL container with correct bind mount"
-  docker run -d \
-    --name postgres \
-    --network langflow-net \
-    -e POSTGRES_USER="${DB_USER}" \
-    -e POSTGRES_PASSWORD="${DB_PASSWORD}" \
-    -e POSTGRES_DB="${DB_NAME}" \
-    -v /app/ebsstorage/postgres:/var/lib/postgresql/data \
-    --restart unless-stopped \
-    "${POSTGRES_IMAGE}"
-
-  ok "PostgreSQL container started with correct bind mount"
+  if docker_exists "postgres"; then
+    step "Starting existing PostgreSQL container"
+    docker start postgres >/dev/null
+    ok "PostgreSQL container already exists and is now started"
+  else
+    step "Starting PostgreSQL container"
+    docker run -d \
+      --name postgres \
+      --network langflow-net \
+      -e POSTGRES_USER="${DB_USER}" \
+      -e POSTGRES_PASSWORD="${DB_PASSWORD}" \
+      -e POSTGRES_DB="${DB_NAME}" \
+      -v langflow-postgres:/var/lib/postgresql/data \
+      "${POSTGRES_IMAGE}"
+    ok "PostgreSQL container started"
+  fi
 }
 
 # ---------- Start/stop containers (STOP-FIRST) ----------
@@ -747,7 +637,6 @@ start_target_container() {
     -l "color=${TARGET_COLOR}"
     -p "${TARGET_PORT}:${CONTAINER_PORT}"
     --network langflow-net
-    -v /app/ebsstorage/langflowstorage:/app/langflow
   )
 
   if [[ -n "${CONTAINER_ENV_FILE}" ]]; then
@@ -850,7 +739,6 @@ report_status() {
 # ---------- Execute flow (STOP-FIRST) ----------
 ensure_nginx
 issue_cert_if_needed
-ensure_ebs_volume
 
 # Prepare but DO NOT switch Nginx yet. We will switch only after new target is healthy.
 # 1) Stop active (frees CPU/RAM/port)
@@ -870,3 +758,4 @@ verify_domain
 ok "Deployment successful: ${TARGET_COLOR} is live"
 cleanup_old_container
 DEPLOY_SUCCESS=1
+
