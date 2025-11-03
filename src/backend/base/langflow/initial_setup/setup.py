@@ -743,6 +743,7 @@ async def load_flows_from_directory() -> None:
         stmt = select(User).where(User.is_superuser == True)  # noqa: E712
         result = await session.exec(stmt)
         user = result.first()
+        user = await get_user_by_username(session, settings_service.auth_settings.SUPERUSER)
         if user is None:
             msg = "No superuser found in the database"
             raise NoResultFound(msg)
@@ -805,6 +806,7 @@ async def load_bundles_from_urls() -> tuple[list[TemporaryDirectory], list[str]]
         stmt = select(User).where(User.is_superuser == True)  # noqa: E712
         result = await session.exec(stmt)
         user = result.first()
+        user = await get_user_by_username(session, settings_service.auth_settings.SUPERUSER)
         if user is None:
             msg = "No superuser found in the database"
             raise NoResultFound(msg)
@@ -905,7 +907,6 @@ async def find_existing_flow(session, flow_id, flow_endpoint_name):
 async def create_or_update_starter_projects(
     all_types_dict: dict,
     *,
-
     do_create: bool = True,
     use_organisation: bool = False
 ) -> None:
@@ -926,6 +927,8 @@ async def create_or_update_starter_projects(
 
     async with session_scope(use_organisation=use_organisation) as session:
         new_folder = await get_or_create_starter_folder(session)
+    async with session_scope(use_organisation=use_organisation) as session:
+        new_folder = await create_starter_folder(session)
         starter_projects = await load_starter_projects()
 
         if get_settings_service().settings.update_starter_projects:
@@ -1152,3 +1155,32 @@ async def sync_flows_from_fs():
             await asyncio.sleep(fs_flows_polling_interval)
     except asyncio.CancelledError:
         await logger.adebug("Flow sync task cancelled")
+    while True:
+        try:
+            async with session_scope(use_organisation=False) as session:
+                stmt = select(Flow).where(col(Flow.fs_path).is_not(None))
+                flows = (await session.exec(stmt)).all()
+                for flow in flows:
+                    mtime = flow_mtimes.setdefault(flow.id, 0)
+                    path = anyio.Path(flow.fs_path)
+                    try:
+                        if await path.exists():
+                            new_mtime = (await path.stat()).st_mtime
+                            if new_mtime > mtime:
+                                update_data = orjson.loads(await path.read_text(encoding="utf-8"))
+                                try:
+                                    for field_name in ("name", "description", "data", "locked"):
+                                        if new_value := update_data.get(field_name):
+                                            setattr(flow, field_name, new_value)
+                                    if folder_id := update_data.get("folder_id"):
+                                        flow.folder_id = UUID(folder_id)
+                                    await session.commit()
+                                    await session.refresh(flow)
+                                except Exception:  # noqa: BLE001
+                                    logger.exception(f"Couldn't update flow {flow.id} in database from path {path}")
+                                flow_mtimes[flow.id] = new_mtime
+                    except Exception:  # noqa: BLE001
+                        logger.exception(f"Error while handling flow file {path}")
+        except Exception:  # noqa: BLE001
+            logger.exception("Error while syncing flows from database")
+        await asyncio.sleep(fs_flows_polling_interval)

@@ -1,5 +1,6 @@
 import { jsonquery } from "@jsonquerylang/jsonquery";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { KeyboardEvent, useEffect, useRef, useState } from "react";
 import type {
   Content,
   createJSONEditor,

@@ -1238,10 +1238,9 @@ async def register_project_with_composer(project: Folder):
 
 
 async def init_mcp_servers():
-    """Initialize MCP servers for all projects."""
+    """Initialize MCP servers for the default database and organisation databases."""
     try:
         settings_service = get_settings_service()
-
         async with session_scope(use_organisation=False) as session:
             projects = (await session.exec(select(Folder))).all()
 
@@ -1365,3 +1364,10 @@ async def get_or_start_mcp_composer(auth_config: dict, project_name: str, projec
         raise MCPComposerConfigError(error_msg, str(project_id))
 
     await mcp_composer_service.start_project_composer(str(project_id), sse_url, auth_config)
+    try:
+        from langflow.services.mcp import init_mcp_servers_for_all_orgs
+
+        await init_mcp_servers_for_all_orgs()
+    except Exception as e:
+        msg = f"Failed to initialize organisation MCP servers: {e}"
+        logger.exception(msg)

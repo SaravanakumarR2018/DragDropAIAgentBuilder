@@ -30,5 +30,23 @@ export default function ContextWrapper({ children }: { children: ReactNode }) {
         </QueryClientProvider>
       </GradientWrapper>
     </CustomWrapper>
+    <>
+      <CustomWrapper>
+        <GradientWrapper>
+          <QueryClientProvider client={queryClient}>
+            <AuthProvider>
+              {IS_CLERK_AUTH && <ClerkAuthAdapter />}
+              <AuthBroadcastListener />
+              <TooltipProvider skipDelayDuration={0}>
+                <ReactFlowProvider>
+                  <ApiInterceptor />
+                  {children}
+                </ReactFlowProvider>
+              </TooltipProvider>
+            </AuthProvider>
+          </QueryClientProvider>
+        </GradientWrapper>
+      </CustomWrapper>
+    </>
   );
 }

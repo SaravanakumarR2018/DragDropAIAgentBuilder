@@ -665,6 +665,7 @@ def superuser(
     In production mode, requires authentication.
     """
     configure(log_level=log_level)
+    db_service = get_db_service(use_organisation=False)
 
     asyncio.run(_create_superuser(username, password, auth_token))
 

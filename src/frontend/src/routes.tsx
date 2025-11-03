@@ -184,6 +184,15 @@ const router = createBrowserRouter(
                       />
                     )}
                   </Route>
+                {ENABLE_FILE_MANAGEMENT && (
+                  <Route
+                    path="files"
+                    element={
+                      <Suspense fallback={<LoadingPage />}>
+                        <FilesPage />
+                      </Suspense>
+                    }
+                  />
                 )}
                 <Route
                   path="flows/"
@@ -311,6 +320,7 @@ const router = createBrowserRouter(
 
               {CustomRoutesStorePages()}
 
+              {CustomRoutesStorePages()}
               <Route path="account">
                 <Route
                   path="delete"
@@ -321,7 +331,6 @@ const router = createBrowserRouter(
                   }
                 />
               </Route>
-
               <Route
                 path="admin"
                 element={
@@ -333,8 +342,6 @@ const router = createBrowserRouter(
                 }
               />
             </Route>
-
-            {/* Flow and View Routes */}
             <Route path="flow/:id/">
               <Route
                 path=""
