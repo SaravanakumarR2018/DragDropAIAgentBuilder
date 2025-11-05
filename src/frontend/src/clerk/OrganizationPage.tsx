@@ -16,6 +16,7 @@ import {
   ensureLangflowUser,
   setStoredActiveOrgId,
 } from "./auth";
+import { navigateWithReload, shouldForceReload } from "@/utils/split-navigation";
 
 export default function OrganizationSwitcherPage() {
   const { getToken } = useAuth();
@@ -114,7 +115,11 @@ export default function OrganizationSwitcherPage() {
 
         // Step 6: Navigate to /flows
         console.debug("[OrgSwitcherPage] Redirecting to /flows");
-        navigate("/flows", { replace: true });
+        if (shouldForceReload("/flows")) {
+          navigateWithReload("/flows", true);
+        } else {
+          navigate("/flows", { replace: true });
+        }
       } catch (err) {
         if (!justLoggedIn.current) {
           console.error("[OrgSwitcherPage] Error during bootstrap", err);

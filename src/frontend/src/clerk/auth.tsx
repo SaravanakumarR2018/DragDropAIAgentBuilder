@@ -10,6 +10,7 @@ import { LANGFLOW_ACCESS_TOKEN, LANGFLOW_REFRESH_TOKEN } from "@/constants/const
 import { Cookies } from "react-cookie";
 import OrganizationPage from "./OrganizationPage";
 import authStore from "@/stores/authStore";
+import { navigateWithReload, shouldForceReload } from "@/utils/split-navigation";
 import {
   getStoredActiveOrgId as readStoredActiveOrgId,
   setStoredActiveOrgId as persistActiveOrgId,
@@ -177,7 +178,11 @@ export function ClerkAuthAdapter() {
       (isAtRoot || isAtLogin)
     ) {
       console.log("[ClerkAuthAdapter] Redirecting to /organization (no org selected)");
-      navigate("/organization", { replace: true });
+      if (shouldForceReload("/organization")) {
+        navigateWithReload("/organization", true);
+      } else {
+        navigate("/organization", { replace: true });
+      }
     }
   }, [isSignedIn, isOrgLoaded, organization?.id, currentPath, navigate, isOrgSelected]);
 
@@ -317,7 +322,11 @@ export function ClerkAuthAdapter() {
       "[ClerkAuthAdapter] Redirecting initialized tab to /flows",
       currentPath,
     );
-    navigate("/flows", { replace: true });
+    if (shouldForceReload("/flows")) {
+      navigateWithReload("/flows", true);
+    } else {
+      navigate("/flows", { replace: true });
+    }
   }, [
     currentPath,
     isSignedIn,

@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from http import HTTPStatus
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 import anyio
 import httpx
@@ -506,6 +506,41 @@ def setup_static_files(app: FastAPI, static_files_dir: Path) -> None:
         app (FastAPI): FastAPI app.
         static_files_dir (str): Path to the static files directory.
     """
+    settings_service = get_settings_service()
+    clerk_split_enabled = bool(settings_service.auth_settings.CLERK_AUTH_ENABLED)
+    auth_shell_path = static_files_dir / "auth.html"
+    auth_shell_exists = auth_shell_path.exists()
+
+    def should_serve_auth_shell(path: str) -> bool:
+        if not clerk_split_enabled or not auth_shell_exists:
+            return False
+
+        parsed_path = urlsplit(path).path
+        if Path(parsed_path).suffix:
+            return False
+
+        segments = [segment for segment in parsed_path.split("/") if segment]
+
+        if not segments:
+            return True
+
+        if segments[-1] in {"login", "signup", "organization"}:
+            return True
+
+        if len(segments) >= 2 and segments[-2:] == ["login", "admin"]:
+            return True
+
+        return False
+
+    if clerk_split_enabled and auth_shell_exists:
+
+        @app.middleware("http")
+        async def auth_shell_router(request: Request, call_next):  # type: ignore[misc]
+            if request.method in {"GET", "HEAD"} and should_serve_auth_shell(request.url.path):
+                return FileResponse(auth_shell_path)
+
+            return await call_next(request)
+
     app.mount(
         "/",
         StaticFiles(directory=static_files_dir, html=True),

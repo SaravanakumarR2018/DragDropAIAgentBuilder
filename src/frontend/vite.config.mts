@@ -27,6 +27,17 @@ export default defineConfig(({ mode }) => {
 
   const port = Number(env.VITE_PORT) || PORT || 3000;
 
+  const splitAuthRoutes =
+    String(env.VITE_SPLIT_AUTH_ROUTES || "").toLowerCase() === "true";
+
+  const rollupInput: Record<string, string> = {
+    main: path.resolve(__dirname, "index.html"),
+  };
+
+  if (splitAuthRoutes) {
+    rollupInput.auth = path.resolve(__dirname, "auth.html");
+  }
+
   const proxyTargets = apiRoutes.reduce((proxyObj, route) => {
     proxyObj[route] = {
       target: target,
@@ -42,6 +53,7 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: "build",
       rollupOptions: {
+        input: rollupInput,
         output: {
           // Add hash to filenames for cache busting
           entryFileNames: `assets/[name].[hash].js`,

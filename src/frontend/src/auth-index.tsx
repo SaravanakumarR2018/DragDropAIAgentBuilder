@@ -8,10 +8,8 @@ import "./style/index.css";
 import "./App.css";
 import "./style/applies.css";
 
-// @ts-ignore
-
 import AppWithProvider from "./clerk/auth";
-import CustomApp from "./customization/custom-App";
+import CustomAuthApp from "./customization/custom-AuthApp";
 
 declare global {
   interface Window {
@@ -21,7 +19,7 @@ declare global {
 }
 
 if (typeof window !== "undefined") {
-  window.__LANGFLOW_APP_VARIANT = "main";
+  window.__LANGFLOW_APP_VARIANT = "auth";
   window.__LANGFLOW_SPLIT_AUTH__ =
     String(import.meta.env.VITE_SPLIT_AUTH_ROUTES ?? "false").toLowerCase() === "true";
 }
@@ -32,7 +30,8 @@ const root = ReactDOM.createRoot(
 
 root.render(
   <AppWithProvider>
-    <CustomApp />
+    <CustomAuthApp />
   </AppWithProvider>,
 );
+
 reportWebVitals();
