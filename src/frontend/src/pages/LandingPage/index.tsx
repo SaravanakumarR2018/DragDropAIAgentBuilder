@@ -1,10 +1,8 @@
-import { motion, AnimatePresence } from "framer-motion";
-import type { JSX, SVGProps } from "react";
-import VisualWorkflow from "../../assets/VisualWorkflow.png";
+import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
-import useAuthStore from "@/stores/authStore";
-import { useLogout } from "@/clerk/auth";
-import { useNavigate } from "react-router-dom";
+import type { JSX, SVGProps } from "react";
+
+import VisualWorkflow from "../../assets/VisualWorkflow.png";
 
 
 function CheckIcon(props: SVGProps<SVGSVGElement>) {
@@ -46,17 +44,9 @@ function AnimatedArrowIcon(props: SVGProps<SVGSVGElement>) {
 
 export default function Landing(): JSX.Element {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  const { mutate: logout } = useLogout();
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    logout();
-  };
-
-  const handleDashboardClick = () => {
-    navigate("/flows");
-  };
+  const flowsHref = import.meta.env.DEV ? "/app.html#/flows" : "/flows";
+  const loginHref = import.meta.env.DEV ? "/app.html#/login" : "/login";
+  const closeMenu = () => setIsMenuOpen(false);
   return (
     <div className="h-screen overflow-y-auto bg-[#0f1217] text-white">
       {/* Background accents */}
@@ -113,93 +103,89 @@ export default function Landing(): JSX.Element {
               </div>
             </button>
 
-            {/* Conditional buttons based on authentication */}
-            {isAuthenticated ? (
-              <>
-                {/* Sign Out button (replaces Book a Demo when authenticated) */}
-                <button
-                  onClick={handleLogout}
-                  className="hidden md:inline-block rounded-xl bg-white px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:opacity-90"
-                >
-                  Sign Out
-                </button>
-                {/* Dashboard button with animated arrow (replaces Log in when authenticated) */}
-                <button
-                  onClick={handleDashboardClick}
-                  className="whitespace-nowrap rounded-xl bg-gradient-to-r from-teal-500 to-blue-500 px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 flex items-center gap-2"
-                >
-                  Dashboard
-                  <AnimatedArrowIcon className="h-4 w-4" />
-                </button>
-              </>
-            ) : (
-              <>
-                {/* Book a Demo (shown when unauthenticated) */}
-                <a
-                  href="#demo"
-                  className="hidden md:inline-block rounded-xl bg-white px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:opacity-90"
-                >
-                  Book a Demo
-                </a>
-                {/* Log in (shown when unauthenticated) */}
-                <a
-                  href="/login"
-                  className="whitespace-nowrap rounded-xl bg-white px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:opacity-90"
-                >
-                  Log in
-                </a>
-              </>
-            )}
+            <a
+              href="#demo"
+              className="hidden md:inline-block rounded-xl bg-white px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:opacity-90"
+            >
+              Book a Demo
+            </a>
+            <a
+              href={loginHref}
+              className="hidden whitespace-nowrap rounded-xl bg-white px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:opacity-90 md:inline-block"
+            >
+              Log in
+            </a>
+            <a
+              href={flowsHref}
+              className="flex items-center gap-2 whitespace-nowrap rounded-xl bg-gradient-to-r from-teal-500 to-blue-500 px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+            >
+              Launch App
+              <AnimatedArrowIcon className="h-4 w-4" />
+            </a>
           </div>
         </div>
       </header>
 
       <AnimatePresence>
         {isMenuOpen && (
-        <motion.div
-          initial={{ opacity: 0, x: "100%" }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: "100%" }}
-          transition={{ duration: 0.3 }}
-          className="fixed inset-0 z-50 flex flex-col items-center justify-start bg-gradient-to-b from-[#0f1217] via-50% via-[#0f1217] to-transparent px-6 pt-24 backdrop-blur-md"
-        >
-        <button
-          className="absolute top-4 right-4 p-2 rounded-lg hover:bg-white/10"
-          onClick={() => setIsMenuOpen(false)}
-        >
-          ✕
-        </button>
-        <nav className="space-y-6 text-center text-x">
-          <a 
-            className="block text-white/90 hover:text-white" 
-            href="#features"
-            onClick={() => setIsMenuOpen(false)}
+          <motion.div
+            initial={{ opacity: 0, x: "100%" }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: "100%" }}
+            transition={{ duration: 0.3 }}
+            className="fixed inset-0 z-50 flex flex-col items-center justify-start bg-gradient-to-b from-[#0f1217] via-50% via-[#0f1217] to-transparent px-6 pt-24 backdrop-blur-md"
           >
-            Features
-          </a>
-          <a 
-            className="block text-white/90 hover:text-white" 
-            href="#how"
-            onClick={() => setIsMenuOpen(false)}
-          >
-            How it Works
-          </a>
-          <a 
-            className="block text-white/90 hover:text-white" 
-            href="#enterprise"
-            onClick={() => setIsMenuOpen(false)}
-          >
-            Enterprise
-          </a>
-          <a 
-            className="block text-white/90 hover:text-white" 
-            href="#pricing"
-            onClick={() => setIsMenuOpen(false)}
-          >
-            Pricing
-          </a>
-        </nav>
-        </motion.div>
+            <button
+              className="absolute top-4 right-4 rounded-lg p-2 hover:bg-white/10"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              ✕
+            </button>
+            <nav className="space-y-6 text-center text-x">
+              <a
+                className="block text-white/90 hover:text-white"
+                href="#features"
+                onClick={closeMenu}
+              >
+                Features
+              </a>
+              <a
+                className="block text-white/90 hover:text-white"
+                href="#how"
+                onClick={closeMenu}
+              >
+                How it Works
+              </a>
+              <a
+                className="block text-white/90 hover:text-white"
+                href="#enterprise"
+                onClick={closeMenu}
+              >
+                Enterprise
+              </a>
+              <a
+                className="block text-white/90 hover:text-white"
+                href="#pricing"
+                onClick={closeMenu}
+              >
+                Pricing
+              </a>
+              <a
+                className="block text-white/90 hover:text-white"
+                href={loginHref}
+                onClick={closeMenu}
+              >
+                Log in
+              </a>
+              <a
+                className="block text-white/90 hover:text-white"
+                href={flowsHref}
+                onClick={closeMenu}
+              >
+                Launch App
+              </a>
+            </nav>
+          </motion.div>
         )}
       </AnimatePresence>
 
