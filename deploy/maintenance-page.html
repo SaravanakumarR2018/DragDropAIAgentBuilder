@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="refresh" content="15" />
+    <title>Updates in Progress</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #0f172a;
+        --card: #1e293b;
+        --text: #e2e8f0;
+        --accent: #38bdf8;
+      }
+      body {
+        margin: 0;
+        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+      }
+      .card {
+        text-align: center;
+        padding: 3rem clamp(2rem, 4vw, 5rem);
+        border-radius: 24px;
+        background: linear-gradient(145deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95));
+        box-shadow: 0 20px 60px rgba(15, 23, 42, 0.6);
+        max-width: min(90vw, 520px);
+      }
+      h1 {
+        font-size: clamp(1.8rem, 4vw, 2.5rem);
+        margin-bottom: 1rem;
+      }
+      p {
+        font-size: clamp(1rem, 2.5vw, 1.15rem);
+        margin-bottom: 2rem;
+        line-height: 1.6;
+        opacity: 0.85;
+      }
+      .progress {
+        width: 100%;
+        height: 14px;
+        border-radius: 999px;
+        background: rgba(148, 163, 184, 0.25);
+        overflow: hidden;
+        position: relative;
+      }
+      .progress::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, rgba(56, 189, 248, 0.2), var(--accent), rgba(56, 189, 248, 0.2));
+        animation: shimmer 2.4s infinite;
+      }
+      @keyframes shimmer {
+        0% { transform: translateX(-100%); }
+        50% { transform: translateX(0%); }
+        100% { transform: translateX(100%); }
+      }
+      .note {
+        margin-top: 1.75rem;
+        font-size: 0.95rem;
+        opacity: 0.7;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card" role="status" aria-live="polite">
+      <h1>We&rsquo;re shipping new features</h1>
+      <p>Our team is deploying updates right now. Thanks for your patience—this won&rsquo;t take long.</p>
+      <div class="progress" aria-hidden="true"></div>
+      <p class="note">This page refreshes automatically when we&rsquo;re back.</p>
+    </main>
+  </body>
+</html>
