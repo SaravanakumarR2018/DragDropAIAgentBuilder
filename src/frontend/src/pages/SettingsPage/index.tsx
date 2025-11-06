@@ -124,7 +124,7 @@ const SettingsPageWithClerk = () => {
 
   const clerkNavItems: SidebarNavItem[] = [
     {
-      title: "Manage account",
+      title: "Manage Account",
       icon: (
         <ForwardedIconComponent
           name="User"
