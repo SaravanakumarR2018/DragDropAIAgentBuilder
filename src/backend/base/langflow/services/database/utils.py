@@ -32,6 +32,12 @@ async def initialize_database(*, fix_migration: bool = False) -> None:
             await logger.aexception(msg)
             raise RuntimeError(msg) from exc
     try:
+        await database_service.run_runtime_migrations()
+    except Exception as exc:  # noqa: BLE001
+        msg = "Error applying runtime database migrations"
+        await logger.aexception(msg)
+        raise RuntimeError(msg) from exc
+    try:
         await database_service.check_schema_health()
     except Exception as exc:
         msg = "Error checking schema health"

@@ -28,6 +28,7 @@ from langflow.services.base import Service
 from langflow.services.database import models
 from langflow.services.database.models.user.crud import get_user_by_username
 from langflow.services.database.session import NoopSession
+from langflow.services.database.runtime_migrations import ensure_runtime_migrations
 from langflow.services.database.utils import Result, TableResults
 from langflow.services.deps import get_settings_service
 from langflow.services.utils import teardown_superuser
@@ -188,6 +189,7 @@ class DatabaseService(Service):
         if self.settings_service.settings.use_noop_database:
             yield NoopSession()
         else:
+            await self.run_runtime_migrations()
             async with AsyncSession(self.engine, expire_on_commit=False) as session:
                 # Start of Selection
                 try:
@@ -245,6 +247,12 @@ class DatabaseService(Service):
             # Commit changes
             await session.commit()
             await logger.adebug("Successfully assigned orphaned flows to the default superuser")
+
+    async def run_runtime_migrations(self) -> None:
+        await ensure_runtime_migrations(
+            self.engine,
+            use_noop_database=self.settings_service.settings.use_noop_database,
+        )
 
     @staticmethod
     def _generate_unique_flow_name(original_name: str, existing_names: set[str]) -> str:
