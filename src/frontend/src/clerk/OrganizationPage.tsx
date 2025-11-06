@@ -171,59 +171,60 @@ export default function OrganizationSwitcherPage() {
     <div
       style={{
         display: "flex",
-        flexDirection:"column",
-        justifyContent: "center",
+        flexDirection: "column",
+        justifyContent: isMobile ? "flex-start" : "center",
         alignItems: "center",
         minHeight: "100vh",
         width: "100%",
-        padding: "2rem 1.5rem",
+        padding: isMobile ? "3rem 1.25rem" : "2rem",
         backgroundColor: "#f8fafc",
+        boxSizing: "border-box",
       }}
     >
-      
-        <div
+      <div
         style={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          gap:"0.75rem",
-          marginBottom: "1.5rem",
-        }}
-        >
-          <img
-          src={logoicon}
-          alt="Visual AI Agent Builder Logo"
-          style={{
-            width: "36px",
-            height: "36px",
-            objectFit: "contain",
-            borderRadius: "8px",
-          }}
-        />
-            <span
-              style={{
-                background: "linear-gradient(90deg, #4f46e5 0%, #38bdf8 80%)",
-                WebkitBackgroundClip: "text",
-                color: "transparent",
-                fontSize: "1rem",
-                fontWeight: 700,
-                letterSpacing: "0.01em",
-              }}
-            >
-              Visual AI Agents Builder
-            </span>
-          </div>
-        <div
-          style={{
+          width: "100%",
+          maxWidth: "480px",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          width: "100%",
-          maxWidth: "480px",
           gap: "1.5rem",
+          margin: "0 auto",
         }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "0.75rem",
+            marginBottom: "0.5rem",
+          }}
         >
+          <img
+            src={logoicon}
+            alt="Visual AI Agent Builder Logo"
+            style={{
+              width: "40px",
+              height: "40px",
+              objectFit: "contain",
+              borderRadius: "8px",
+            }}
+          />
+          <span
+            style={{
+              background: "linear-gradient(90deg, #4f46e5 0%, #38bdf8 80%)",
+              WebkitBackgroundClip: "text",
+              color: "transparent",
+              fontSize: "1.125rem",
+              fontWeight: 700,
+              letterSpacing: "0.01em",
+            }}
+          >
+            Visual AI Agents Builder
+          </span>
+        </div>
         <div
           style={{
             alignItems: "center",
@@ -237,74 +238,74 @@ export default function OrganizationSwitcherPage() {
             width: "100%",
           }}
         >
-            <div
-              style={{
-                width: "2.75rem",
-                height: "2.75rem",
-                borderRadius: "9999px",
-                overflow: "hidden",
-                border: "2px solid rgba(99, 102, 241, 0.35)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background:
-                  "linear-gradient(135deg, rgba(99,102,241,0.16), rgba(129,140,248,0.22))",
-              }}
-            >
-              {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt={displayName || "Current user"}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              ) : (
-                <span
-                  style={{
-                    color: "#312e81",
-                    fontSize: "1.5rem",
-                    fontWeight: 600,
-                  }}
-                >
-                  {initials || (displayName?.[0]?.toUpperCase() ?? "U")}
-                </span>
-              )}
-            </div>
-
-            <div
-              style={{
-                display: "flex",
-                flex: 1,
-                flexDirection: "column",
-                overflow:"hidden",
-              }}
-            >
-              <div
+          <div
+            style={{
+              width: "2.75rem",
+              height: "2.75rem",
+              borderRadius: "9999px",
+              overflow: "hidden",
+              border: "2px solid rgba(99, 102, 241, 0.35)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background:
+                "linear-gradient(135deg, rgba(99,102,241,0.16), rgba(129,140,248,0.22))",
+            }}
+          >
+            {avatarUrl ? (
+              <img
+                src={avatarUrl}
+                alt={displayName || "Current user"}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : (
+              <span
                 style={{
-                  fontSize: "1rem",
+                  color: "#312e81",
+                  fontSize: "1.5rem",
                   fontWeight: 600,
-                  color: "#1e293b",
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
                 }}
-                title={displayName || undefined}
               >
-                {displayName || "Current member"}
-              </div>
-              <div
-                style={{
-                  color: "#475569",
-                  fontSize: "0.9rem",
-                  lineHeight: 1.3,
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-                title={emailAddress || undefined}
-              >
-                {emailAddress || "Signed in user"}
-              </div>
+                {initials || (displayName?.[0]?.toUpperCase() ?? "U")}
+              </span>
+            )}
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              flex: 1,
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                fontSize: "1rem",
+                fontWeight: 600,
+                color: "#1e293b",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+              title={displayName || undefined}
+            >
+              {displayName || "Current member"}
             </div>
+            <div
+              style={{
+                color: "#475569",
+                fontSize: "0.9rem",
+                lineHeight: 1.3,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+              title={emailAddress || undefined}
+            >
+              {emailAddress || "Signed in user"}
+            </div>
+          </div>
         </div>
 
         {shouldShowEnterpriseEmptyState ? (
@@ -330,13 +331,13 @@ export default function OrganizationSwitcherPage() {
         ) : (
           <div
             style={{
-              maxWidth: isMobile ? "100%" : "480px",
-              background:"transparent",
-              border: "none",
-              boxshadow:"none",
               width: "100%",
+              background: "transparent",
+              border: "none",
+              boxShadow: "none",
+              boxSizing: "border-box",
+              padding: 0,
               margin: "0 auto",
-              padding: isMobile ? "0 1rem" : 0,
             }}
           >
             <OrganizationList
