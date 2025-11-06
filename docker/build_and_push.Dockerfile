@@ -6,35 +6,23 @@
 # Used to build deps + create our virtual environment
 ################################
 
-# 1. use python:3.12.3-slim as the base image until https://github.com/pydantic/pydantic-core/issues/1292 gets resolved
-# 2. do not add --platform=$BUILDPLATFORM because the pydantic binaries must be resolved for the final architecture
-# Use a Python image with uv pre-installed
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
 
-# Install the project into `/app`
 WORKDIR /app
-
-# Enable bytecode compilation
 ENV UV_COMPILE_BYTECODE=1
-
-# Copy from the cache instead of linking since it's a mounted volume
 ENV UV_LINK_MODE=copy
-
-# Set RUSTFLAGS for reqwest unstable features needed by apify-client v2.0.0
 ENV RUSTFLAGS='--cfg reqwest_unstable'
 
 RUN apt-get update \
     && apt-get upgrade -y \
     && apt-get install --no-install-recommends -y \
-    # deps for building python deps
     build-essential \
     git \
-    # npm
     npm \
-    # gcc
     gcc \
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && rm -f /etc/nginx/sites-enabled/default \
 
 # Copy files first to avoid permission issues with bind mounts
 COPY ./uv.lock /app/uv.lock
@@ -48,26 +36,40 @@ COPY ./src/lfx/pyproject.toml /app/src/lfx/pyproject.toml
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     RUSTFLAGS='--cfg reqwest_unstable' \
-    uv sync --frozen --no-install-project --no-editable --extra postgresql
+    uv sync --no-install-project --no-editable --extra postgresql
 
 COPY ./src /app/src
 
+################################
+# BUILD FRONTEND 1
+################################
 ARG VITE_AUTO_LOGIN=true
 ENV VITE_AUTO_LOGIN=$VITE_AUTO_LOGIN
-    
-COPY src/frontend /tmp/src/frontend
-WORKDIR /tmp/src/frontend
-
 ARG VITE_CLERK_AUTH_ENABLED=false
 ARG VITE_CLERK_PUBLISHABLE_KEY=""
 ENV VITE_CLERK_AUTH_ENABLED=$VITE_CLERK_AUTH_ENABLED
 ENV VITE_CLERK_PUBLISHABLE_KEY=$VITE_CLERK_PUBLISHABLE_KEY
 
+COPY src/frontend1 /tmp/src/frontend1
+WORKDIR /tmp/src/frontend1
+
 RUN --mount=type=cache,target=/root/.npm \
     npm ci \
     && ESBUILD_BINARY_PATH="" NODE_OPTIONS="--max-old-space-size=12288" JOBS=1 npm run build \
-    && cp -r build /app/src/backend/langflow/frontend \
-    && rm -rf /tmp/src/frontend
+    && cp -r build /app/frontend1_build \
+    && rm -rf /tmp/src/frontend1
+
+################################
+# BUILD FRONTEND 2
+################################
+COPY src/frontend2 /tmp/src/frontend2
+WORKDIR /tmp/src/frontend2
+
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci \
+    && ESBUILD_BINARY_PATH="" NODE_OPTIONS="--max-old-space-size=12288" JOBS=1 npm run build \
+    && cp -r build /app/frontend2_build \
+    && rm -rf /tmp/src/frontend2
 
 WORKDIR /app
 
@@ -77,35 +79,35 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 ################################
 # RUNTIME
-# Setup user, utilities and copy the virtual environment only
+# Setup user, Nginx, and Python environment
 ################################
 FROM python:3.12.3-slim AS runtime
 
 RUN apt-get update \
     && apt-get upgrade -y \
-    && apt-get install -y curl git libpq5 gnupg \
+    && apt-get install -y curl git libpq5 gnupg nginx \
     && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
     && apt-get install -y nodejs \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd user -u 1000 -g 0 --no-create-home --home-dir /app/data
+    && useradd user -u 1000 -g 0 --no-create-home --home-dir /app/data \
+    && mkdir -p /var/lib/nginx/body /var/tmp/nginx \
+    && chown -R 1000:0 /var/lib/nginx /var/tmp/nginx /var/log/nginx /etc/nginx /usr/share/nginx/html \
+    && mkdir -p /run && touch /run/nginx.pid && chown -R 1000:0 /run
 
 COPY --from=builder --chown=1000 /app/.venv /app/.venv
+COPY --from=builder /app/src/backend /app/src/backend
+COPY --from=builder /app/frontend1_build /usr/share/nginx/html/frontend1
+COPY --from=builder /app/frontend2_build /usr/share/nginx/html/frontend2
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 
-# Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
-
-LABEL org.opencontainers.image.title=langflow
-LABEL org.opencontainers.image.authors=['Langflow']
-LABEL org.opencontainers.image.licenses=MIT
-LABEL org.opencontainers.image.url=https://github.com/langflow-ai/langflow
-LABEL org.opencontainers.image.source=https://github.com/langflow-ai/langflow
+ENV LANGFLOW_HOST=0.0.0.0
+ENV LANGFLOW_PORT=7860
 
 USER user
 WORKDIR /app
 
-ENV LANGFLOW_HOST=0.0.0.0
-ENV LANGFLOW_PORT=7860
+EXPOSE 7860
 
-CMD ["langflow", "run"]
-
+CMD ["sh", "-c", "langflow run --host 0.0.0.0 --port 7861 --backend-only & nginx -g 'daemon off;'"]
