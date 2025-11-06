@@ -170,10 +170,9 @@ export default function OrganizationSwitcherPage() {
   return (
     <div
       style={{
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: isMobile ? "flex-start" : "center",
-        alignItems: "center",
+        display: "grid"
+        placeItems: isMobile ? "start center" : "center",
+        alignContent: "center",
         minHeight: "100vh",
         width: "100%",
         padding: isMobile ? "3rem 1.25rem" : "2rem",
@@ -190,7 +189,7 @@ export default function OrganizationSwitcherPage() {
           alignItems: "center",
           justifyContent: "center",
           gap: "1.5rem",
-          margin: "0 auto",
+          transform: !isMobile ? "translateY(-5vh)" : "none",
         }}
       >
         <div
