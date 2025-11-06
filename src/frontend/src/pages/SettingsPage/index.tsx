@@ -24,18 +24,6 @@ export default function SettingsPage(): JSX.Element {
     icon: React.ReactNode;
   }[] = [];
 
-  if (showGeneralSettings) {
-    sidebarNavItems.push({
-      title: "General",
-      href: "/settings/general",
-      icon: (
-        <ForwardedIconComponent
-          name="SlidersHorizontal"
-          className="w-4 flex-shrink-0 justify-start stroke-[1.5]"
-        />
-      ),
-    });
-  }
 
   sidebarNavItems.push(
     {
