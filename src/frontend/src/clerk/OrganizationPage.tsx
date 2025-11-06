@@ -170,7 +170,7 @@ export default function OrganizationSwitcherPage() {
   return (
     <div
       style={{
-        display: "grid"
+        display: "grid",
         placeItems: isMobile ? "start center" : "center",
         alignContent: "center",
         minHeight: "100vh",
