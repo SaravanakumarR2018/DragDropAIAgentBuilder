@@ -170,7 +170,7 @@ export default function OrganizationSwitcherPage() {
   return (
     <div
       style={{
-        display: "grid",
+        display: "grid"
         placeItems: isMobile ? "start center" : "center",
         alignContent: "center",
         minHeight: "100vh",
@@ -189,7 +189,7 @@ export default function OrganizationSwitcherPage() {
           alignItems: "center",
           justifyContent: "center",
           gap: "1.5rem",
-          transform: !isMobile ? "translateY(-5vh)" : "none",
+          margin: "0 auto",
         }}
       >
         <div
@@ -337,6 +337,7 @@ export default function OrganizationSwitcherPage() {
               boxSizing: "border-box",
               padding: 0,
               margin: "0 auto",
+              transform: isMobile ? "none" : "translateX(40px)",
             }}
           >
             <OrganizationList
