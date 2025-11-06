@@ -165,7 +165,8 @@ export default function OrganizationSwitcherPage() {
   const initials = (
     (user?.firstName?.[0] || "") + (user?.lastName?.[0] || user?.firstName?.[1] || "")
   ).toUpperCase();
-
+   
+ const isMobile = window.innerWidth < 640; 
   return (
     <div
       style={{
@@ -329,14 +330,13 @@ export default function OrganizationSwitcherPage() {
         ) : (
           <div
             style={{
-              maxWidth: "480px",
+              maxWidth: isMobile ? "100%" : "480px",
               background:"transparent",
               border: "none",
               boxshadow:"none",
-              boxSizing: "border-box",
               width: "100%",
-              transform: "translateX(40px)",
-              padding:0,
+              margin: "0 auto",
+              padding: isMobile ? "0 1rem" : 0,
             }}
           >
             <OrganizationList
