@@ -7,7 +7,6 @@ import {
 } from "react-router-dom";
 import { ProtectedAdminRoute } from "./components/authorization/authAdminGuard";
 import { ProtectedRoute } from "./components/authorization/authGuard";
-import { ProtectedLoginRoute } from "./components/authorization/authLoginGuard";
 import { AuthSettingsGuard } from "./components/authorization/authSettingsGuard";
 import ContextWrapper from "./contexts";
 import { CustomNavigate } from "./customization/components/custom-navigate";
@@ -68,23 +67,6 @@ const KnowledgePage = lazy(
   () => import("./pages/MainPage/pages/knowledgePage"),
 );
 const ViewPage = lazy(() => import("./pages/ViewPage"));
-const OrganizationPage = lazy(() => import("./clerk/OrganizationPage"));
-const LoginPage = lazy(() =>
-  import("./clerk/login-pages").then((module) => ({
-    default: module.LoginPage,
-  })),
-);
-const SignUp = lazy(() =>
-  import("./clerk/login-pages").then((module) => ({
-    default: module.SignUp,
-  })),
-);
-const LoginAdminPage = lazy(() =>
-  import("./clerk/login-pages").then((module) => ({
-    default: module.LoginAdminPage,
-  })),
-);
-
 const AdminPage = lazy(() => import("./pages/AdminPage"));
 const DeleteAccountPage = lazy(() => import("./pages/DeleteAccountPage"));
 const PlaygroundPage = lazy(() => import("./pages/Playground"));
@@ -373,47 +355,6 @@ const router = createBrowserRouter(
           </Route>
         </Route>
 
-        {/* Auth routes */}
-        <Route
-          path="login"
-          element={
-            <Suspense fallback={<LoadingPage />}>
-              <ProtectedLoginRoute>
-                <LoginPage />
-              </ProtectedLoginRoute>
-            </Suspense>
-          }
-        />
-        <Route
-          path="organization"
-          element={
-            <Suspense fallback={<LoadingPage />}>
-              <ProtectedLoginRoute>
-                <OrganizationPage />
-              </ProtectedLoginRoute>
-            </Suspense>
-          }
-        />
-        <Route
-          path="signup"
-          element={
-            <Suspense fallback={<LoadingPage />}>
-              <ProtectedLoginRoute>
-                <SignUp />
-              </ProtectedLoginRoute>
-            </Suspense>
-          }
-        />
-        <Route
-          path="login/admin"
-          element={
-            <Suspense fallback={<LoadingPage />}>
-              <ProtectedLoginRoute>
-                <LoginAdminPage />
-              </ProtectedLoginRoute>
-            </Suspense>
-          }
-        />
       </Route>
       <Route path="*" element={<CatchAllRedirect />} />
     </Route>,
