@@ -1,10 +1,9 @@
 import { motion, AnimatePresence } from "framer-motion";
 import type { JSX, SVGProps } from "react";
 import VisualWorkflow from "../../assets/VisualWorkflow.png";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import useAuthStore from "@/stores/authStore";
 import { useLogout } from "@/clerk/auth";
-import { useNavigate } from "react-router-dom";
 
 
 function CheckIcon(props: SVGProps<SVGSVGElement>) {
@@ -46,16 +45,51 @@ function AnimatedArrowIcon(props: SVGProps<SVGSVGElement>) {
 
 export default function Landing(): JSX.Element {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [hasRedirected, setHasRedirected] = useState(false);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const isOrgSelected = useAuthStore((state) => state.isOrgSelected);
   const { mutate: logout } = useLogout();
-  const navigate = useNavigate();
+
+  const redirectToFullApp = (path?: string) => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const fallback = import.meta.env.VITE_FULL_APP_BASE_PATH ?? "/flows";
+    const target = path || fallback;
+    const normalizedTarget =
+      target.startsWith("http") || target.startsWith("/")
+        ? target
+        : `/${target}`;
+
+    window.location.replace(normalizedTarget);
+  };
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setHasRedirected(false);
+      return;
+    }
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const sessionOrgSelected =
+      sessionStorage.getItem("isOrgSelected") === "true";
+
+    if ((isOrgSelected || sessionOrgSelected) && !hasRedirected) {
+      setHasRedirected(true);
+      redirectToFullApp();
+    }
+  }, [isAuthenticated, isOrgSelected, hasRedirected]);
 
   const handleLogout = () => {
     logout();
   };
 
   const handleDashboardClick = () => {
-    navigate("/flows");
+    redirectToFullApp();
   };
   return (
     <div className="h-screen overflow-y-auto bg-[#0f1217] text-white">
