@@ -1,4 +1,3 @@
-import { CustomNavigate } from "@/customization/components/custom-navigate";
 import useAuthStore from "@/stores/authStore";
 import { useOrganization } from "@clerk/clerk-react";
 import { IS_CLERK_AUTH } from "@/clerk/auth";
@@ -45,11 +44,17 @@ export const ProtectedLoginRoute = ({ children }) => {
   if (canRedirect) {
     const urlParams = new URLSearchParams(window.location.search);
     const redirectPath = urlParams.get("redirect");
+    const fallbackRedirect =
+      import.meta.env.VITE_FULL_APP_BASE_PATH ?? "/flows";
 
-    if (redirectPath) {
-      return <CustomNavigate to={redirectPath} replace />;
+    const target = redirectPath || fallbackRedirect;
+
+    // Force a full navigation so nginx hands the request to frontend2.
+    if (typeof window !== "undefined") {
+      window.location.replace(target);
     }
-    return <CustomNavigate to="/flows" replace />;
+
+    return null;
   }
   return children;
 };
