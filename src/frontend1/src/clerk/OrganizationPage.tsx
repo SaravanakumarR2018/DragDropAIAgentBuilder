@@ -9,7 +9,7 @@ import {
   useUser,
 } from "@clerk/clerk-react";
 import { useContext, useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import {
   backendLogin,
   createOrganisation,
@@ -21,7 +21,6 @@ export default function OrganizationSwitcherPage() {
   const { getToken } = useAuth();
   const { organization } = useOrganization();
   const { user } = useUser();
-  const navigate = useNavigate();
   const location = useLocation();
   const { mutateAsync: logout } = useLogout();
   const bootstrapped = useRef(false);
@@ -114,7 +113,14 @@ export default function OrganizationSwitcherPage() {
 
         // Step 6: Navigate to /flows
         console.debug("[OrgSwitcherPage] Redirecting to /flows");
-        navigate("/flows", { replace: true });
+
+        const fallback =
+          import.meta.env.VITE_FULL_APP_BASE_PATH ?? "/flows";
+        const target = fallback.startsWith("http")
+          ? fallback
+          : `${fallback.startsWith("/") ? "" : "/"}${fallback}`;
+
+        window.location.replace(target);
       } catch (err) {
         if (!justLoggedIn.current) {
           console.error("[OrgSwitcherPage] Error during bootstrap", err);
@@ -138,7 +144,6 @@ export default function OrganizationSwitcherPage() {
     isOrgSelectedManually,
     getToken,
     user,
-    navigate,
     login,
     logout,
   ]);
