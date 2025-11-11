@@ -10,6 +10,7 @@ import {
 } from "@clerk/clerk-react";
 import { useContext, useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { handOffToFullApp } from "@/utils/fullAppRedirect";
 import {
   backendLogin,
   createOrganisation,
@@ -114,13 +115,7 @@ export default function OrganizationSwitcherPage() {
         // Step 6: Navigate to /flows
         console.debug("[OrgSwitcherPage] Redirecting to /flows");
 
-        const fallback =
-          import.meta.env.VITE_FULL_APP_BASE_PATH ?? "/flows";
-        const target = fallback.startsWith("http")
-          ? fallback
-          : `${fallback.startsWith("/") ? "" : "/"}${fallback}`;
-
-        window.location.replace(target);
+        handOffToFullApp();
       } catch (err) {
         if (!justLoggedIn.current) {
           console.error("[OrgSwitcherPage] Error during bootstrap", err);

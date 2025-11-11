@@ -4,6 +4,7 @@ import VisualWorkflow from "../../assets/VisualWorkflow.png";
 import { useEffect, useState } from "react";
 import useAuthStore from "@/stores/authStore";
 import { useLogout } from "@/clerk/auth";
+import { handOffToFullApp } from "@/utils/fullAppRedirect";
 
 
 function CheckIcon(props: SVGProps<SVGSVGElement>) {
@@ -50,21 +51,6 @@ export default function Landing(): JSX.Element {
   const isOrgSelected = useAuthStore((state) => state.isOrgSelected);
   const { mutate: logout } = useLogout();
 
-  const redirectToFullApp = (path?: string) => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const fallback = import.meta.env.VITE_FULL_APP_BASE_PATH ?? "/flows";
-    const target = path || fallback;
-    const normalizedTarget =
-      target.startsWith("http") || target.startsWith("/")
-        ? target
-        : `/${target}`;
-
-    window.location.replace(normalizedTarget);
-  };
-
   useEffect(() => {
     if (!isAuthenticated) {
       setHasRedirected(false);
@@ -80,7 +66,7 @@ export default function Landing(): JSX.Element {
 
     if ((isOrgSelected || sessionOrgSelected) && !hasRedirected) {
       setHasRedirected(true);
-      redirectToFullApp();
+      handOffToFullApp();
     }
   }, [isAuthenticated, isOrgSelected, hasRedirected]);
 
@@ -89,7 +75,7 @@ export default function Landing(): JSX.Element {
   };
 
   const handleDashboardClick = () => {
-    redirectToFullApp();
+    handOffToFullApp();
   };
   return (
     <div className="h-screen overflow-y-auto bg-[#0f1217] text-white">

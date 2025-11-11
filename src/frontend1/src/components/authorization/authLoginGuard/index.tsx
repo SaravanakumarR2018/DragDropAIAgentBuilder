@@ -2,6 +2,7 @@ import useAuthStore from "@/stores/authStore";
 import { useOrganization } from "@clerk/clerk-react";
 import { IS_CLERK_AUTH } from "@/clerk/auth";
 import { useLocation } from "react-router-dom";
+import { handOffToFullApp } from "@/utils/fullAppRedirect";
 
 export const ProtectedLoginRoute = ({ children }) => {
   const autoLogin = useAuthStore((state) => state.autoLogin);
@@ -43,18 +44,9 @@ export const ProtectedLoginRoute = ({ children }) => {
 
   if (canRedirect) {
     const urlParams = new URLSearchParams(window.location.search);
-    const redirectPath = urlParams.get("redirect");
-    const fallbackRedirect =
-      import.meta.env.VITE_FULL_APP_BASE_PATH ?? "/flows";
+    const redirectPath = urlParams.get("redirect") ?? undefined;
 
-    const target = redirectPath || fallbackRedirect;
-    const normalizedTarget =
-      target.startsWith("http") || target.startsWith("/")
-        ? target
-        : `/${target}`;
-
-    // Force a full navigation so nginx hands the request to frontend2.
-    window.location.replace(normalizedTarget);
+    handOffToFullApp(redirectPath);
 
     return null;
   }
