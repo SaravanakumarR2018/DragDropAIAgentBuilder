@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect } from "react";
+import { Suspense, lazy, useEffect, useRef } from "react";
 import {
   Outlet,
   Route,
@@ -27,6 +27,7 @@ const MarketingCatchAll = () => {
   const location = useLocation();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isOrgSelected = useAuthStore((state) => state.isOrgSelected);
+  const hasRedirected = useRef(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -37,7 +38,12 @@ const MarketingCatchAll = () => {
       typeof window !== "undefined" &&
       sessionStorage.getItem("isOrgSelected") === "true";
 
+    if (hasRedirected.current) {
+      return;
+    }
+
     if (isOrgSelected || sessionOrgSelected) {
+      hasRedirected.current = true;
       const fullPath = `${location.pathname}${location.search}${location.hash}`;
       handOffToFullApp(fullPath || undefined);
     }

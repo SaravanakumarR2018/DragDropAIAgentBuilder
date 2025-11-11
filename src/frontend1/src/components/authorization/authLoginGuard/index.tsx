@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import useAuthStore from "@/stores/authStore";
 import { useOrganization } from "@clerk/clerk-react";
 import { IS_CLERK_AUTH } from "@/clerk/auth";
@@ -8,6 +9,7 @@ export const ProtectedLoginRoute = ({ children }) => {
   const autoLogin = useAuthStore((state) => state.autoLogin);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const location = useLocation();
+  const hasRedirectedRef = useRef(false);
 
   // // ✅ Only enforce this wrapper on the actual login page
   // const isLoginPage = location.pathname.includes("login");
@@ -42,7 +44,8 @@ export const ProtectedLoginRoute = ({ children }) => {
     (autoLogin === true || isAuthenticated) &&
     isOrgSelected;
 
-  if (canRedirect) {
+  if (canRedirect && !hasRedirectedRef.current) {
+    hasRedirectedRef.current = true;
     const urlParams = new URLSearchParams(window.location.search);
     const redirectPath = urlParams.get("redirect") ?? undefined;
 
