@@ -1,9 +1,10 @@
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import {
   Outlet,
   Route,
   createBrowserRouter,
   createRoutesFromElements,
+  useLocation,
 } from "react-router-dom";
 
 import { ProtectedLoginRoute } from "./components/authorization/authLoginGuard";
@@ -11,6 +12,8 @@ import ContextWrapper from "./contexts";
 import { CustomNavigate } from "./customization/components/custom-navigate";
 import { BASENAME } from "./customization/config-constants";
 import { LoadingPage } from "./pages/LoadingPage";
+import useAuthStore from "@/stores/authStore";
+import { handOffToFullApp } from "@/utils/fullAppRedirect";
 
 const LandingPage = lazy(() => import("./pages/LandingPage"));
 const LoginPage = lazy(() =>
@@ -19,6 +22,39 @@ const LoginPage = lazy(() =>
   })),
 );
 const OrganizationPage = lazy(() => import("./clerk/OrganizationPage"));
+
+const MarketingCatchAll = () => {
+  const location = useLocation();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const isOrgSelected = useAuthStore((state) => state.isOrgSelected);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+
+    const sessionOrgSelected =
+      typeof window !== "undefined" &&
+      sessionStorage.getItem("isOrgSelected") === "true";
+
+    if (isOrgSelected || sessionOrgSelected) {
+      const fullPath = `${location.pathname}${location.search}${location.hash}`;
+      handOffToFullApp(fullPath || undefined);
+    }
+  }, [
+    isAuthenticated,
+    isOrgSelected,
+    location.pathname,
+    location.search,
+    location.hash,
+  ]);
+
+  if (!isAuthenticated) {
+    return <CustomNavigate replace to="/" />;
+  }
+
+  return <LoadingPage />;
+};
 
 const router = createBrowserRouter(
   createRoutesFromElements(
@@ -58,7 +94,7 @@ const router = createBrowserRouter(
           </Suspense>
         }
       />
-      <Route path="*" element={<CustomNavigate replace to="/" />} />
+      <Route path="*" element={<MarketingCatchAll />} />
     </Route>,
   ),
   { basename: BASENAME || undefined },

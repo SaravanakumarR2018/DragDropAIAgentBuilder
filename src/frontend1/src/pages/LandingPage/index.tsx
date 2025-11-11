@@ -1,10 +1,10 @@
 import { motion, AnimatePresence } from "framer-motion";
 import type { JSX, SVGProps } from "react";
 import VisualWorkflow from "../../assets/VisualWorkflow.png";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import useAuthStore from "@/stores/authStore";
 import { useLogout } from "@/clerk/auth";
-import { useNavigate } from "react-router-dom";
+import { handOffToFullApp } from "@/utils/fullAppRedirect";
 
 
 function CheckIcon(props: SVGProps<SVGSVGElement>) {
@@ -46,16 +46,36 @@ function AnimatedArrowIcon(props: SVGProps<SVGSVGElement>) {
 
 export default function Landing(): JSX.Element {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [hasRedirected, setHasRedirected] = useState(false);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const isOrgSelected = useAuthStore((state) => state.isOrgSelected);
   const { mutate: logout } = useLogout();
-  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setHasRedirected(false);
+      return;
+    }
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const sessionOrgSelected =
+      sessionStorage.getItem("isOrgSelected") === "true";
+
+    if ((isOrgSelected || sessionOrgSelected) && !hasRedirected) {
+      setHasRedirected(true);
+      handOffToFullApp();
+    }
+  }, [isAuthenticated, isOrgSelected, hasRedirected]);
 
   const handleLogout = () => {
     logout();
   };
 
   const handleDashboardClick = () => {
-    navigate("/flows");
+    handOffToFullApp();
   };
   return (
     <div className="h-screen overflow-y-auto bg-[#0f1217] text-white">
