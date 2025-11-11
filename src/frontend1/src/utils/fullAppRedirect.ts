@@ -147,9 +147,5 @@ export const handOffToFullApp = (overridePath?: string) => {
     ? target
     : buildAbsoluteUrl(target, window.location.origin);
 
-  if (absoluteTarget === window.location.href) {
-    return;
-  }
-
   window.location.replace(target);
 };
