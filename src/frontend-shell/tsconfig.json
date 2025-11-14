@@ -1,0 +1,11 @@
+{
+  "extends": "../frontend/tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["../frontend/src/*"],
+      "@queries/*": ["../frontend/src/controllers/API/queries/*"]
+    }
+  },
+  "include": ["src"]
+}
