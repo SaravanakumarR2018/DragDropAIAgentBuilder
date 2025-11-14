@@ -52,20 +52,33 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 COPY ./src /app/src
 
+RUN mkdir -p /app/static
+
 ARG VITE_AUTO_LOGIN=true
 ENV VITE_AUTO_LOGIN=$VITE_AUTO_LOGIN
-    
-COPY src/frontend /tmp/src/frontend
-WORKDIR /tmp/src/frontend
-
 ARG VITE_CLERK_AUTH_ENABLED=false
 ARG VITE_CLERK_PUBLISHABLE_KEY=""
 ENV VITE_CLERK_AUTH_ENABLED=$VITE_CLERK_AUTH_ENABLED
 ENV VITE_CLERK_PUBLISHABLE_KEY=$VITE_CLERK_PUBLISHABLE_KEY
 
+COPY src/frontend-shell /tmp/src/frontend-shell
+WORKDIR /tmp/src/frontend-shell
+
 RUN --mount=type=cache,target=/root/.npm \
     npm ci \
     && ESBUILD_BINARY_PATH="" NODE_OPTIONS="--max-old-space-size=12288" JOBS=1 npm run build \
+    && mkdir -p /app/static/frontend-shell \
+    && cp -r build/. /app/static/frontend-shell/ \
+    && rm -rf /tmp/src/frontend-shell
+
+COPY src/frontend /tmp/src/frontend
+WORKDIR /tmp/src/frontend
+
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci \
+    && ESBUILD_BINARY_PATH="" NODE_OPTIONS="--max-old-space-size=12288" JOBS=1 npm run build \
+    && mkdir -p /app/static/frontend-app \
+    && cp -r build/. /app/static/frontend-app/ \
     && cp -r build /app/src/backend/langflow/frontend \
     && rm -rf /tmp/src/frontend
 
@@ -83,7 +96,7 @@ FROM python:3.12.3-slim AS runtime
 
 RUN apt-get update \
     && apt-get upgrade -y \
-    && apt-get install -y curl git libpq5 gnupg \
+    && apt-get install -y curl git libpq5 gnupg nginx supervisor \
     && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
     && apt-get install -y nodejs \
     && apt-get clean \
@@ -91,6 +104,17 @@ RUN apt-get update \
     && useradd user -u 1000 -g 0 --no-create-home --home-dir /app/data
 
 COPY --from=builder --chown=1000 /app/.venv /app/.venv
+
+RUN mkdir -p /app/docker
+
+COPY --from=builder --chown=1000 /app/static /app/static
+COPY --from=builder --chown=1000 /app/src/backend/langflow/frontend /app/src/backend/langflow/frontend
+COPY docker/nginx/nginx.conf /etc/nginx/nginx.conf
+COPY docker/nginx/multi-frontend.conf /etc/nginx/conf.d/multi-frontend.conf
+COPY docker/supervisord.conf /app/docker/supervisord.conf
+
+RUN rm -f /etc/nginx/conf.d/default.conf \
+    && chown -R 1000:0 /app/docker /app/static
 
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
@@ -107,5 +131,5 @@ WORKDIR /app
 ENV LANGFLOW_HOST=0.0.0.0
 ENV LANGFLOW_PORT=7860
 
-CMD ["langflow", "run"]
+CMD ["/usr/bin/supervisord", "-c", "/app/docker/supervisord.conf"]
 
