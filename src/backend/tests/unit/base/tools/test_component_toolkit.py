@@ -1,4 +1,3 @@
-import os
 import sqlite3
 from pathlib import Path
 
@@ -11,6 +10,93 @@ from lfx.components.openai.openai_chat_model import OpenAIModelComponent
 from lfx.components.tools.calculator import CalculatorToolComponent
 from lfx.graph.graph.base import Graph
 from pydantic import BaseModel
+
+from tests.api_keys import get_openai_api_key
+
+
+@pytest.fixture
+def test_db():
+    """Fixture that creates a temporary SQLite database for testing."""
+    test_data_dir = Path(__file__).parent.parent.parent.parent / "data"
+    db_path = test_data_dir / "test.db"
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    # Create students table
+    cursor.execute("""
+    CREATE TABLE students (
+        id INTEGER PRIMARY KEY,
+        first_name TEXT NOT NULL,
+        last_name TEXT NOT NULL,
+        age INTEGER,
+        gpa REAL,
+        major TEXT
+    )
+    """)
+
+    # Create courses table
+    cursor.execute("""
+    CREATE TABLE courses (
+        id INTEGER PRIMARY KEY,
+        course_name TEXT NOT NULL,
+        instructor TEXT,
+        credits INTEGER
+    )
+    """)
+
+    # Create enrollment junction table
+    cursor.execute("""
+    CREATE TABLE enrollments (
+        student_id INTEGER,
+        course_id INTEGER,
+        grade TEXT,
+        PRIMARY KEY (student_id, course_id),
+        FOREIGN KEY (student_id) REFERENCES students (id),
+        FOREIGN KEY (course_id) REFERENCES courses (id)
+    )
+    """)
+
+    # Insert sample student data
+    students = [
+        (1, "John", "Smith", 20, 3.5, "Computer Science"),
+        (2, "Emma", "Johnson", 21, 3.8, "Mathematics"),
+        (3, "Michael", "Williams", 19, 3.2, "Physics"),
+        (4, "Olivia", "Brown", 22, 3.9, "Biology"),
+        (5, "James", "Davis", 20, 3.1, "Chemistry"),
+    ]
+
+    cursor.executemany("INSERT INTO students VALUES (?, ?, ?, ?, ?, ?)", students)
+
+    # Insert sample course data
+    courses = [
+        (101, "Introduction to Programming", "Dr. Jones", 3),
+        (102, "Calculus I", "Dr. Smith", 4),
+        (103, "Physics 101", "Dr. Brown", 4),
+        (104, "Biology Fundamentals", "Dr. Wilson", 3),
+        (105, "Chemistry Basics", "Dr. Miller", 3),
+    ]
+
+    cursor.executemany("INSERT INTO courses VALUES (?, ?, ?, ?)", courses)
+
+    # Insert sample enrollment data
+    enrollments = [
+        (1, 101, "A"),
+        (1, 102, "B+"),
+        (2, 102, "A"),
+        (2, 103, "A-"),
+        (3, 103, "B"),
+        (3, 105, "C+"),
+        (4, 104, "A"),
+        (5, 105, "B+"),
+    ]
+
+    cursor.executemany("INSERT INTO enrollments VALUES (?, ?, ?)", enrollments)
+
+    # Commit changes and close connection
+    conn.commit()
+    conn.close()
+    yield str(db_path)
+
+    Path(db_path).unlink()
 
 
 @pytest.fixture
@@ -126,7 +212,7 @@ def test_component_tool():
 async def test_component_tool_with_api_key():
     chat_output = ChatOutput()
     openai_llm = OpenAIModelComponent()
-    openai_llm.set(api_key=os.environ["OPENAI_API_KEY"])
+    openai_llm.set(api_key=get_openai_api_key())
     tool_calling_agent = ToolCallingAgentComponent()
     tools = await chat_output.to_toolkit()
     tool_calling_agent.set(
@@ -150,7 +236,7 @@ async def test_sql_component_to_toolkit(test_db):
     sql_component.set(database_url=f"sqlite:///{test_db}")
     tool = await sql_component.to_toolkit()
     openai_llm = OpenAIModelComponent()
-    openai_llm.set(api_key=os.environ["OPENAI_API_KEY"])
+    openai_llm.set(api_key=get_openai_api_key())
     tool_calling_agent = ToolCallingAgentComponent()
 
     tool_calling_agent.set(

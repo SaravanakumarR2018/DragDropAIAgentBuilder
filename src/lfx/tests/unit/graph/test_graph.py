@@ -2,7 +2,10 @@ import copy
 import json
 
 import pytest
+<<<<<<< HEAD
 
+=======
+>>>>>>> upstream/main
 from lfx.graph import Graph
 from lfx.graph.graph.utils import (
     find_last_node,

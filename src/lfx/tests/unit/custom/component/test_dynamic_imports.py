@@ -12,7 +12,10 @@ This module tests the new langchain-style dynamic import system to ensure:
 from unittest.mock import patch
 
 import pytest
+<<<<<<< HEAD
 
+=======
+>>>>>>> upstream/main
 from lfx.components._importing import import_mod
 
 

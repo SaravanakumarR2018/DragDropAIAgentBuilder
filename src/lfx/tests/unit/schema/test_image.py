@@ -2,8 +2,11 @@ import tempfile
 
 import aiofiles
 import pytest
+<<<<<<< HEAD
 from PIL import Image as PILImage
 
+=======
+>>>>>>> upstream/main
 from lfx.schema.image import (
     get_file_paths,
     get_files,

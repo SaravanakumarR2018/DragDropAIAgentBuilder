@@ -27,7 +27,7 @@ async def get_or_create_super_user(session: AsyncSession, username, password, is
     from langflow.services.database.models.user.model import User
 
     stmt = select(User).where(User.username == username)
-    result = await session.exec(stmt)    
+    result = await session.exec(stmt)
     user = result.first()
 
     if user and user.is_superuser:

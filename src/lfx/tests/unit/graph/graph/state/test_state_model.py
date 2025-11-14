@@ -1,4 +1,12 @@
 import pytest
+<<<<<<< HEAD
+=======
+from lfx.components.input_output import ChatInput, ChatOutput
+from lfx.graph import Graph
+from lfx.graph.graph.constants import Finish
+from lfx.graph.state.model import create_state_model
+from lfx.template.field.base import UNDEFINED
+>>>>>>> upstream/main
 from pydantic import Field
 
 from lfx.components.input_output import ChatInput, ChatOutput

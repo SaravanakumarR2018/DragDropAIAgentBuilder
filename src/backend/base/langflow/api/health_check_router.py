@@ -5,6 +5,7 @@ from lfx.log.logger import logger
 from pydantic import BaseModel
 from sqlmodel import select
 
+from langflow.api.utils import DbSession
 from langflow.services.database.models.flow.model import Flow
 from langflow.services.deps import get_chat_service
 from langflow.services.deps_no_org import DbNoOrgSession

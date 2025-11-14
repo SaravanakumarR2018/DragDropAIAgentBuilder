@@ -2,10 +2,7 @@ import { customGetHostProtocol } from "@/customization/utils/custom-get-host-pro
 import {
   getAllChatInputNodeIds,
   getAllFileNodeIds,
-  getChatInputNodeId,
-  getFileNodeId,
   getNonFileTypeTweaks,
-  hasChatInputFiles,
   hasFileTweaks,
 } from "./detect-file-tweaks";
 
@@ -48,7 +45,8 @@ export function getNewPythonApiCode({
 import os
 import uuid
 
-${authSection}url = "${apiUrl}"  # The complete API endpoint URL for this flow
+${authSection}
+url = "${apiUrl}"  # The complete API endpoint URL for this flow
 
 # Request payload configuration
 payload = ${payloadString}

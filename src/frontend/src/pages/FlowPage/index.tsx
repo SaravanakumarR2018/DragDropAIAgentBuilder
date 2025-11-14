@@ -18,7 +18,6 @@ import {
   FlowSidebarComponent,
 } from "./components/flowSidebarComponent";
 import Page from "./components/PageComponent";
-import { FlowSidebarComponent } from "./components/flowSidebarComponent";
 import { WorkspaceLoadingPage } from "../WorkspaceLoadingPage";
 import { clearMutateTemplateDebounce } from "@/CustomNodes/helpers/mutate-template"; 
 

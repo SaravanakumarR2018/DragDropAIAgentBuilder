@@ -7,7 +7,10 @@ which is responsible for processing and managing parameters in vertices.
 from unittest.mock import Mock
 
 import pytest
+<<<<<<< HEAD
 
+=======
+>>>>>>> upstream/main
 from lfx.graph.edge.base import Edge
 from lfx.graph.vertex.base import ParameterHandler, Vertex
 from lfx.services.storage.service import StorageService

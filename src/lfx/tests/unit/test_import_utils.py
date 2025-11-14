@@ -6,7 +6,10 @@ Tests the core import_mod function used throughout the dynamic import system.
 from unittest.mock import patch
 
 import pytest
+<<<<<<< HEAD
 
+=======
+>>>>>>> upstream/main
 from lfx.components._importing import import_mod
 
 

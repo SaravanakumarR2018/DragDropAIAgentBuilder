@@ -2,7 +2,10 @@ import copy
 
 import pytest
 from langchain_core.documents import Document
+<<<<<<< HEAD
 
+=======
+>>>>>>> upstream/main
 from lfx.schema import Data
 
 
