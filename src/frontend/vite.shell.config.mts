@@ -2,7 +2,6 @@ import react from "@vitejs/plugin-react-swc";
 import * as dotenv from "dotenv";
 import path from "path";
 import { defineConfig, loadEnv } from "vite";
-import svgr from "vite-plugin-svgr";
 import tsconfigPaths from "vite-tsconfig-paths";
 import {
   API_ROUTES,
@@ -10,6 +9,8 @@ import {
   PORT,
   PROXY_TARGET,
 } from "./src/customization/config-constants";
+
+const shellRoot = path.resolve(__dirname, "shell");
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
@@ -22,36 +23,41 @@ export default defineConfig(({ mode }) => {
 
   const apiRoutes = API_ROUTES || ["^/api/v1/", "^/api/v2/", "/health"];
 
-  const target =
-    env.VITE_PROXY_TARGET || PROXY_TARGET || "http://localhost:7860";
+  const target = env.VITE_PROXY_TARGET || PROXY_TARGET || "http://localhost:7860";
 
   const port = Number(env.VITE_PORT) || PORT || 3000;
 
   const proxyTargets = apiRoutes.reduce((proxyObj, route) => {
     proxyObj[route] = {
-      target: target,
+      target,
       changeOrigin: true,
       secure: false,
       ws: true,
     };
     return proxyObj;
-  }, {});
+  }, {} as Record<string, unknown>);
 
-  const assetsDir = "app-assets";
+  const assetsDir = "shell-assets";
 
   return {
+    root: shellRoot,
     base: BASENAME || "",
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "src"),
+      },
+    },
     build: {
-      outDir: "build",
+      outDir: path.resolve(__dirname, "build-shell"),
+      emptyOutDir: true,
       assetsDir,
       rollupOptions: {
         output: {
-          // Add hash to filenames for cache busting
           entryFileNames: `${assetsDir}/[name].[hash].js`,
           chunkFileNames: `${assetsDir}/[name].[hash].js`,
-          assetFileNames: `${assetsDir}/[name].[hash].[ext]`
-        }
-      }
+          assetFileNames: `${assetsDir}/[name].[hash].[ext]`,
+        },
+      },
     },
     define: {
       "process.env.BACKEND_URL": JSON.stringify(
@@ -68,11 +74,22 @@ export default defineConfig(({ mode }) => {
         envLangflow.LANGFLOW_MCP_COMPOSER_ENABLED ?? "true",
       ),
     },
-    plugins: [react(), svgr(), tsconfigPaths()],
+    plugins: [
+      react(),
+      tsconfigPaths({
+        projects: [
+          path.resolve(__dirname, "tsconfig.json"),
+          path.resolve(shellRoot, "tsconfig.json"),
+        ],
+      }),
+    ],
     server: {
-      port: port,
+      port,
       proxy: {
         ...proxyTargets,
+      },
+      fs: {
+        allow: [shellRoot, path.resolve(__dirname, "src")],
       },
     },
   };

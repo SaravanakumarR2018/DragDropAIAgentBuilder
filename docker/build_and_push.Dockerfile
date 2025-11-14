@@ -66,7 +66,13 @@ ENV VITE_CLERK_PUBLISHABLE_KEY=$VITE_CLERK_PUBLISHABLE_KEY
 RUN --mount=type=cache,target=/root/.npm \
     npm ci \
     && ESBUILD_BINARY_PATH="" NODE_OPTIONS="--max-old-space-size=12288" JOBS=1 npm run build \
-    && cp -r build /app/src/backend/langflow/frontend \
+    && ESBUILD_BINARY_PATH="" NODE_OPTIONS="--max-old-space-size=12288" JOBS=1 npm run build -- --config ./vite.shell.config.mts \
+    && mkdir -p /app/static/frontend-app \
+    && cp -r build/. /app/static/frontend-app/ \
+    && mkdir -p /app/static/frontend-shell \
+    && cp -r build-shell/. /app/static/frontend-shell/ \
+    && cp -r build/. /app/src/backend/langflow/frontend \
+    && rm -rf build build-shell \
     && rm -rf /tmp/src/frontend
 
 WORKDIR /app
@@ -83,14 +89,19 @@ FROM python:3.12.3-slim AS runtime
 
 RUN apt-get update \
     && apt-get upgrade -y \
-    && apt-get install -y curl git libpq5 gnupg \
+    && apt-get install -y curl git libpq5 gnupg nginx \
     && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
     && apt-get install -y nodejs \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && useradd user -u 1000 -g 0 --no-create-home --home-dir /app/data
 
+RUN rm -rf /etc/nginx/conf.d/* /etc/nginx/sites-enabled/*
+
 COPY --from=builder --chown=1000 /app/.venv /app/.venv
+COPY --from=builder --chown=1000 /app/static /app/static
+COPY docker/nginx/multi-frontend.conf /etc/nginx/nginx.conf
+COPY --chmod=0755 --chown=1000 docker/runtime/start-services.sh /app/start-services.sh
 
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
@@ -105,7 +116,7 @@ USER user
 WORKDIR /app
 
 ENV LANGFLOW_HOST=0.0.0.0
-ENV LANGFLOW_PORT=7860
+ENV LANGFLOW_PORT=7861
 
-CMD ["langflow", "run"]
+CMD ["/app/start-services.sh"]
 
