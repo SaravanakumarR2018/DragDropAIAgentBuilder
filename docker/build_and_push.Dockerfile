@@ -55,18 +55,33 @@ COPY ./src /app/src
 ARG VITE_AUTO_LOGIN=true
 ENV VITE_AUTO_LOGIN=$VITE_AUTO_LOGIN
     
+RUN mkdir -p /app/static
+
+COPY src/frontend-shell /tmp/src/frontend-shell
 COPY src/frontend /tmp/src/frontend
-WORKDIR /tmp/src/frontend
 
 ARG VITE_CLERK_AUTH_ENABLED=false
 ARG VITE_CLERK_PUBLISHABLE_KEY=""
 ENV VITE_CLERK_AUTH_ENABLED=$VITE_CLERK_AUTH_ENABLED
 ENV VITE_CLERK_PUBLISHABLE_KEY=$VITE_CLERK_PUBLISHABLE_KEY
 
+WORKDIR /tmp/src/frontend-shell
+
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci \
+    && ESBUILD_BINARY_PATH="" NODE_OPTIONS="--max-old-space-size=12288" JOBS=1 npm run build \
+    && mkdir -p /app/static/frontend-shell \
+    && cp -r dist/. /app/static/frontend-shell/ \
+    && rm -rf /tmp/src/frontend-shell
+
+WORKDIR /tmp/src/frontend
+
 RUN --mount=type=cache,target=/root/.npm \
     npm ci \
     && ESBUILD_BINARY_PATH="" NODE_OPTIONS="--max-old-space-size=12288" JOBS=1 npm run build \
     && cp -r build /app/src/backend/langflow/frontend \
+    && mkdir -p /app/static/frontend-app \
+    && cp -r build/. /app/static/frontend-app/ \
     && rm -rf /tmp/src/frontend
 
 WORKDIR /app
@@ -85,12 +100,15 @@ RUN apt-get update \
     && apt-get upgrade -y \
     && apt-get install -y curl git libpq5 gnupg \
     && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-    && apt-get install -y nodejs \
+    && apt-get install -y nodejs nginx \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && useradd user -u 1000 -g 0 --no-create-home --home-dir /app/data
 
 COPY --from=builder --chown=1000 /app/.venv /app/.venv
+COPY --from=builder --chown=1000 /app/static /app/static
+COPY --chown=1000 docker/nginx /app/etc/nginx
+COPY --chown=1000 scripts/start-with-nginx.sh /app/scripts/start-with-nginx.sh
 
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
@@ -101,11 +119,13 @@ LABEL org.opencontainers.image.licenses=MIT
 LABEL org.opencontainers.image.url=https://github.com/langflow-ai/langflow
 LABEL org.opencontainers.image.source=https://github.com/langflow-ai/langflow
 
+RUN chmod +x /app/scripts/start-with-nginx.sh
+
 USER user
 WORKDIR /app
 
 ENV LANGFLOW_HOST=0.0.0.0
-ENV LANGFLOW_PORT=7860
+ENV LANGFLOW_PORT=7861
 
-CMD ["langflow", "run"]
+CMD ["/app/scripts/start-with-nginx.sh"]
 
