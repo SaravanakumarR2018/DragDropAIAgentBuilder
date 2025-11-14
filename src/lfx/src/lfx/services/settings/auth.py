@@ -39,6 +39,19 @@ class AuthSettings(BaseSettings):
     """If True, the application will skip authentication when AUTO_LOGIN is enabled.
     This will be removed in v2.0"""
 
+    AUTO_LOGIN: bool = Field(
+        default=True,  # TODO: Set to False in v2.0
+        description=(
+            "Enable automatic login with default credentials. "
+            "SECURITY WARNING: This bypasses authentication and should only be used in development environments. "
+            "Set to False in production. This will default to False in v2.0."
+        ),
+    )
+    """If True, the application will attempt to log in automatically as a super user."""
+    skip_auth_auto_login: bool = False
+    """If True, the application will skip authentication when AUTO_LOGIN is enabled.
+    This will be removed in v2.0"""
+
     WEBHOOK_AUTH_ENABLE: bool = False
     """If True, webhook endpoints will require API key authentication.
     If False, webhooks run as flow owner without authentication."""

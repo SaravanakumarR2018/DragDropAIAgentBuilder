@@ -45,7 +45,11 @@ def test_dotdict_with_complex_structure():
     dd = dotdict(sample_input)
 
     # Test accessing various fields
+<<<<<<< HEAD
     assert dd._input_type == "MultilineInput"
+=======
+    assert dd["_input_type"] == "MultilineInput"
+>>>>>>> upstream/main
     assert dd.advanced is False
     assert dd.display_name == "Chat Input - Text"
     assert dd.input_types == ["Message"]

@@ -2,7 +2,10 @@ import pickle
 from typing import TYPE_CHECKING
 
 import pytest
+<<<<<<< HEAD
 
+=======
+>>>>>>> upstream/main
 from lfx.graph.graph.runnable_vertices_manager import RunnableVerticesManager
 
 if TYPE_CHECKING:

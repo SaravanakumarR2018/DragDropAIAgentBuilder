@@ -5,7 +5,10 @@ import json
 from unittest.mock import MagicMock
 
 import pytest
+<<<<<<< HEAD
 
+=======
+>>>>>>> upstream/main
 from lfx.events.event_manager import (
     EventManager,
     create_default_event_manager,

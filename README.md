@@ -3,7 +3,6 @@
 [Drag and Drop AI Agent Builder](https://visualaiagentsbuilder.org) is a powerful tool for building and deploying AI-powered agents and workflows. It provides developers with both a visual authoring experience and a built-in API server that turns every agent into an API endpoint that can be integrated into applications built on any framework or stack. Langflow comes with batteries included and supports all major LLMs, vector databases and a growing library of AI tools.
 ![Langflow logo](./docs/static/img/langflow-logo-color-black-solid.svg)
 
-
 [![Release Notes](https://img.shields.io/github/release/langflow-ai/langflow?style=flat-square)](https://github.com/langflow-ai/langflow/releases)
 [![PyPI - License](https://img.shields.io/badge/license-MIT-orange)](https://opensource.org/licenses/MIT)
 [![PyPI - Downloads](https://img.shields.io/pypi/dm/langflow?style=flat-square)](https://pypistats.org/packages/langflow)
@@ -26,7 +25,7 @@
 
 ## ✨ Highlight features
 
-- **Visual builder interface** to quickly get started and iterate .
+- **Visual builder interface** to quickly get started and iterate.
 - **Source code access** lets you customize any component using Python.
 - **Interactive playground** to immediately test and refine your flows with step-by-step control.
 - **Multi-agent orchestration** with conversation management and retrieval.
@@ -37,27 +36,40 @@
 
 ## ⚡️ Quickstart
 
-Langflow requires [Python 3.10 to 3.13](https://www.python.org/downloads/release/python-3100/) and [uv](https://docs.astral.sh/uv/getting-started/installation/).
+### Install locally (recommended)
 
-1. To install Langflow, run:
+Requires Python 3.10–3.13 and [uv](https://docs.astral.sh/uv/getting-started/installation/) (recommended package manager).
+
+#### Install
 
 ```shell
 uv pip install langflow -U
 ```
 
-2. To run Langflow, run:
+Installs the latest Langflow package.
+
+#### Run
 
 ```shell
 uv run langflow run
 ```
 
-3. Go to the default Langflow URL at `http://127.0.0.1:7860`.
+Starts the Langflow server at http://127.0.0.1:7860.
 
-For more information about installing Langflow, including Docker and Desktop options, see [Install Langflow](https://docs.langflow.org/get-started-installation).
+That's it! You're ready to build with Langflow 🎉
+
+### Other install options
+
+- [Docker](https://docs.langflow.org/deployment-docker)
+- [Desktop app](https://docs.langflow.org/get-started-installation#install-and-run-langflow-desktop)
+
+### Install from repo
+
+If you're contributing or running from source, see [DEVELOPMENT.md](./DEVELOPMENT.md) for setup instructions.
 
 ## 📦 Deployment
 
-Langflow is completely open source and you can deploy it to all major deployment clouds. To learn how to use Docker to deploy Langflow, see the [Docker deployment guide](https://docs.langflow.org/deployment-docker).
+Langflow is completely open source, and you can deploy it to all major clouds. To learn how to use Docker to deploy Langflow, see the [Docker deployment guide](https://docs.langflow.org/deployment-docker).
 
 ## ⭐ Stay up-to-date
 
@@ -76,4 +88,3 @@ We welcome contributions from developers of all levels. If you'd like to contrib
 ## ❤️ Contributors
 
 [![langflow contributors](https://contrib.rocks/image?repo=langflow-ai/langflow)](https://github.com/langflow-ai/langflow/graphs/contributors)
-

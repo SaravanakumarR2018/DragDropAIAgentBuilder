@@ -3,7 +3,10 @@
 from unittest.mock import MagicMock
 
 import pytest
+<<<<<<< HEAD
 
+=======
+>>>>>>> upstream/main
 from lfx.graph.vertex.param_handler import ParameterHandler
 from lfx.schema.table import Column
 
@@ -93,7 +96,11 @@ class TestParameterHandlerTableLoadFromDb:
         # Recreate handler with updated template
         self.handler = ParameterHandler(self.mock_vertex, storage_service=None)
 
+<<<<<<< HEAD
         table_data = [{"api_key": "MY_API_KEY", "timeout": 30}]
+=======
+        table_data = [{"api_key": "MY_API_KEY", "timeout": 30}]  # pragma: allowlist secret
+>>>>>>> upstream/main
         params = {}
 
         # Call the method
