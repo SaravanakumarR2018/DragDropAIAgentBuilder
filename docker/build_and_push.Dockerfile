@@ -98,7 +98,7 @@ COPY --from=builder --chown=1000 /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
 
 COPY ${FRONTEND2_DIR}/ /usr/share/nginx/frontend2/
-COPY deploy/nginx-extra.conf /etc/nginx/conf.d/frontend2.conf
+COPY deploy/nginx-extra.conf /etc/nginx/conf.d/frontend2.conf.template
 COPY scripts/start_with_nginx.sh /app/scripts/start_with_nginx.sh
 
 RUN chmod +x /app/scripts/start_with_nginx.sh \
@@ -113,6 +113,7 @@ WORKDIR /app
 
 ENV LANGFLOW_HOST=0.0.0.0
 ENV LANGFLOW_PORT=7860
+ENV LANGFLOW_BACKEND_PORT=7861
 
 CMD ["/app/scripts/start_with_nginx.sh"]
 

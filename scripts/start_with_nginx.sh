@@ -2,9 +2,20 @@
 set -e
 
 BACKEND_HOST="${LANGFLOW_HOST:-0.0.0.0}"
-BACKEND_PORT="${LANGFLOW_PORT:-7860}"
+PUBLIC_PORT="${LANGFLOW_PORT:-7860}"
+BACKEND_PORT="${LANGFLOW_BACKEND_PORT:-7861}"
 
-runuser -u user -- langflow run --host "$BACKEND_HOST" --port "$BACKEND_PORT" &
+CONFIG_TEMPLATE="/etc/nginx/conf.d/frontend2.conf.template"
+CONFIG_PATH="/etc/nginx/conf.d/frontend2.conf"
+
+if [ -f "$CONFIG_TEMPLATE" ]; then
+  sed \
+    -e "s/{{NGINX_PORT}}/${PUBLIC_PORT}/g" \
+    -e "s/{{BACKEND_PORT}}/${BACKEND_PORT}/g" \
+    "$CONFIG_TEMPLATE" > "$CONFIG_PATH"
+fi
+
+LANGFLOW_PORT="$BACKEND_PORT" runuser -u user -- langflow run --host "$BACKEND_HOST" --port "$BACKEND_PORT" &
 BACKEND_PID=$!
 
 graceful_shutdown() {
