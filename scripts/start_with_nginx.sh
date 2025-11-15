@@ -1,6 +1,8 @@
 #!/bin/sh
 set -eu
 
+SCRIPT_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
+
 BACKEND_HOST="${LANGFLOW_HOST:-0.0.0.0}"
 PUBLIC_PORT="${LANGFLOW_PORT:-7860}"
 BACKEND_PORT="${LANGFLOW_BACKEND_PORT:-7861}"
@@ -20,39 +22,16 @@ if [ -f "$CONFIG_TEMPLATE" ]; then
     "$CONFIG_TEMPLATE" > "$CONFIG_PATH"
 fi
 
-cleanup() {
-  if [ -n "${BACKEND_PID:-}" ] && kill -0 "$BACKEND_PID" 2>/dev/null; then
-    kill "$BACKEND_PID"
-  fi
-  if [ -n "${NGINX_PID:-}" ] && kill -0 "$NGINX_PID" 2>/dev/null; then
-    kill "$NGINX_PID"
-  fi
-}
+SUPERVISORD_CONF="${SCRIPT_DIR}/langflow_supervisord.conf"
 
-trap 'cleanup' INT TERM
+if [ ! -f "$SUPERVISORD_CONF" ]; then
+  echo "Supervisor configuration not found at $SUPERVISORD_CONF" >&2
+  exit 1
+fi
 
-langflow run --host "$BACKEND_HOST" --port "$BACKEND_PORT" --log-level info &
-BACKEND_PID=$!
+if ! command -v supervisord >/dev/null 2>&1; then
+  echo "supervisord is not installed or not available in PATH" >&2
+  exit 1
+fi
 
-/usr/sbin/nginx -g "daemon off;" &
-NGINX_PID=$!
-
-while :; do
-  if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
-    wait "$BACKEND_PID"
-    EXIT_CODE=$?
-    cleanup
-    wait "$NGINX_PID" 2>/dev/null || true
-    exit "$EXIT_CODE"
-  fi
-
-  if ! kill -0 "$NGINX_PID" 2>/dev/null; then
-    wait "$NGINX_PID"
-    EXIT_CODE=$?
-    cleanup
-    wait "$BACKEND_PID" 2>/dev/null || true
-    exit "$EXIT_CODE"
-  fi
-
-  sleep 1
-done
+exec supervisord -c "$SUPERVISORD_CONF"
