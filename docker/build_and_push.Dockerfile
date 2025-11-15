@@ -58,6 +58,7 @@ ENV VITE_AUTO_LOGIN=$VITE_AUTO_LOGIN
 COPY src/frontend /tmp/src/frontend
 WORKDIR /tmp/src/frontend
 
+# pragma: allowlist secret
 ARG VITE_CLERK_AUTH_ENABLED=false
 ARG VITE_CLERK_PUBLISHABLE_KEY=""
 ENV VITE_CLERK_AUTH_ENABLED=$VITE_CLERK_AUTH_ENABLED
@@ -81,9 +82,11 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 ################################
 FROM python:3.12.3-slim AS runtime
 
+ARG FRONTEND2_DIR=frontend2-static
+
 RUN apt-get update \
     && apt-get upgrade -y \
-    && apt-get install -y curl git libpq5 gnupg \
+    && apt-get install -y curl git libpq5 gnupg nginx \
     && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
     && apt-get install -y nodejs \
     && apt-get clean \
@@ -95,17 +98,23 @@ COPY --from=builder --chown=1000 /app/.venv /app/.venv
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
 
+COPY ${FRONTEND2_DIR}/ /usr/share/nginx/frontend2/
+COPY deploy/nginx-extra.conf /etc/nginx/conf.d/frontend2.conf.template
+COPY scripts/start_with_nginx.sh /app/scripts/start_with_nginx.sh
+
+RUN chmod +x /app/scripts/start_with_nginx.sh \
+    && rm -f /etc/nginx/conf.d/default.conf
+
 LABEL org.opencontainers.image.title=langflow
 LABEL org.opencontainers.image.authors=['Langflow']
 LABEL org.opencontainers.image.licenses=MIT
 LABEL org.opencontainers.image.url=https://github.com/langflow-ai/langflow
 LABEL org.opencontainers.image.source=https://github.com/langflow-ai/langflow
-
-USER user
 WORKDIR /app
 
 ENV LANGFLOW_HOST=0.0.0.0
 ENV LANGFLOW_PORT=7860
+ENV LANGFLOW_BACKEND_PORT=7861
 
-CMD ["langflow", "run"]
+CMD ["/app/scripts/start_with_nginx.sh"]
 

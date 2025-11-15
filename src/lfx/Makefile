@@ -1,8 +1,9 @@
 .PHONY: all init format lint build test coverage clean help install dev
 
 # Configurations
+# Allow overriding the container runtime from environment/CLI (default to podman)
 VERSION=$(shell grep "^version" pyproject.toml | sed 's/.*\"\(.*\)\"$$/\1/')
-DOCKER=podman
+DOCKER ?= podman
 GREEN=\033[0;32m
 RED=\033[0;31m
 NC=\033[0m # No Color
