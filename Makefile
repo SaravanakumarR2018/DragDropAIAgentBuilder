@@ -7,6 +7,7 @@ DOCKERFILE=docker/build_and_push.Dockerfile
 DOCKERFILE_BACKEND=docker/build_and_push_backend.Dockerfile
 DOCKERFILE_FRONTEND=docker/frontend/build_and_push_frontend.Dockerfile
 DOCKER_COMPOSE=docker_example/docker-compose.yml
+FRONTEND2_DIR=frontend2-static
 
 VITE_CLERK_AUTH_ENABLED ?= false
 VITE_CLERK_PUBLISHABLE_KEY ?=
@@ -339,6 +340,7 @@ dockerfile_build:
 	@command -v $(DOCKER) >/dev/null 2>&1 || { echo "Error: $(DOCKER) is not installed. Please install $(DOCKER), or run 'make docker_build DOCKER=podman' (or DOCKER=docker) if you have an alternative installed."; exit 1; }
 	@$(DOCKER) build --rm \
 		-f ${DOCKERFILE} \
+		--build-arg FRONTEND2_DIR=$(FRONTEND2_DIR) \
 		--build-arg VITE_CLERK_AUTH_ENABLED=${VITE_CLERK_AUTH_ENABLED} \
 		--build-arg VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY} \
 		--build-arg VITE_AUTO_LOGIN=$(VITE_AUTO_LOGIN) \

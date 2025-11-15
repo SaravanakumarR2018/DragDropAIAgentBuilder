@@ -81,9 +81,11 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 ################################
 FROM python:3.12.3-slim AS runtime
 
+ARG FRONTEND2_DIR=frontend2-static
+
 RUN apt-get update \
     && apt-get upgrade -y \
-    && apt-get install -y curl git libpq5 gnupg \
+    && apt-get install -y curl git libpq5 gnupg nginx \
     && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
     && apt-get install -y nodejs \
     && apt-get clean \
@@ -95,17 +97,22 @@ COPY --from=builder --chown=1000 /app/.venv /app/.venv
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
 
+COPY ${FRONTEND2_DIR}/ /usr/share/nginx/frontend2/
+COPY deploy/nginx-extra.conf /etc/nginx/conf.d/frontend2.conf
+COPY scripts/start_with_nginx.sh /app/scripts/start_with_nginx.sh
+
+RUN chmod +x /app/scripts/start_with_nginx.sh \
+    && rm /etc/nginx/conf.d/default.conf
+
 LABEL org.opencontainers.image.title=langflow
 LABEL org.opencontainers.image.authors=['Langflow']
 LABEL org.opencontainers.image.licenses=MIT
 LABEL org.opencontainers.image.url=https://github.com/langflow-ai/langflow
 LABEL org.opencontainers.image.source=https://github.com/langflow-ai/langflow
-
-USER user
 WORKDIR /app
 
 ENV LANGFLOW_HOST=0.0.0.0
 ENV LANGFLOW_PORT=7860
 
-CMD ["langflow", "run"]
+CMD ["/app/scripts/start_with_nginx.sh"]
 
