@@ -31,7 +31,7 @@ cleanup() {
 
 trap 'cleanup' INT TERM
 
-/usr/sbin/runuser -u user -- langflow run --host "$BACKEND_HOST" --port "$BACKEND_PORT" --log-level info &
+langflow run --host "$BACKEND_HOST" --port "$BACKEND_PORT" --log-level info &
 BACKEND_PID=$!
 
 /usr/sbin/nginx -g "daemon off;" &

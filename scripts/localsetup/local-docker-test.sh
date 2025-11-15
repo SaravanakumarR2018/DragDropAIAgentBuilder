@@ -249,6 +249,10 @@ VITE_CLERK_AUTH_ENABLED=true
 VITE_CLERK_PUBLISHABLE_KEY="${VITE_CLERK_PUBLISHABLE_KEY:-}"
 VITE_CLERK_FRONTEND_API="${VITE_CLERK_FRONTEND_API:-}"
 
+# Default container runtime: prefer docker unless user has set DOCKER explicitly
+DOCKER="${DOCKER:-docker}"
+export DOCKER
+
 # Docker image details
 IMAGE_NAME="langflow"
 IMAGE_TAG="localbuild_$(date +%Y%m%d_%H%M%S)"
@@ -298,7 +302,7 @@ build_docker() {
     echo ""
     echo "🔨 Building Docker image with tag: ${IMAGE_NAME}:${IMAGE_TAG}"
     
-    BUILD_CMD="TAG=\"${IMAGE_NAME}:${IMAGE_TAG}\" DOCKER_BUILDKIT=1 \
+    BUILD_CMD="TAG=\"${IMAGE_NAME}:${IMAGE_TAG}\" DOCKER=${DOCKER} DOCKER_BUILDKIT=1 \
     VITE_AUTO_LOGIN=${VITE_AUTO_LOGIN} \
     VITE_CLERK_AUTH_ENABLED=${VITE_CLERK_AUTH_ENABLED} \
     VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY} \
@@ -307,6 +311,7 @@ build_docker() {
     display_command "$BUILD_CMD" "Building Docker image"
 
     TAG="${IMAGE_NAME}:${IMAGE_TAG}" \
+    DOCKER=${DOCKER} \
     DOCKER_BUILDKIT=1 \
     VITE_AUTO_LOGIN=${VITE_AUTO_LOGIN} \
     VITE_CLERK_AUTH_ENABLED=${VITE_CLERK_AUTH_ENABLED} \

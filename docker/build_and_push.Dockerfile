@@ -58,6 +58,7 @@ ENV VITE_AUTO_LOGIN=$VITE_AUTO_LOGIN
 COPY src/frontend /tmp/src/frontend
 WORKDIR /tmp/src/frontend
 
+# pragma: allowlist secret
 ARG VITE_CLERK_AUTH_ENABLED=false
 ARG VITE_CLERK_PUBLISHABLE_KEY=""
 ENV VITE_CLERK_AUTH_ENABLED=$VITE_CLERK_AUTH_ENABLED
@@ -102,7 +103,7 @@ COPY deploy/nginx-extra.conf /etc/nginx/conf.d/frontend2.conf.template
 COPY scripts/start_with_nginx.sh /app/scripts/start_with_nginx.sh
 
 RUN chmod +x /app/scripts/start_with_nginx.sh \
-    && rm /etc/nginx/conf.d/default.conf
+    && rm -f /etc/nginx/conf.d/default.conf
 
 LABEL org.opencontainers.image.title=langflow
 LABEL org.opencontainers.image.authors=['Langflow']
