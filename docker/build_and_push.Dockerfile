@@ -85,7 +85,7 @@ ARG FRONTEND2_DIR=frontend2-static
 
 RUN apt-get update \
     && apt-get upgrade -y \
-    && apt-get install -y curl git libpq5 gnupg nginx supervisor \
+    && apt-get install -y curl git libpq5 gnupg nginx \
     && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
     && apt-get install -y nodejs \
     && apt-get clean \
@@ -99,12 +99,10 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 COPY ${FRONTEND2_DIR}/ /usr/share/nginx/frontend2/
 COPY deploy/nginx-extra.conf /etc/nginx/conf.d/frontend2.conf.template
-COPY deploy/supervisord.conf /etc/supervisor/conf.d/langflow.conf
 COPY scripts/start_with_nginx.sh /app/scripts/start_with_nginx.sh
 
 RUN chmod +x /app/scripts/start_with_nginx.sh \
-    && rm /etc/nginx/conf.d/default.conf \
-    && mkdir -p /var/log/supervisor
+    && rm /etc/nginx/conf.d/default.conf
 
 LABEL org.opencontainers.image.title=langflow
 LABEL org.opencontainers.image.authors=['Langflow']
