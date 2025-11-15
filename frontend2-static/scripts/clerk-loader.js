@@ -1,33 +1,43 @@
+import {
+  CLERK_FRONTEND_API,
+  CLERK_PUBLISHABLE_KEY,
+  applyClerkConfigToWindow,
+  getClerkFrontendApi,
+  getClerkPublishableKey,
+} from "./clerk-config.js";
+
 const CLERK_SCRIPT_URL = "https://cdn.jsdelivr.net/npm/@clerk/clerk-js@latest";
-const STORAGE_KEY = "lf-clerk-publishable-key";
 
-function resolvePublishableKey() {
-  const candidates = [
-    () => document.querySelector('meta[name="clerk-publishable-key"]')?.content,
-    () => window.CLERK_PUBLISHABLE_KEY,
-    () => window.VITE_CLERK_PUBLISHABLE_KEY,
-    () => window.__CLERK_PUBLISHABLE_KEY__,
-    () => window?.__env__?.VITE_CLERK_PUBLISHABLE_KEY,
-    () => window?.__ENV__?.VITE_CLERK_PUBLISHABLE_KEY,
-    () => localStorage.getItem(STORAGE_KEY),
-  ];
-
-  for (const getter of candidates) {
-    try {
-      const value = getter();
-      if (typeof value === "string" && value.trim().length > 0) {
-        localStorage.setItem(STORAGE_KEY, value.trim());
-        return value.trim();
-      }
-    } catch (error) {
-      console.warn("[clerk-loader] Unable to read candidate key", error);
+function rememberResolvedConfig(publishableKey, frontendApi) {
+  if (typeof window === "undefined") return;
+  try {
+    if (publishableKey && publishableKey !== CLERK_PUBLISHABLE_KEY) {
+      window.localStorage.setItem("lf-clerk-publishable-key", publishableKey);
     }
+    if (frontendApi && frontendApi !== CLERK_FRONTEND_API) {
+      window.localStorage.setItem("lf-clerk-frontend-api", frontendApi);
+    }
+  } catch (error) {
+    console.warn("[clerk-loader] Unable to persist Clerk settings", error);
   }
-
-  throw new Error("Missing Clerk publishable key. Ensure it is exposed to window or meta tag.");
 }
 
-function injectScript(publishableKey) {
+function resolvePublishableKey() {
+  const publishableKey = getClerkPublishableKey();
+  if (publishableKey) {
+    return publishableKey;
+  }
+
+  throw new Error(
+    "Missing Clerk publishable key. Ensure it is configured in scripts/clerk-config.js or exposed globally.",
+  );
+}
+
+function resolveFrontendApi() {
+  return getClerkFrontendApi();
+}
+
+function injectScript(publishableKey, frontendApi) {
   return new Promise((resolve, reject) => {
     if (window.Clerk) {
       resolve();
@@ -43,6 +53,9 @@ function injectScript(publishableKey) {
     script.src = CLERK_SCRIPT_URL;
     script.async = true;
     script.setAttribute("data-clerk-publishable-key", publishableKey);
+    if (frontendApi) {
+      script.setAttribute("data-clerk-frontend-api", frontendApi);
+    }
     script.addEventListener("load", () => resolve());
     script.addEventListener("error", () => reject(new Error("Failed to load Clerk script")));
     document.head.appendChild(script);
@@ -52,14 +65,21 @@ function injectScript(publishableKey) {
 let clerkPromise = null;
 
 export async function loadClerk() {
+  applyClerkConfigToWindow();
+
   if (clerkPromise) return clerkPromise;
   clerkPromise = (async () => {
     const publishableKey = resolvePublishableKey();
-    await injectScript(publishableKey);
+    const frontendApi = resolveFrontendApi();
+    await injectScript(publishableKey, frontendApi);
     if (!window.Clerk) {
       throw new Error("Clerk failed to initialise");
     }
-    return window.Clerk.load({ publishableKey });
+    rememberResolvedConfig(publishableKey, frontendApi);
+    const loadOptions = frontendApi
+      ? { publishableKey, frontendApi }
+      : { publishableKey };
+    return window.Clerk.load(loadOptions);
   })();
   return clerkPromise;
 }
