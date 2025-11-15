@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Langflow Login</title>
+    <meta name="clerk-publishable-key" content="" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles/base.css" />
+    <link rel="stylesheet" href="./styles/auth.css" />
+    <script type="module" src="./scripts/login.js"></script>
+  </head>
+  <body>
+    <main class="auth-shell">
+      <section class="auth-card" aria-labelledby="login-title">
+        <header class="auth-header">
+          <p class="auth-eyebrow">Sign in</p>
+          <h1 class="auth-title" id="login-title">Log in to Langflow</h1>
+          <p class="auth-subtitle">
+            Use the same Clerk credentials as the primary Langflow experience. After signing
+            in you&rsquo;ll pick your organisation and sync browser storage automatically.
+          </p>
+        </header>
+        <div id="clerk-sign-in" class="auth-clerk-slot" aria-live="polite"></div>
+        <p class="auth-footer">
+          Need an account?
+          <a href="/new/landingpage/signup">Create one</a>
+        </p>
+      </section>
+    </main>
+  </body>
+</html>
