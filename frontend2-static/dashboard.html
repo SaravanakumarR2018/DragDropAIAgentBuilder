@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Langflow dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles/base.css" />
+    <link rel="stylesheet" href="./styles/dashboard.css" />
+    <script type="module" src="./scripts/dashboard.js"></script>
+  </head>
+  <body>
+    <main class="dashboard-shell">
+      <section class="dashboard-card" aria-live="polite">
+        <header class="dashboard-header">
+          <p class="dashboard-eyebrow">Step 3 · Complete</p>
+          <h1 class="dashboard-title">You&rsquo;re logged in to Langflow</h1>
+          <p class="dashboard-subtitle">
+            The same browser cookies and storage markers used by Frontend&nbsp;1 are in place,
+            so you can open the main application and continue working without logging in
+            again.
+          </p>
+        </header>
+        <dl class="dashboard-details">
+          <div>
+            <dt>Active organisation</dt>
+            <dd id="dashboard-org">—</dd>
+          </div>
+          <div>
+            <dt>Stored redirect</dt>
+            <dd id="dashboard-redirect">—</dd>
+          </div>
+        </dl>
+        <p class="dashboard-note">
+          Open a new tab at <code>/flows</code> or return to the main app using the
+          navigation above when you&rsquo;re ready.
+        </p>
+        <button type="button" class="button button--ghost" id="dashboard-logout">
+          Log out
+        </button>
+      </section>
+    </main>
+  </body>
+</html>

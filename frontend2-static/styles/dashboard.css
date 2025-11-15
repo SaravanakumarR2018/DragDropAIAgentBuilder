@@ -1,0 +1,91 @@
+body {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+}
+
+.dashboard-shell {
+  width: min(520px, 92vw);
+  margin: 4rem auto;
+}
+
+.dashboard-card {
+  background: rgba(255, 255, 255, 0.94);
+  border-radius: var(--radius-lg);
+  padding: clamp(2.5rem, 5vw, 3.5rem);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  display: grid;
+  gap: 1.75rem;
+}
+
+.dashboard-header {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.dashboard-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--brand);
+  margin: 0;
+}
+
+.dashboard-title {
+  margin: 0;
+  font-size: clamp(2rem, 4.5vw, 2.6rem);
+}
+
+.dashboard-subtitle {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.dashboard-details {
+  margin: 0;
+  display: grid;
+  gap: 1rem;
+}
+
+.dashboard-details div {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.dashboard-details dt {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(15, 23, 42, 0.55);
+}
+
+.dashboard-details dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.dashboard-note {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+#dashboard-logout {
+  justify-self: start;
+}
+
+@media (prefers-color-scheme: dark) {
+  .dashboard-card {
+    background: rgba(15, 23, 42, 0.78);
+    border-color: rgba(94, 109, 141, 0.35);
+  }
+
+  .dashboard-subtitle,
+  .dashboard-note,
+  .dashboard-details dt {
+    color: rgba(226, 232, 240, 0.78);
+  }
+}

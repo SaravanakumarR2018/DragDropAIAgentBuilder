@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Select your organisation</title>
+    <meta name="clerk-publishable-key" content="" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles/base.css" />
+    <link rel="stylesheet" href="./styles/organisation.css" />
+    <script type="module" src="./scripts/organisation.js"></script>
+  </head>
+  <body>
+    <main class="org-shell">
+      <section class="org-card" aria-labelledby="organisation-title">
+        <header class="org-header">
+          <p class="org-eyebrow">Step 2 · Organisation</p>
+          <h1 class="org-title" id="organisation-title">Choose your organisation</h1>
+          <p class="org-subtitle">
+            Pick or create a Clerk organisation. Once selected we&rsquo;ll mirror the Langflow
+            bootstrap process—creating the backend org, ensuring your user exists, and syncing
+            tokens into the usual cookies and storage entries.
+          </p>
+        </header>
+        <div id="clerk-org-list" class="org-clerk-slot" aria-live="polite"></div>
+        <aside class="org-status" aria-live="polite">
+          <h2 class="org-status__title">Bootstrap status</h2>
+          <ul class="org-status__list">
+            <li class="org-status__item" data-step="org" data-status="pending">
+              <span class="org-status__label">Create organisation</span>
+              <span class="org-status__note"></span>
+            </li>
+            <li class="org-status__item" data-step="user" data-status="pending">
+              <span class="org-status__label">Ensure Langflow user</span>
+              <span class="org-status__note"></span>
+            </li>
+            <li class="org-status__item" data-step="login" data-status="pending">
+              <span class="org-status__label">Backend login</span>
+              <span class="org-status__note"></span>
+            </li>
+            <li class="org-status__item" data-step="storage" data-status="pending">
+              <span class="org-status__label">Sync browser storage</span>
+              <span class="org-status__note"></span>
+            </li>
+          </ul>
+          <div class="org-status__message" role="status"></div>
+        </aside>
+      </section>
+    </main>
+  </body>
+</html>

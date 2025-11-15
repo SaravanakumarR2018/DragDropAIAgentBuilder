@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Create a Langflow account</title>
+    <meta name="clerk-publishable-key" content="" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles/base.css" />
+    <link rel="stylesheet" href="./styles/auth.css" />
+    <script type="module" src="./scripts/signup.js"></script>
+  </head>
+  <body>
+    <main class="auth-shell">
+      <section class="auth-card" aria-labelledby="signup-title">
+        <header class="auth-header">
+          <p class="auth-eyebrow">Get started</p>
+          <h1 class="auth-title" id="signup-title">Create your Langflow account</h1>
+          <p class="auth-subtitle">
+            Sign up with Clerk to create your profile. You&rsquo;ll be redirected to choose an
+            organisation once registration completes.
+          </p>
+        </header>
+        <div id="clerk-sign-up" class="auth-clerk-slot" aria-live="polite"></div>
+        <p class="auth-footer">
+          Already have an account?
+          <a href="/new/landingpage/login">Log in</a>
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

@@ -3,32 +3,62 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Langflow Frontend 2</title>
-    <link rel="stylesheet" href="styles.css" />
-    <script defer src="script.js"></script>
+    <title>Langflow Landing</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles/base.css" />
+    <link rel="stylesheet" href="./styles/landing.css" />
+    <script type="module" src="./scripts/boot.js"></script>
   </head>
   <body>
     <div class="page">
       <header class="hero">
-        <h1>Welcome to Langflow</h1>
-        <p class="subtitle">Experience the new Frontend 2 landing page.</p>
-        <a class="cta" href="/">Back to main application</a>
+        <div class="hero__content">
+          <p class="hero__eyebrow">Introducing the static landing</p>
+          <h1 class="hero__title">Welcome to Langflow Frontend&nbsp;2</h1>
+          <p class="hero__subtitle">
+            Explore the lightweight experience while keeping your authentication in sync
+            with the main Langflow application.
+          </p>
+          <div class="hero__actions">
+            <a class="button button--primary" href="/new/landingpage/login">Log in</a>
+            <a class="button button--ghost" href="/">Back to main application</a>
+          </div>
+        </div>
+        <div class="hero__card">
+          <h2>What&rsquo;s included</h2>
+          <ul class="hero__list">
+            <li>Clerk-powered sign in and organisation selection</li>
+            <li>Backend bootstrapping that mirrors the React app</li>
+            <li>A dashboard confirmation when you&rsquo;re signed in</li>
+          </ul>
+        </div>
       </header>
-      <section class="features">
+      <section class="feature-grid">
         <article class="feature">
-          <h2>Familiar Experience</h2>
-          <p>Enjoy a layout closely matching the original landing page.</p>
+          <h3>Same auth stores</h3>
+          <p>
+            Tokens, auto-login flags, and organisation markers update the exact cookies and
+            storage keys used by the React experience.
+          </p>
         </article>
         <article class="feature">
-          <h2>Lightweight Shell</h2>
-          <p>Built with plain HTML, CSS, and JavaScript for quick loading.</p>
+          <h3>Clerk components</h3>
+          <p>
+            Reuse Clerk&rsquo;s hosted <code>SignIn</code>, <code>SignUp</code>, and organisation
+            list components with your existing publishable key.
+          </p>
         </article>
         <article class="feature">
-          <h2>Future Ready</h2>
-          <p>Prepared for additional pages like /login or /organization.</p>
+          <h3>Lightweight footprint</h3>
+          <p>Plain HTML, CSS, and vanilla JavaScript—no bundler or framework required.</p>
         </article>
       </section>
     </div>
-    <div class="watermark">Frontend 2</div>
+    <footer class="footer">Frontend 2 preview</footer>
   </body>
 </html>
