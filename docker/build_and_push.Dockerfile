@@ -83,6 +83,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 FROM python:3.12.3-slim AS runtime
 
 ARG FRONTEND2_DIR=frontend2-static
+ARG VITE_CLERK_PUBLISHABLE_KEY=""
+ARG VITE_CLERK_FRONTEND_API=""
 
 RUN apt-get update \
     && apt-get upgrade -y \
@@ -93,12 +95,18 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && useradd user -u 1000 -g 0 --no-create-home --home-dir /app/data
 
+ENV VITE_CLERK_PUBLISHABLE_KEY=$VITE_CLERK_PUBLISHABLE_KEY
+ENV VITE_CLERK_FRONTEND_API=$VITE_CLERK_FRONTEND_API
+
 COPY --from=builder --chown=1000 /app/.venv /app/.venv
 
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
 
 COPY ${FRONTEND2_DIR}/ /usr/share/nginx/frontend2/
+COPY scripts/configure_frontend2_static.py /tmp/configure_frontend2_static.py
+RUN python /tmp/configure_frontend2_static.py --source /usr/share/nginx/frontend2 \
+    && rm /tmp/configure_frontend2_static.py
 COPY deploy/nginx-extra.conf /etc/nginx/conf.d/frontend2.conf.template
 COPY scripts/langflow_supervisord.conf /app/scripts/langflow_supervisord.conf
 COPY scripts/start_with_nginx.sh /app/scripts/start_with_nginx.sh
