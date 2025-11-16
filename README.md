@@ -59,6 +59,13 @@ For more information about installing Langflow, including Docker and Desktop opt
 
 Langflow is completely open source and you can deploy it to all major deployment clouds. To learn how to use Docker to deploy Langflow, see the [Docker deployment guide](https://docs.langflow.org/deployment-docker).
 
+### Container landing page and reverse proxy
+
+The default Docker image now starts both the Langflow API server and an nginx reverse proxy under `make docker_build`. Nginx
+terminates HTTP/WebSocket traffic on port `7860`, proxies dynamic requests to the internal Langflow service, and serves a Vite-based
+landing page at [`/new/landingpage`](http://localhost:7860/new/landingpage). This makes it easy to add lightweight marketing or onboarding
+experiences without deploying a second container.
+
 ## ⭐ Stay up-to-date
 
 Star Langflow on GitHub to be instantly notified of new releases.

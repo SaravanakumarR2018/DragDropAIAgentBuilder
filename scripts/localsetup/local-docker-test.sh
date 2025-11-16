@@ -5,6 +5,17 @@
 
 set -e
 
+# Determine which container engine to use. Default to docker but respect
+# CONTAINER_ENGINE or DOCKER if the caller specifies podman.
+CONTAINER_ENGINE="${CONTAINER_ENGINE:-${DOCKER:-docker}}"
+export CONTAINER_ENGINE
+export DOCKER="${CONTAINER_ENGINE}"
+
+# Helper so every plain `docker` call honors the selected engine.
+docker() {
+    command "${CONTAINER_ENGINE}" "$@"
+}
+
 # Change to git root directory
 echo "📂 Changing to git root directory..."
 GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
@@ -298,7 +309,7 @@ build_docker() {
     echo ""
     echo "🔨 Building Docker image with tag: ${IMAGE_NAME}:${IMAGE_TAG}"
     
-    BUILD_CMD="TAG=\"${IMAGE_NAME}:${IMAGE_TAG}\" DOCKER_BUILDKIT=1 \
+    BUILD_CMD="TAG=\"${IMAGE_NAME}:${IMAGE_TAG}\" DOCKER=${CONTAINER_ENGINE} DOCKER_BUILDKIT=1 \
     VITE_AUTO_LOGIN=${VITE_AUTO_LOGIN} \
     VITE_CLERK_AUTH_ENABLED=${VITE_CLERK_AUTH_ENABLED} \
     VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY} \
@@ -307,6 +318,7 @@ build_docker() {
     display_command "$BUILD_CMD" "Building Docker image"
 
     TAG="${IMAGE_NAME}:${IMAGE_TAG}" \
+    DOCKER=${CONTAINER_ENGINE} \
     DOCKER_BUILDKIT=1 \
     VITE_AUTO_LOGIN=${VITE_AUTO_LOGIN} \
     VITE_CLERK_AUTH_ENABLED=${VITE_CLERK_AUTH_ENABLED} \
