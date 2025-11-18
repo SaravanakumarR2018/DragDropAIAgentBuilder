@@ -94,7 +94,7 @@ FROM python:3.12.3-slim AS runtime
 
 RUN apt-get update \
     && apt-get upgrade -y \
-    && apt-get install -y curl git libpq5 gnupg nginx gettext-base \
+    && apt-get install -y curl git libpq5 gnupg nginx gettext-base supervisor \
     && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
     && apt-get install -y nodejs \
     && apt-get clean \
@@ -104,8 +104,9 @@ RUN apt-get update \
 COPY --from=builder --chown=1000 /app/.venv /app/.venv
 COPY --from=builder --chown=1000 /app/new-landingpage /app/new-landingpage
 COPY docker/nginx/nginx.conf /etc/nginx/nginx.conf.template
-COPY docker/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY docker/supervisord.conf /etc/supervisor/supervisord.conf
+COPY docker/entrypoint.sh /usr/local/bin/langflow-entrypoint.sh
+RUN chmod +x /usr/local/bin/langflow-entrypoint.sh
 
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
@@ -123,4 +124,4 @@ ENV LANGFLOW_PORT=7861
 ENV LANGFLOW_BACKEND_PORT=7861
 ENV NGINX_PORT=7860
 
-CMD ["/entrypoint.sh"]
+CMD ["/usr/local/bin/langflow-entrypoint.sh"]
