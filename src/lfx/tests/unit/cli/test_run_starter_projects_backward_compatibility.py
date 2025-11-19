@@ -10,8 +10,9 @@ This ensures backwards compatibility with existing starter projects.
 from pathlib import Path
 
 import pytest
-from lfx.__main__ import app
 from typer.testing import CliRunner
+
+from lfx.__main__ import app
 
 runner = CliRunner()
 

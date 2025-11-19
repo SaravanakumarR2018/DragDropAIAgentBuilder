@@ -236,7 +236,7 @@ class KnowledgeRetrievalComponent(Component):
             # Only proceed if we have valid document IDs
             if doc_ids:
                 # Access underlying collection to get embeddings
-                collection = chroma._collection  # noqa: SLF001
+                collection = chroma._collection
                 embeddings_result = collection.get(where={"_id": {"$in": doc_ids}}, include=["metadatas", "embeddings"])
 
                 # Create a mapping from document ID to embedding

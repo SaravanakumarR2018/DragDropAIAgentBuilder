@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from lfx.utils.ssrf_protection import (
     SSRFProtectionError,
     get_allowed_hosts,
