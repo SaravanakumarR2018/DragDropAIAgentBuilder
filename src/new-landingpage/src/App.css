@@ -6,7 +6,7 @@
   font-weight: 400;
 }
 
-body {
+body.landing-page {
   margin: 0;
   background: radial-gradient(circle at top, #1c1f3a, #05060f 70%);
   min-height: 100vh;

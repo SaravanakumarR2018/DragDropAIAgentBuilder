@@ -12,7 +12,11 @@
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
     "noEmit": true,
-    "strict": true
+    "strict": true,
+    "baseUrl": "./",
+    "paths": {
+      "@/*": ["../frontend/src/*"]
+    }
   },
   "include": ["vite.config.ts"]
 }
