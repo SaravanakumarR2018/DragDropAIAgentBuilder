@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Link, Navigate, Route, Routes } from "react-router-dom";
 import NewLandingPageLogin from "./NewLandingPageLogin";
 import "./App.css";
 
@@ -20,7 +20,10 @@ function LandingHero() {
           between Langflow and standalone marketing pages inside a single container image.
         </p>
         <div className="cta-row">
-          <a className="cta" href="https://github.com/langflow-ai/langflow" target="_blank" rel="noreferrer">
+          <Link className="cta" to="/login">
+            Log in
+          </Link>
+          <a className="secondary" href="https://github.com/langflow-ai/langflow" target="_blank" rel="noreferrer">
             Visit GitHub
           </a>
           <a className="secondary" href="https://docs.langflow.org" target="_blank" rel="noreferrer">
@@ -46,7 +49,6 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LandingHero />} />
         <Route path="/login" element={<NewLandingPageLogin />} />
-        <Route path="/new-landingpage" element={<NewLandingPageLogin />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
