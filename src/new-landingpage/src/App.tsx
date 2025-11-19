@@ -45,6 +45,7 @@ export default function App() {
     <BrowserRouter basename="/new/landingpage">
       <Routes>
         <Route path="/" element={<LandingHero />} />
+        <Route path="/login" element={<NewLandingPageLogin />} />
         <Route path="/new-landingpage" element={<NewLandingPageLogin />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
