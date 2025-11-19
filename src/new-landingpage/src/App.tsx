@@ -1,5 +1,6 @@
 import { BrowserRouter, Link, Navigate, Route, Routes } from "react-router-dom";
 import NewLandingPageLogin from "./NewLandingPageLogin";
+import OrganizationOnboarding from "./OrganizationOnboarding";
 import "./App.css";
 
 const features = [
@@ -49,6 +50,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LandingHero />} />
         <Route path="/login" element={<NewLandingPageLogin />} />
+        <Route path="/organization" element={<OrganizationOnboarding />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
