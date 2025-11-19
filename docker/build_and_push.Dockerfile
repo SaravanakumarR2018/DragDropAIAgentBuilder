@@ -68,6 +68,7 @@ RUN --mount=type=cache,target=/root/.npm \
     && ESBUILD_BINARY_PATH="" NODE_OPTIONS="--max-old-space-size=12288" JOBS=1 npm run build \
     && cp -r build /app/src/backend/langflow/frontend \
     && rm -rf /tmp/src/frontend
+
 # Build the marketing landing page served from nginx
 COPY src/new-landingpage /tmp/src/new-landingpage
 WORKDIR /tmp/src/new-landingpage
@@ -78,7 +79,6 @@ RUN --mount=type=cache,target=/root/.npm \
     && mkdir -p /app/new-landingpage \
     && cp -r dist /app/new-landingpage/dist \
     && rm -rf /tmp/src/new-landingpage
-
 
 WORKDIR /app
 
@@ -119,9 +119,9 @@ LABEL org.opencontainers.image.source=https://github.com/langflow-ai/langflow
 
 WORKDIR /app
 
+ENV LANGFLOW_HOST=0.0.0.0
 ENV LANGFLOW_PORT=7861
 ENV LANGFLOW_BACKEND_PORT=7861
 ENV NGINX_PORT=7860
 
 CMD ["/usr/local/bin/langflow-entrypoint.sh"]
-
