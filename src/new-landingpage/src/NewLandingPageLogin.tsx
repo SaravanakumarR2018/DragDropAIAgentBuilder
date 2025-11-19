@@ -388,10 +388,10 @@ export default function NewLandingPageLogin() {
           {status && <div className="login-status">{status}</div>}
           <SignedOut>
             <SignIn
-              path="/new-landingpage"
+              path="/new/landingpage/login"
               routing="path"
-              afterSignInUrl="/new-landingpage"
-              redirectUrl="/new-landingpage"
+              afterSignInUrl="/new/landingpage"
+              redirectUrl="/new/landingpage"
             />
           </SignedOut>
           <SignedIn>
