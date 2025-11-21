@@ -49,7 +49,7 @@ class OrganizationService:
         payload: dict | None = auth_header_ctx.get()
         org_id = payload.get("org_id") if payload else None
         if not org_id:
-            msg = "Missing organisation id"
+            msg = "Missing organisation id oraganisation.py file 1"
             raise RuntimeError(msg)
 
         return cls.get_db_service_for_org(org_id)
@@ -171,7 +171,7 @@ class OrganizationService:
 
         org_id = payload.get("org_id")
         if not org_id:
-            msg = "Missing organisation id"
+            msg = "Missing organisation id organisation file 2"
             raise RuntimeError(msg)
 
         # Build per-org DB URL
