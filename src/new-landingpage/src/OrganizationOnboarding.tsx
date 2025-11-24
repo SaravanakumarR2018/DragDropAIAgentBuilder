@@ -267,6 +267,10 @@ export default function OrganizationOnboarding() {
 
   const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
 
+  const showLoadingOverlay = isBootstrapping;
+  const loadingMessage =
+    status || "Preparing your workspace. This will only take a moment...";
+
   const hasExistingOrgSelection = useMemo(() => {
     if (typeof window === "undefined") return false;
     return sessionStorage.getItem("isOrgSelected") === "true";
@@ -493,30 +497,43 @@ export default function OrganizationOnboarding() {
   }
 
   return (
-    <div
-      style={{
-        display: "grid",
-        placeItems: isMobile ? "start center" : "center",
-        alignContent: "center",
-        minHeight: "100vh",
-        width: "100%",
-        padding: isMobile ? "3rem 1.25rem" : "2rem",
-        backgroundColor: "#f8fafc",
-        boxSizing: "border-box",
-      }}
-    >
+    <>
+      {showLoadingOverlay && (
+        <div className="loading-overlay" role="status" aria-live="polite">
+          <div className="loading-card">
+            <div className="loading-spinner" />
+            <div style={{ fontWeight: 700, fontSize: "1.05rem" }}>
+              Setting up your organization
+            </div>
+            <div className="loading-subtitle">{loadingMessage}</div>
+          </div>
+        </div>
+      )}
+
       <div
         style={{
+          display: "grid",
+          placeItems: isMobile ? "start center" : "center",
+          alignContent: "center",
+          minHeight: "100vh",
           width: "100%",
-          maxWidth: "480px",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "1.5rem",
-          margin: "0 auto",
+          padding: isMobile ? "3rem 1.25rem" : "2rem",
+          backgroundColor: "#f8fafc",
+          boxSizing: "border-box",
         }}
       >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: "480px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "1.5rem",
+            margin: "0 auto",
+          }}
+        >
         {/* Logo + title */}
         <div
           style={{
@@ -695,5 +712,6 @@ export default function OrganizationOnboarding() {
         </SignedOut>
       </div>
     </div>
+    </>
   );
 }
