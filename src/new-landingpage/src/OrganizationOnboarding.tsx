@@ -21,6 +21,7 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import { useCookies } from "react-cookie";
+import { LANDING_BASENAME } from "./landingRoutes";
 import logoicon from "./new-assets/visualailogo.png";
 /**
  * ==========
@@ -629,8 +630,8 @@ export default function OrganizationOnboarding() {
         <SignedIn>
           <OrganizationList
             hidePersonal
-            afterCreateOrganizationUrl="/organization?selected=true"
-            afterSelectOrganizationUrl="/organization?selected=true"
+            afterCreateOrganizationUrl={`${LANDING_BASENAME}/organization?selected=true`}
+            afterSelectOrganizationUrl={`${LANDING_BASENAME}/organization?selected=true`}
           />
         </SignedIn>
 

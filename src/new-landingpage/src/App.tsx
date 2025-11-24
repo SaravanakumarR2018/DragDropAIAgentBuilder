@@ -1,5 +1,6 @@
 import { useAuth } from "@clerk/clerk-react";
 import { BrowserRouter, Link, Navigate, Route, Routes } from "react-router-dom";
+import { LANDING_BASENAME } from "./landingRoutes";
 import NewLandingPageLogin from "./NewLandingPageLogin";
 import OrganizationOnboarding from "./OrganizationOnboarding";
 import "./App.css";
@@ -63,7 +64,7 @@ export default function App() {
   console.log("[App] App mounted with basename /new/landingpage");
 
   return (
-    <BrowserRouter basename="/new/landingpage">
+    <BrowserRouter basename={LANDING_BASENAME}>
       <Routes>
         <Route path="/" element={<RootRoute />} />
         <Route path="/login" element={<NewLandingPageLogin />} />

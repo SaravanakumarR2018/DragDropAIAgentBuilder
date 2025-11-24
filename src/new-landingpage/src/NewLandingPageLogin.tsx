@@ -1,6 +1,7 @@
 import { SignIn, SignedIn, SignedOut, useAuth } from "@clerk/clerk-react";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { LANDING_BASENAME } from "./landingRoutes";
 
 export default function NewLandingPageLogin() {
   const { isSignedIn, isLoaded } = useAuth();
@@ -28,10 +29,10 @@ export default function NewLandingPageLogin() {
       <div>
         <SignedOut>
           <SignIn
-            path="/new/landingpage/login"
+            path={`${LANDING_BASENAME}/login`}
             routing="path"
-            afterSignInUrl="/new/landingpage/organization"
-            redirectUrl="/new/landingpage/organization"
+            afterSignInUrl={`${LANDING_BASENAME}/organization`}
+            redirectUrl={`${LANDING_BASENAME}/organization`}
           />
         </SignedOut>
         <SignedIn>
