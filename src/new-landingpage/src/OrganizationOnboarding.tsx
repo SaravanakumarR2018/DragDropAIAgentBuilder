@@ -214,7 +214,7 @@ function setStoredActiveOrgId(orgId: string | null) {
  */
 
 export default function OrganizationOnboarding() {
-  const { isSignedIn, getToken } = useAuth();
+  const { isSignedIn, isLoaded, getToken } = useAuth();
   const { signOut } = useClerk();
   const { organization } = useOrganization();
   const { user } = useUser();
@@ -380,7 +380,7 @@ export default function OrganizationOnboarding() {
   ]);
 
   useEffect(() => {
-    if (!isSignedIn || !organization?.id) return;
+    if (!isLoaded || !isSignedIn || !organization?.id) return;
     if (!hasExistingOrgSelection || bootstrappedRef.current) return;
 
     console.log(
@@ -391,6 +391,7 @@ export default function OrganizationOnboarding() {
   }, [
     bootstrapSession,
     hasExistingOrgSelection,
+    isLoaded,
     isSignedIn,
     organization?.id,
   ]);
@@ -400,7 +401,7 @@ export default function OrganizationOnboarding() {
    * create org + bootstrap session, then go to /dashboard.
    */
   useEffect(() => {
-    if (!isSignedIn) return;
+    if (!isLoaded || !isSignedIn) return;
 
     const selected = searchParams.get("selected") === "true";
     if (!selected || !organization?.id) return;
@@ -434,6 +435,7 @@ export default function OrganizationOnboarding() {
     });
   }, [
     bootstrapSession,
+    isLoaded,
     isSignedIn,
     organization?.id,
     searchParams,
@@ -443,6 +445,13 @@ export default function OrganizationOnboarding() {
   /**
    * If not signed in, send to new landing login route.
    */
+  if (!isLoaded) {
+    console.log(
+      "[OrganizationOnboarding] Clerk not loaded yet; waiting before routing",
+    );
+    return null;
+  }
+
   if (!isSignedIn) {
     console.log(
       "[OrganizationOnboarding] User not signed in, redirecting to /login",
