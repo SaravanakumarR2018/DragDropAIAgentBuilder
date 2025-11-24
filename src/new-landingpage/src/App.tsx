@@ -1,3 +1,4 @@
+import { useAuth } from "@clerk/clerk-react";
 import { BrowserRouter, Link, Navigate, Route, Routes } from "react-router-dom";
 import NewLandingPageLogin from "./NewLandingPageLogin";
 import OrganizationOnboarding from "./OrganizationOnboarding";
@@ -45,11 +46,21 @@ function LandingHero() {
   );
 }
 
+function RootRoute() {
+  const { isSignedIn } = useAuth();
+
+  if (isSignedIn) {
+    return <Navigate to="/organization" replace />;
+  }
+
+  return <LandingHero />;
+}
+
 export default function App() {
   return (
     <BrowserRouter basename="/new/landingpage">
       <Routes>
-        <Route path="/" element={<LandingHero />} />
+        <Route path="/" element={<RootRoute />} />
         <Route path="/login" element={<NewLandingPageLogin />} />
         <Route path="/organization" element={<OrganizationOnboarding />} />
         <Route path="/dashboard" element={<DashboardPage />} />

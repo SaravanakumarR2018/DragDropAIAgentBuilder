@@ -3,14 +3,14 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 export default function NewLandingPageLogin() {
-  const { isSignedIn } = useAuth();
+  const { isSignedIn, isLoaded } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (isSignedIn) {
+    if (isLoaded && isSignedIn) {
       navigate("/organization", { replace: true });
     }
-  }, [isSignedIn, navigate]);
+  }, [isLoaded, isSignedIn, navigate]);
 
   return (
     <div

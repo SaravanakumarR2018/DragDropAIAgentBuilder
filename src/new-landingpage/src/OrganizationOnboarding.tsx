@@ -260,6 +260,11 @@ export default function OrganizationOnboarding() {
 
   const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
 
+  const hasExistingOrgSelection = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    return sessionStorage.getItem("isOrgSelected") === "true";
+  }, []);
+
   /**
    * Persist session like old component (cookies + storage)
    * This is what the main app /flows logic expects.
@@ -360,6 +365,18 @@ export default function OrganizationOnboarding() {
     organization?.id,
     persistSession,
     user,
+  ]);
+
+  useEffect(() => {
+    if (!isSignedIn || !organization?.id) return;
+    if (!hasExistingOrgSelection || bootstrappedRef.current) return;
+
+    bootstrapSession();
+  }, [
+    bootstrapSession,
+    hasExistingOrgSelection,
+    isSignedIn,
+    organization?.id,
   ]);
 
   /**
