@@ -343,18 +343,28 @@ export default function OrganizationOnboarding() {
         user?.id ||
         "clerk_user";
 
+      console.log("[OrganizationOnboarding] Calling createOrganisation()");
       setStatus("Ensuring organization exists...");
       await createOrganisation(orgToken);
+      console.log("[OrganizationOnboarding] createOrganisation() completed");
 
+      console.log("[OrganizationOnboarding] Calling ensureLangflowUser()");
       setStatus("Synchronizing user profile...");
       await ensureLangflowUser(orgToken, username);
+      console.log("[OrganizationOnboarding] ensureLangflowUser() completed");
 
+      console.log("[OrganizationOnboarding] Calling backendLogin()");
       setStatus("Creating backend session...");
       const tokens = await backendLogin(username, orgToken);
+      console.log("[OrganizationOnboarding] backendLogin() succeeded");
 
       persistSession(orgToken, (tokens as any)?.refresh_token ?? null, activeOrgId);
 
       setStatus("Redirecting to dashboard...");
+      console.log(
+        "[OrganizationOnboarding] Redirecting to dashboard with org",
+        activeOrgId,
+      );
       navigate("/dashboard", { replace: true });
     } catch (err: any) {
       console.error("[OrganizationOnboarding] Failed to bootstrap", err);

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { LANDING_BASENAME } from "./landingRoutes";
 import { useCookies } from "react-cookie";
 
 const LANGFLOW_ACCESS_TOKEN = "access_token_lf";
@@ -18,7 +19,8 @@ export default function DashboardPage() {
 
     if (!token || !orgSelected || !orgId) {
       // Missing session → go to login
-      navigate("/new/landingpage/login", { replace: true });
+      console.log("[DashboardPage] Missing session, redirecting to", `${LANDING_BASENAME}/login`);
+      navigate("/login", { replace: true });
     }
   }, [cookies, navigate]);
 
