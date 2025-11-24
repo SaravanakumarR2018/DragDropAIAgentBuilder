@@ -228,7 +228,7 @@ export default function OrganizationOnboarding() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [, setCookie, removeCookie] = useCookies([
+  const [cookies, setCookie, removeCookie] = useCookies([
     LANGFLOW_ACCESS_TOKEN,
     LANGFLOW_REFRESH_TOKEN,
     LANGFLOW_AUTO_LOGIN_OPTION,
@@ -237,6 +237,7 @@ export default function OrganizationOnboarding() {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
+  const [shouldGoToDashboard, setShouldGoToDashboard] = useState(false);
 
   const bootstrappedRef = useRef(false);
   const processedOrgRef = useRef<string | null>(null);
@@ -365,6 +366,7 @@ export default function OrganizationOnboarding() {
         "[OrganizationOnboarding] Redirecting to dashboard with org",
         activeOrgId,
       );
+      setShouldGoToDashboard(true);
       navigate("/dashboard", { replace: true });
     } catch (err: any) {
       console.error("[OrganizationOnboarding] Failed to bootstrap", err);
@@ -405,6 +407,22 @@ export default function OrganizationOnboarding() {
     isSignedIn,
     organization?.id,
   ]);
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+
+    const orgSelected = sessionStorage.getItem("isOrgSelected") === "true";
+    const activeOrgId = localStorage.getItem(ACTIVE_ORG_STORAGE_KEY);
+    const hasAccessToken = Boolean(cookies[LANGFLOW_ACCESS_TOKEN]);
+
+    if (orgSelected && activeOrgId && hasAccessToken) {
+      console.log("[OrganizationOnboarding] Session already present; routing to /dashboard", {
+        activeOrgId,
+      });
+      setShouldGoToDashboard(true);
+      navigate("/dashboard", { replace: true });
+    }
+  }, [cookies, isLoaded, isSignedIn, navigate]);
 
   /**
    * When Clerk redirects back with ?selected=true,
@@ -467,6 +485,11 @@ export default function OrganizationOnboarding() {
       "[OrganizationOnboarding] User not signed in, redirecting to /login",
     );
     return <Navigate to="/login" replace />;
+  }
+
+  if (shouldGoToDashboard) {
+    console.log("[OrganizationOnboarding] Local redirect flag set; sending to /dashboard");
+    return <Navigate to="/dashboard" replace />;
   }
 
   return (
