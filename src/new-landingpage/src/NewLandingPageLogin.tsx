@@ -6,8 +6,11 @@ export default function NewLandingPageLogin() {
   const { isSignedIn, isLoaded } = useAuth();
   const navigate = useNavigate();
 
+  console.log("[NewLandingPageLogin] render", { isLoaded, isSignedIn });
+
   useEffect(() => {
     if (isLoaded && isSignedIn) {
+      console.log("[NewLandingPageLogin] User signed in, redirecting to /organization");
       navigate("/organization", { replace: true });
     }
   }, [isLoaded, isSignedIn, navigate]);

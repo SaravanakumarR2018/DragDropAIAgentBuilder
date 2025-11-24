@@ -49,7 +49,10 @@ function LandingHero() {
 function RootRoute() {
   const { isSignedIn } = useAuth();
 
+  console.log("[App] RootRoute render", { isSignedIn });
+
   if (isSignedIn) {
+    console.log("[App] Redirecting signed-in user from root to /organization");
     return <Navigate to="/organization" replace />;
   }
 
@@ -57,6 +60,8 @@ function RootRoute() {
 }
 
 export default function App() {
+  console.log("[App] App mounted with basename /new/landingpage");
+
   return (
     <BrowserRouter basename="/new/landingpage">
       <Routes>

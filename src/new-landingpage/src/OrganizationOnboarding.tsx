@@ -218,6 +218,11 @@ export default function OrganizationOnboarding() {
   const { organization } = useOrganization();
   const { user } = useUser();
 
+  console.log("[OrganizationOnboarding] render", {
+    isSignedIn,
+    organizationId: organization?.id,
+  });
+
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -282,6 +287,12 @@ export default function OrganizationOnboarding() {
 
       sessionStorage.setItem("isOrgSelected", "true");
       setStoredActiveOrgId(activeOrgId);
+
+      console.log("[OrganizationOnboarding] Session persisted", {
+        hasAccessToken: Boolean(accessToken),
+        hasRefreshToken: Boolean(refreshToken),
+        activeOrgId,
+      });
     },
     [setCookie],
   );
@@ -306,7 +317,7 @@ export default function OrganizationOnboarding() {
    * - ensureLangflowUser
    * - backendLogin
    * - persist cookies + storage
-   * - redirect to /new/landingpage/dashboard
+   * - redirect to /dashboard
    */
   const bootstrapSession = useCallback(async () => {
     if (!isSignedIn || !organization?.id || bootstrappedRef.current) return;
@@ -343,7 +354,7 @@ export default function OrganizationOnboarding() {
       persistSession(orgToken, (tokens as any)?.refresh_token ?? null, activeOrgId);
 
       setStatus("Redirecting to dashboard...");
-      navigate("/new/landingpage/dashboard", { replace: true });
+      navigate("/dashboard", { replace: true });
     } catch (err: any) {
       console.error("[OrganizationOnboarding] Failed to bootstrap", err);
       const msg =
@@ -371,6 +382,10 @@ export default function OrganizationOnboarding() {
     if (!isSignedIn || !organization?.id) return;
     if (!hasExistingOrgSelection || bootstrappedRef.current) return;
 
+    console.log(
+      "[OrganizationOnboarding] Existing org selection detected; bootstrapping",
+    );
+
     bootstrapSession();
   }, [
     bootstrapSession,
@@ -381,13 +396,17 @@ export default function OrganizationOnboarding() {
 
   /**
    * When Clerk redirects back with ?selected=true,
-   * create org + bootstrap session, then go to /new/landingpage/dashboard.
+   * create org + bootstrap session, then go to /dashboard.
    */
   useEffect(() => {
     if (!isSignedIn) return;
 
     const selected = searchParams.get("selected") === "true";
     if (!selected || !organization?.id) return;
+
+    console.log("[OrganizationOnboarding] Detected ?selected=true for org", {
+      organizationId: organization.id,
+    });
 
     if (
       processedOrgRef.current === organization.id ||
@@ -424,7 +443,10 @@ export default function OrganizationOnboarding() {
    * If not signed in, send to new landing login route.
    */
   if (!isSignedIn) {
-    return <Navigate to="/new/landingpage/login" replace />;
+    console.log(
+      "[OrganizationOnboarding] User not signed in, redirecting to /login",
+    );
+    return <Navigate to="/login" replace />;
   }
 
   return (
@@ -607,8 +629,8 @@ export default function OrganizationOnboarding() {
         <SignedIn>
           <OrganizationList
             hidePersonal
-            afterCreateOrganizationUrl="/new/landingpage/organization?selected=true"
-            afterSelectOrganizationUrl="/new/landingpage/organization?selected=true"
+            afterCreateOrganizationUrl="/organization?selected=true"
+            afterSelectOrganizationUrl="/organization?selected=true"
           />
         </SignedIn>
 
