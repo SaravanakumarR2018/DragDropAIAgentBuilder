@@ -25,9 +25,105 @@ env:
   PROD_HOST: visualaiagentsbuilder.com
 
 jobs:
+  check-db-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      db_changes: ${{ steps.check_changes.outputs.db_changes }}
+    steps:
+      - name: Checkout selected branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: |
+          pip install alembic psycopg2-binary google-generativeai
+      - name: Check for DB changes
+        id: check_changes
+        env:
+          ENVIRONMENT: ${{ github.event.inputs.environment }}
+          STAGING_DB_USER: ${{ secrets.POSTGRES_USER }}
+          STAGING_DB_PASSWORD: ${{ secrets.POSTGRES_PASSWD }}
+          STAGING_DB_NAME: ${{ secrets.POSTGRES_DB }}
+          STAGING_DB_HOST: ${{ env.STAGING_HOST }}
+          PROD_DB_USER: ${{ secrets.PROD_POSTGRES_USER }}
+          PROD_DB_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWD }}
+          PROD_DB_NAME: ${{ secrets.PROD_POSTGRES_DB }}
+          PROD_DB_HOST: ${{ env.PROD_HOST }}
+        run: python .github/scripts/check_db_changes.py
+      - name: Install Bytebase CLI
+        if: steps.check_changes.outputs.db_changes == 'true'
+        run: |
+          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/bytebase/install/HEAD/install.sh)"
+          sudo mv bb /usr/local/bin
+      - name: Verify with Bytebase
+        if: steps.check_changes.outputs.db_changes == 'true'
+        run: |
+          bb check-sql --file src/backend/base/langflow/upgrade.sql
+          bb check-sql --file src/backend/base/langflow/downgrade.sql
+      - name: Verify with Gemini AI
+        if: steps.check_changes.outputs.db_changes == 'true'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python .github/scripts/verify_sql_with_gemini.py src/backend/base/langflow/upgrade.sql src/backend/base/langflow/downgrade.sql
+      - name: Manual approval for DB changes
+        if: steps.check_changes.outputs.db_changes == 'true'
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ secrets.GITHUB_TOKEN }}
+          approvers: ${{ github.actor }}
+          minimum-approvals: 1
+      - name: Upload SQL artifacts
+        if: steps.check_changes.outputs.db_changes == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sql-migrations
+          path: |
+            src/backend/base/langflow/upgrade.sql
+            src/backend/base/langflow/downgrade.sql
+
+  apply-db-changes:
+    runs-on: ubuntu-latest
+    needs: check-db-changes
+    environment:
+      name: ${{ github.event.inputs.environment }}-db-apply
+      url: https://${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
+    if: needs.check-db-changes.outputs.db_changes == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download SQL artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: sql-migrations
+          path: migrations
+      - name: Install dependencies
+        run: pip install sqlalchemy psycopg2-binary alembic
+      - name: Manual approval to apply changes
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ secrets.GITHUB_TOKEN }}
+          approvers: ${{ github.actor }}
+          minimum-approvals: 1
+      - name: Apply DB changes
+        env:
+          ENVIRONMENT: ${{ github.event.inputs.environment }}
+          STAGING_DB_USER: ${{ secrets.POSTGRES_USER }}
+          STAGING_DB_PASSWORD: ${{ secrets.POSTGRES_PASSWD }}
+          STAGING_DB_NAME: ${{ secrets.POSTGRES_DB }}
+          STAGING_DB_HOST: ${{ env.STAGING_HOST }}
+          PROD_DB_USER: ${{ secrets.PROD_POSTGRES_USER }}
+          PROD_DB_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWD }}
+          PROD_DB_NAME: ${{ secrets.PROD_POSTGRES_DB }}
+          PROD_DB_HOST: ${{ env.PROD_HOST }}
+        run: python .github/scripts/apply_db_changes.py
+
   build-and-push:
     runs-on: ubuntu-latest
-
+    needs: apply-db-changes
+    if: always() && (needs.apply-db-changes.result == 'success' || needs.apply-db-changes.result == 'skipped')
     steps:
       - name: Checkout selected branch
         uses: actions/checkout@v4
