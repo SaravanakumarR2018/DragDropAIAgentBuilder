@@ -25,7 +25,208 @@ env:
   PROD_HOST: visualaiagentsbuilder.com
 
 jobs:
+  alembic-plan:
+    name: Validate Alembic migrations
+    runs-on: ubuntu-latest
+    outputs:
+      requires_migration: ${{ steps.compare.outputs.requires_migration }}
+      current_version: ${{ steps.capture_db.outputs.current_version }}
+      target_version: ${{ steps.detect_repo.outputs.target_version }}
+      commit_id: ${{ steps.commit.outputs.commit_id }}
+      branch_name: ${{ steps.branch.outputs.branch_name }}
+
+    steps:
+      - name: Checkout selected branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+
+      - name: Checkout specific commit if provided
+        if: ${{ github.event.inputs.commit_id != '' }}
+        run: |
+          git fetch --depth=1 origin ${{ github.event.inputs.commit_id }}
+          git checkout ${{ github.event.inputs.commit_id }}
+          echo "✅ Checked out commit ${{ github.event.inputs.commit_id }}"
+
+      - name: Determine Commit ID
+        id: commit
+        run: |
+          if [ -n "${{ github.event.inputs.commit_id }}" ]; then
+            echo "commit_id=${{ github.event.inputs.commit_id }}" >> $GITHUB_OUTPUT
+          else
+            if [ "${{ github.event.inputs.branch }}" = "main" ]; then
+              COMMIT_ID=$(git rev-parse HEAD)
+            else
+              COMMIT_ID=$(git log -1 --format="%H")
+            fi
+              echo "commit_id=$COMMIT_ID" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Determine Branch Name
+        id: branch
+        run: |
+          BRANCH_NAME=$(echo "${{ github.event.inputs.branch }}" | tr '/' '-')
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+      - name: Set database connection values
+        id: db
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "staging" ]; then
+            echo "db_user=${{ secrets.POSTGRES_USER }}" >> $GITHUB_OUTPUT
+            echo "db_password=${{ secrets.POSTGRES_PASSWD }}" >> $GITHUB_OUTPUT
+            echo "db_name=${{ secrets.POSTGRES_DB }}" >> $GITHUB_OUTPUT
+            echo "db_host=${{ env.STAGING_HOST }}" >> $GITHUB_OUTPUT
+          else
+            echo "db_user=${{ secrets.PROD_POSTGRES_USER }}" >> $GITHUB_OUTPUT
+            echo "db_password=${{ secrets.PROD_POSTGRES_PASSWD }}" >> $GITHUB_OUTPUT
+            echo "db_name=${{ secrets.PROD_POSTGRES_DB }}" >> $GITHUB_OUTPUT
+            echo "db_host=${{ env.PROD_HOST }}" >> $GITHUB_OUTPUT
+          fi
+          echo "db_port=5432" >> $GITHUB_OUTPUT
+
+      - name: Install tooling for DB checks
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client docker.io python3-pip
+          python -m pip install --upgrade pip
+
+      - name: Capture current alembic version from database
+        id: capture_db
+        env:
+          PGPASSWORD: ${{ steps.db.outputs.db_password }}
+        run: |
+          CURRENT=$(psql \
+            -h "${{ steps.db.outputs.db_host }}" \
+            -p "${{ steps.db.outputs.db_port }}" \
+            -U "${{ steps.db.outputs.db_user }}" \
+            -d "${{ steps.db.outputs.db_name }}" \
+            -t -A -c "select version_num from alembic_version limit 1")
+
+          CURRENT_VERSION=${CURRENT:-unknown}
+          echo "Current DB revision: $CURRENT_VERSION"
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Detect target alembic revision in repo
+        id: detect_repo
+        run: |
+          TARGET=$(python scripts/ci/detect_alembic_revision.py --versions-dir src/backend/base/langflow/alembic/versions)
+          echo "target_version=$TARGET" >> $GITHUB_OUTPUT
+          echo "Target repo revision: $TARGET"
+
+      - name: Compare alembic revisions
+        id: compare
+        run: |
+          if [ "${{ steps.capture_db.outputs.current_version }}" = "${{ steps.detect_repo.outputs.target_version }}" ]; then
+            echo "No migration changes detected"
+            echo "requires_migration=false" >> $GITHUB_OUTPUT
+          else
+            echo "Migration delta detected"
+            echo "requires_migration=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install Alembic dependencies
+        if: ${{ steps.compare.outputs.requires_migration == 'true' }}
+        run: |
+          pip install alembic psycopg2-binary google-generativeai
+          pip install -e .
+
+      - name: Generate upgrade and downgrade SQL
+        if: ${{ steps.compare.outputs.requires_migration == 'true' }}
+        env:
+          CURRENT_VERSION: ${{ steps.capture_db.outputs.current_version }}
+          TARGET_VERSION: ${{ steps.detect_repo.outputs.target_version }}
+        run: |
+          mkdir -p alembic-artifacts
+          alembic -c src/backend/base/langflow/alembic.ini upgrade "$TARGET_VERSION" --sql > alembic-artifacts/alembic-upgrade.sql
+          alembic -c src/backend/base/langflow/alembic.ini downgrade "$CURRENT_VERSION" --sql > alembic-artifacts/alembic-downgrade.sql
+          echo "Upgrade SQL saved to alembic-artifacts/alembic-upgrade.sql"
+          echo "Downgrade SQL saved to alembic-artifacts/alembic-downgrade.sql"
+
+      - name: Verify SQL compatibility with Bytebase
+        if: ${{ steps.compare.outputs.requires_migration == 'true' }}
+        env:
+          DB_USER: ${{ steps.db.outputs.db_user }}
+          DB_PASSWORD: ${{ steps.db.outputs.db_password }}
+          DB_HOST: ${{ steps.db.outputs.db_host }}
+          DB_PORT: ${{ steps.db.outputs.db_port }}
+          DB_NAME: ${{ steps.db.outputs.db_name }}
+        run: |
+          DSN="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+          docker run --rm -v "$PWD:/workspace" bytebase/bytebase:2.15.0 bb lint --dsn "$DSN" --sql-file /workspace/alembic-artifacts/alembic-upgrade.sql --format pretty
+          docker run --rm -v "$PWD:/workspace" bytebase/bytebase:2.15.0 bb lint --dsn "$DSN" --sql-file /workspace/alembic-artifacts/alembic-downgrade.sql --format pretty
+
+      - name: Gemini safety check on migration scripts
+        if: ${{ steps.compare.outputs.requires_migration == 'true' }}
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python scripts/ci/gemini_review_sql.py \
+            --upgrade alembic-artifacts/alembic-upgrade.sql \
+            --downgrade alembic-artifacts/alembic-downgrade.sql
+
+      - name: Upload planned SQL artifacts
+        if: ${{ steps.compare.outputs.requires_migration == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: alembic-sql-${{ steps.commit.outputs.commit_id }}
+          path: alembic-artifacts/
+
+  apply-alembic:
+    name: Apply Alembic migrations
+    needs: alembic-plan
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ needs.alembic-plan.outputs.requires_migration == 'true' && 'alembic-apply-approval' || 'auto-continue' }}
+    outputs:
+      ready_for_deploy: ${{ steps.ready.outputs.ready_for_deploy }}
+
+    steps:
+      - name: Download planned SQL artifacts
+        if: ${{ needs.alembic-plan.outputs.requires_migration == 'true' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: alembic-sql-${{ needs.alembic-plan.outputs.commit_id }}
+          path: alembic-artifacts/
+
+      - name: Install PostgreSQL client
+        if: ${{ needs.alembic-plan.outputs.requires_migration == 'true' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Apply upgrade SQL to database
+        if: ${{ needs.alembic-plan.outputs.requires_migration == 'true' }}
+        env:
+          PGPASSWORD: ${{ needs.alembic-plan.outputs.requires_migration == 'true' && secrets.POSTGRES_PASSWD || secrets.PROD_POSTGRES_PASSWD }}
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "staging" ]; then
+            DB_USER="${{ secrets.POSTGRES_USER }}"
+            DB_PASSWORD="${{ secrets.POSTGRES_PASSWD }}"
+            DB_NAME="${{ secrets.POSTGRES_DB }}"
+            DB_HOST="${{ env.STAGING_HOST }}"
+          else
+            DB_USER="${{ secrets.PROD_POSTGRES_USER }}"
+            DB_PASSWORD="${{ secrets.PROD_POSTGRES_PASSWD }}"
+            DB_NAME="${{ secrets.PROD_POSTGRES_DB }}"
+            DB_HOST="${{ env.PROD_HOST }}"
+          fi
+
+          PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p 5432 -U "$DB_USER" -d "$DB_NAME" -f alembic-artifacts/alembic-upgrade.sql
+
+      - name: Set ready flag
+        id: ready
+        run: |
+          if [ "${{ needs.alembic-plan.outputs.requires_migration }}" = "true" ]; then
+            echo "ready_for_deploy=true" >> $GITHUB_OUTPUT
+          else
+            echo "ready_for_deploy=true" >> $GITHUB_OUTPUT
+          fi
+
   build-and-push:
+    needs: [apply-alembic, alembic-plan]
+    if: ${{ needs.apply-alembic.outputs.ready_for_deploy == 'true' }}
+    environment:
+      name: ${{ needs.alembic-plan.outputs.requires_migration == 'true' && 'post-migration-deploy' || 'auto-continue' }}
     runs-on: ubuntu-latest
 
     steps:
