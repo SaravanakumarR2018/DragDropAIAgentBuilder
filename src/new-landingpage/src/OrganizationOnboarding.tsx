@@ -21,7 +21,9 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import { useCookies } from "react-cookie";
+import { LANDING_BASENAME } from "./landingRoutes";
 import logoicon from "./new-assets/visualailogo.png";
+import ProgressBar from "./ProgressBar";
 /**
  * ==========
  * Constants
@@ -213,16 +215,21 @@ function setStoredActiveOrgId(orgId: string | null) {
  */
 
 export default function OrganizationOnboarding() {
-  const { isSignedIn, getToken } = useAuth();
+  const { isSignedIn, isLoaded, getToken } = useAuth();
   const { signOut } = useClerk();
   const { organization } = useOrganization();
   const { user } = useUser();
+
+  console.log("[OrganizationOnboarding] render", {
+    isSignedIn,
+    organizationId: organization?.id,
+  });
 
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [, setCookie, removeCookie] = useCookies([
+  const [cookies, setCookie, removeCookie] = useCookies([
     LANGFLOW_ACCESS_TOKEN,
     LANGFLOW_REFRESH_TOKEN,
     LANGFLOW_AUTO_LOGIN_OPTION,
@@ -231,6 +238,7 @@ export default function OrganizationOnboarding() {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
+  const [shouldGoToDashboard, setShouldGoToDashboard] = useState(false);
 
   const bootstrappedRef = useRef(false);
   const processedOrgRef = useRef<string | null>(null);
@@ -260,6 +268,15 @@ export default function OrganizationOnboarding() {
 
   const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
 
+  const showLoadingOverlay = isBootstrapping;
+  const loadingMessage =
+    status || "Preparing your workspace. This will only take a moment...";
+
+  const hasExistingOrgSelection = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    return sessionStorage.getItem("isOrgSelected") === "true";
+  }, []);
+
   /**
    * Persist session like old component (cookies + storage)
    * This is what the main app /flows logic expects.
@@ -277,6 +294,12 @@ export default function OrganizationOnboarding() {
 
       sessionStorage.setItem("isOrgSelected", "true");
       setStoredActiveOrgId(activeOrgId);
+
+      console.log("[OrganizationOnboarding] Session persisted", {
+        hasAccessToken: Boolean(accessToken),
+        hasRefreshToken: Boolean(refreshToken),
+        activeOrgId,
+      });
     },
     [setCookie],
   );
@@ -301,7 +324,7 @@ export default function OrganizationOnboarding() {
    * - ensureLangflowUser
    * - backendLogin
    * - persist cookies + storage
-   * - redirect to /new/landingpage/dashboard
+   * - redirect to /dashboard
    */
   const bootstrapSession = useCallback(async () => {
     if (!isSignedIn || !organization?.id || bootstrappedRef.current) return;
@@ -326,19 +349,30 @@ export default function OrganizationOnboarding() {
         user?.id ||
         "clerk_user";
 
+      console.log("[OrganizationOnboarding] Calling createOrganisation()");
       setStatus("Ensuring organization exists...");
       await createOrganisation(orgToken);
+      console.log("[OrganizationOnboarding] createOrganisation() completed");
 
+      console.log("[OrganizationOnboarding] Calling ensureLangflowUser()");
       setStatus("Synchronizing user profile...");
       await ensureLangflowUser(orgToken, username);
+      console.log("[OrganizationOnboarding] ensureLangflowUser() completed");
 
+      console.log("[OrganizationOnboarding] Calling backendLogin()");
       setStatus("Creating backend session...");
       const tokens = await backendLogin(username, orgToken);
+      console.log("[OrganizationOnboarding] backendLogin() succeeded");
 
       persistSession(orgToken, (tokens as any)?.refresh_token ?? null, activeOrgId);
 
       setStatus("Redirecting to dashboard...");
-      navigate("/new/landingpage/dashboard", { replace: true });
+      console.log(
+        "[OrganizationOnboarding] Redirecting to dashboard with org",
+        activeOrgId,
+      );
+      setShouldGoToDashboard(true);
+      navigate("/dashboard", { replace: true });
     } catch (err: any) {
       console.error("[OrganizationOnboarding] Failed to bootstrap", err);
       const msg =
@@ -362,15 +396,52 @@ export default function OrganizationOnboarding() {
     user,
   ]);
 
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || !organization?.id) return;
+    if (!hasExistingOrgSelection || bootstrappedRef.current) return;
+
+    console.log(
+      "[OrganizationOnboarding] Existing org selection detected; bootstrapping",
+    );
+
+    bootstrapSession();
+  }, [
+    bootstrapSession,
+    hasExistingOrgSelection,
+    isLoaded,
+    isSignedIn,
+    organization?.id,
+  ]);
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+
+    const orgSelected = sessionStorage.getItem("isOrgSelected") === "true";
+    const activeOrgId = localStorage.getItem(ACTIVE_ORG_STORAGE_KEY);
+    const hasAccessToken = Boolean(cookies[LANGFLOW_ACCESS_TOKEN]);
+
+    if (orgSelected && activeOrgId && hasAccessToken) {
+      console.log("[OrganizationOnboarding] Session already present; routing to /dashboard", {
+        activeOrgId,
+      });
+      setShouldGoToDashboard(true);
+      navigate("/dashboard", { replace: true });
+    }
+  }, [cookies, isLoaded, isSignedIn, navigate]);
+
   /**
    * When Clerk redirects back with ?selected=true,
-   * create org + bootstrap session, then go to /new/landingpage/dashboard.
+   * create org + bootstrap session, then go to /dashboard.
    */
   useEffect(() => {
-    if (!isSignedIn) return;
+    if (!isLoaded || !isSignedIn) return;
 
     const selected = searchParams.get("selected") === "true";
     if (!selected || !organization?.id) return;
+
+    console.log("[OrganizationOnboarding] Detected ?selected=true for org", {
+      organizationId: organization.id,
+    });
 
     if (
       processedOrgRef.current === organization.id ||
@@ -379,6 +450,8 @@ export default function OrganizationOnboarding() {
       return;
     }
 
+    setStatus("Preparing your workspace...");
+    setIsBootstrapping(true);
     provisioningOrgRef.current = organization.id;
 
     (async () => {
@@ -397,6 +470,7 @@ export default function OrganizationOnboarding() {
     });
   }, [
     bootstrapSession,
+    isLoaded,
     isSignedIn,
     organization?.id,
     searchParams,
@@ -406,35 +480,61 @@ export default function OrganizationOnboarding() {
   /**
    * If not signed in, send to new landing login route.
    */
+  if (!isLoaded) {
+    console.log(
+      "[OrganizationOnboarding] Clerk not loaded yet; waiting before routing",
+    );
+    return null;
+  }
+
   if (!isSignedIn) {
-    return <Navigate to="/new/landingpage/login" replace />;
+    console.log(
+      "[OrganizationOnboarding] User not signed in, redirecting to /login",
+    );
+    return <Navigate to="/login" replace />;
+  }
+
+  if (shouldGoToDashboard) {
+    console.log("[OrganizationOnboarding] Local redirect flag set; sending to /dashboard");
+    return <Navigate to="/dashboard" replace />;
   }
 
   return (
-    <div
-      style={{
-        display: "grid",
-        placeItems: isMobile ? "start center" : "center",
-        alignContent: "center",
-        minHeight: "100vh",
-        width: "100%",
-        padding: isMobile ? "3rem 1.25rem" : "2rem",
-        backgroundColor: "#f8fafc",
-        boxSizing: "border-box",
-      }}
-    >
+    <>
+      {showLoadingOverlay && (
+        <div className="loading-overlay" role="status" aria-live="polite">
+          <div className="loading-card">
+            <div className="loading-title">Setting up your organization</div>
+            <ProgressBar remSize={18} />
+            <div className="loading-subtitle">{loadingMessage}</div>
+          </div>
+        </div>
+      )}
+
       <div
         style={{
+          display: "grid",
+          placeItems: isMobile ? "start center" : "center",
+          alignContent: "center",
+          minHeight: "100vh",
           width: "100%",
-          maxWidth: "480px",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "1.5rem",
-          margin: "0 auto",
+          padding: isMobile ? "3rem 1.25rem" : "2rem",
+          backgroundColor: "#f8fafc",
+          boxSizing: "border-box",
         }}
       >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: "480px",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "1.5rem",
+            margin: "0 auto",
+          }}
+        >
         {/* Logo + title */}
         <div
           style={{
@@ -590,8 +690,8 @@ export default function OrganizationOnboarding() {
         <SignedIn>
           <OrganizationList
             hidePersonal
-            afterCreateOrganizationUrl="/new/landingpage/organization?selected=true"
-            afterSelectOrganizationUrl="/new/landingpage/organization?selected=true"
+            afterCreateOrganizationUrl={`${LANDING_BASENAME}/organization?selected=true`}
+            afterSelectOrganizationUrl={`${LANDING_BASENAME}/organization?selected=true`}
           />
         </SignedIn>
 
@@ -613,5 +713,6 @@ export default function OrganizationOnboarding() {
         </SignedOut>
       </div>
     </div>
+    </>
   );
 }

@@ -1,4 +1,6 @@
+import { useAuth } from "@clerk/clerk-react";
 import { BrowserRouter, Link, Navigate, Route, Routes } from "react-router-dom";
+import { LANDING_BASENAME } from "./landingRoutes";
 import NewLandingPageLogin from "./NewLandingPageLogin";
 import OrganizationOnboarding from "./OrganizationOnboarding";
 import "./App.css";
@@ -45,11 +47,29 @@ function LandingHero() {
   );
 }
 
+function RootRoute() {
+  const { isSignedIn } = useAuth();
+
+  console.log("[App] RootRoute render", { isSignedIn });
+
+  if (isSignedIn) {
+    console.log(
+      "[App] Redirecting signed-in user from root to",
+      `${LANDING_BASENAME}/organization`,
+    );
+    return <Navigate to="/organization" replace />;
+  }
+
+  return <LandingHero />;
+}
+
 export default function App() {
+  console.log(`[App] App mounted with basename ${LANDING_BASENAME}`);
+
   return (
-    <BrowserRouter basename="/new/landingpage">
+    <BrowserRouter basename={LANDING_BASENAME}>
       <Routes>
-        <Route path="/" element={<LandingHero />} />
+        <Route path="/" element={<RootRoute />} />
         <Route path="/login" element={<NewLandingPageLogin />} />
         <Route path="/organization" element={<OrganizationOnboarding />} />
         <Route path="/dashboard" element={<DashboardPage />} />
