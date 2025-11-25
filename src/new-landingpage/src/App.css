@@ -26,41 +26,43 @@ body {
 }
 
 .loading-card {
-  width: min(420px, 100%);
-  background: rgba(12, 16, 35, 0.92);
+  width: min(440px, 100%);
+  background: rgba(12, 16, 35, 0.94);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  padding: 1.5rem;
+  border-radius: 18px;
+  padding: 1.75rem 1.5rem 1.5rem;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
   color: #e5e7eb;
   text-align: center;
   display: grid;
-  gap: 0.75rem;
+  gap: 1rem;
   justify-items: center;
 }
 
-.loading-spinner {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  border: 6px solid rgba(99, 102, 241, 0.25);
-  border-top-color: #6366f1;
-  animation: spin 1s linear infinite;
-  box-shadow: 0 0 0 6px rgba(99, 102, 241, 0.08);
+.loading-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.loading-progress-shell {
+  width: 100%;
+  max-width: 360px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  height: 12px;
+}
+
+.loading-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #6366f1, #8b5cf6);
+  transition: width 300ms ease-out;
 }
 
 .loading-subtitle {
-  color: #93c5fd;
+  color: #c7d2fe;
   font-size: 0.95rem;
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .hero {

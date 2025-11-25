@@ -23,6 +23,7 @@ import {
 import { useCookies } from "react-cookie";
 import { LANDING_BASENAME } from "./landingRoutes";
 import logoicon from "./new-assets/visualailogo.png";
+import ProgressBar from "./ProgressBar";
 /**
  * ==========
  * Constants
@@ -449,6 +450,8 @@ export default function OrganizationOnboarding() {
       return;
     }
 
+    setStatus("Preparing your workspace...");
+    setIsBootstrapping(true);
     provisioningOrgRef.current = organization.id;
 
     (async () => {
@@ -501,10 +504,8 @@ export default function OrganizationOnboarding() {
       {showLoadingOverlay && (
         <div className="loading-overlay" role="status" aria-live="polite">
           <div className="loading-card">
-            <div className="loading-spinner" />
-            <div style={{ fontWeight: 700, fontSize: "1.05rem" }}>
-              Setting up your organization
-            </div>
+            <div className="loading-title">Setting up your organization</div>
+            <ProgressBar remSize={18} />
             <div className="loading-subtitle">{loadingMessage}</div>
           </div>
         </div>
