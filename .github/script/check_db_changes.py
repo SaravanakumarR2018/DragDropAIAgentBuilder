@@ -55,26 +55,54 @@ def main():
 
     print("Using alembic.ini:", alembic_ini_path)
 
-    latest_revision_process = subprocess.run(
-        ["alembic", "-c", alembic_ini_path, "heads"],
-        capture_output=True,
-        text=True,
-        cwd=alembic_dir,
-        check=True,
-    )
+    alembic_command = ["alembic", "-c", alembic_ini_path, "heads"]
+
+    def write_output_flag(value: str):
+        output_path = os.getenv("GITHUB_OUTPUT")
+        if not output_path:
+            return
+        with open(output_path, "a") as f:
+            f.write(f"db_changes={value}\n")
+
+    def run_alembic(command: list[str]):
+        try:
+            return subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                cwd=alembic_dir,
+                check=True,
+            )
+        except subprocess.CalledProcessError as err:
+            print("Alembic command failed.")
+            if err.stdout:
+                print("Stdout:", err.stdout)
+            if err.stderr:
+                print("Stderr:", err.stderr)
+            raise
+
+    try:
+        latest_revision_process = run_alembic(alembic_command)
+    except FileNotFoundError:
+        print("Alembic CLI not found; retrying with uv.")
+        uv_command = [
+            "uv",
+            "run",
+            "--project",
+            os.path.join(workspace, "src/backend/base"),
+            *alembic_command,
+        ]
+        latest_revision_process = run_alembic(uv_command)
 
     latest_revision = latest_revision_process.stdout.strip().split(" ")[0]
 
     if current_revision != latest_revision:
         print(f"DB changes detected → current: {current_revision}, latest: {latest_revision}")
 
-        with open(os.getenv("GITHUB_OUTPUT"), "a") as f:
-            f.write("db_changes=true\n")
+        write_output_flag("true")
 
     else:
-        print("No DB changes detected.")
-        with open(os.getenv("GITHUB_OUTPUT"), "a") as f:
-            f.write("db_changes=false\n")
+        write_output_flag("false")
 
 
 if __name__ == "__main__":
