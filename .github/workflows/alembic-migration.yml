@@ -53,7 +53,7 @@ jobs:
           PROD_DB_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWD }}
           PROD_DB_NAME: ${{ secrets.PROD_POSTGRES_DB }}
           PROD_DB_HOST: ${{ env.PROD_HOST }}
-        run: python .github/scripts/check_db_changes.py
+        run: python .github/script/check_db_changes.py
       - name: Install Bytebase CLI
         if: steps.check_changes.outputs.db_changes == 'true'
         run: |
@@ -68,7 +68,7 @@ jobs:
         if: steps.check_changes.outputs.db_changes == 'true'
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: python .github/scripts/verify_sql_with_gemini.py src/backend/base/langflow/upgrade.sql src/backend/base/langflow/downgrade.sql
+        run: python .github/script/verify_sql_with_gemini.py src/backend/base/langflow/upgrade.sql src/backend/base/langflow/downgrade.sql
       - name: Manual approval for DB changes
         if: steps.check_changes.outputs.db_changes == 'true'
         uses: trstringer/manual-approval@v1
@@ -118,7 +118,7 @@ jobs:
           PROD_DB_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWD }}
           PROD_DB_NAME: ${{ secrets.PROD_POSTGRES_DB }}
           PROD_DB_HOST: ${{ env.PROD_HOST }}
-        run: python .github/scripts/apply_db_changes.py
+        run: python .github/script/apply_db_changes.py
 
   build-and-push:
     runs-on: ubuntu-latest
