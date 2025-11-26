@@ -41,6 +41,8 @@ jobs:
       - name: Install dependencies
         run: |
           pip install alembic psycopg2-binary google-generativeai
+      - name: Install sshpass
+        run: sudo apt-get update && sudo apt-get install -y sshpass    
       - name: Check for DB changes
         id: check_changes
         env:
@@ -49,10 +51,13 @@ jobs:
           STAGING_DB_PASSWORD: ${{ secrets.POSTGRES_PASSWD }}
           STAGING_DB_NAME: ${{ secrets.POSTGRES_DB }}
           STAGING_DB_HOST: ${{ env.STAGING_HOST }}
+          STAGING_VM_PASSWORD: ${{ secrets.VM_PASSWORD }}
           PROD_DB_USER: ${{ secrets.PROD_POSTGRES_USER }}
           PROD_DB_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWD }}
           PROD_DB_NAME: ${{ secrets.PROD_POSTGRES_DB }}
           PROD_DB_HOST: ${{ env.PROD_HOST }}
+          PROD_VM_PASSWORD: ${{ secrets.PROD_VM_PASSWORD }}
+
         run: python .github/script/check_db_changes.py
       - name: Install Bytebase CLI
         if: steps.check_changes.outputs.db_changes == 'true'

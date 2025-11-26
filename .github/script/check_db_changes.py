@@ -3,6 +3,49 @@ import subprocess
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError
 
+def get_revision_via_ssh(environment: str, host: str):
+    """Fetch the current alembic revision by SSH'ing into the VM and querying Postgres."""
+
+    vm_password = (
+        os.getenv("STAGING_VM_PASSWORD")
+        if environment == "staging"
+        else os.getenv("PROD_VM_PASSWORD")
+    )
+
+    if not vm_password or not host:
+        print("Warning: VM credentials not provided; skipping SSH DB check.")
+        return None
+
+    container_cmd = (
+        "container=$(docker ps --filter 'ancestor=postgres' --format '{{.Names}}' | head -n1); "
+        "if [ -z \"$container\" ]; then exit 1; fi; "
+        "docker exec -i \"$container\" psql -U langflow -d langflow -t -c \"select version_num from alembic_version;\""
+    )
+
+    ssh_command = [
+        "sshpass",
+        "-p",
+        vm_password,
+        "ssh",
+        "-o",
+        "StrictHostKeyChecking=no",
+        f"root@{host}",
+        container_cmd,
+    ]
+
+    try:
+        result = subprocess.run(
+            ssh_command, capture_output=True, text=True, check=True
+        )
+        revision = result.stdout.strip()
+        return revision or None
+    except subprocess.CalledProcessError as ssh_err:
+        print(
+            "Warning: SSH fallback to fetch alembic_version failed.",
+            f"Command output: {ssh_err.stderr or ssh_err.stdout}",
+        )
+        return None
+
 def main():
     environment = os.getenv("ENVIRONMENT")
     if environment == "staging":
@@ -26,6 +69,7 @@ def main():
     except OperationalError as e:
         # Connection issues (e.g., DB not reachable in CI) should not fail the workflow
         print(f"Warning: unable to connect to database: {e}")
+        current_revision = get_revision_via_ssh(environment, db_host)
         current_revision = None        
     except Exception as e:
         if "does not exist" in str(e):
