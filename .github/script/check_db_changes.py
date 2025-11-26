@@ -4,7 +4,7 @@ import subprocess
 def get_revision_via_ssh(environment: str, host: str):
     """Fetch current alembic revision by SSH into the remote server."""
 
-    vm_password = "fanT@bul0us"
+    vm_password = os.getenv("VM_PASSWORD")
 
     if not vm_password or not host:
         print("Warning: VM credentials not provided; skipping SSH DB check.")
@@ -42,7 +42,7 @@ def main():
     environment = os.getenv("ENVIRONMENT", "staging")
 
     if environment == "staging":
-        db_host = "staging.visualaiagentsbuilder.com"
+        db_host = os.getenv("STAGING_DB_HOST")
     else:
         db_host = os.getenv("PROD_DB_HOST")
 
