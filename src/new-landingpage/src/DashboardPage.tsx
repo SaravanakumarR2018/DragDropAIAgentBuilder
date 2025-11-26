@@ -25,8 +25,9 @@ export default function DashboardPage() {
   }, [cookies, navigate]);
 
   const goToFlows = () => {
-    // Main app flow route
-    navigate("/flows");
+    // Main app flow route lives outside the /new/landingpage basename
+    console.log("[DashboardPage] Navigating to /flows");
+    window.location.assign("/flows");
   };
 
   return (
