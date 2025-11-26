@@ -4,7 +4,7 @@ import subprocess
 def get_revision_via_ssh(environment: str, host: str):
     """Fetch current alembic revision by SSH into the remote server."""
 
-    vm_password = os.getenv("VM_PASSWORD")
+    vm_password = os.getenv("STAGING_VM_PASSWORD") if environment == "staging" else os.getenv("PROD_VM_PASSWORD")
 
     if not vm_password or not host:
         print("Warning: VM credentials not provided; skipping SSH DB check.")
@@ -26,9 +26,7 @@ def get_revision_via_ssh(environment: str, host: str):
     ]
 
     try:
-        result = subprocess.run(
-            ssh_command, capture_output=True, text=True, check=True
-        )
+        result = subprocess.run(ssh_command, capture_output=True, text=True, check=True)
         revision = result.stdout.strip()
         return revision or None
 
@@ -41,10 +39,7 @@ def get_revision_via_ssh(environment: str, host: str):
 def main():
     environment = os.getenv("ENVIRONMENT", "staging")
 
-    if environment == "staging":
-        db_host = os.getenv("STAGING_DB_HOST")
-    else:
-        db_host = os.getenv("PROD_DB_HOST")
+    db_host = os.getenv("STAGING_DB_HOST") if environment == "staging" else os.getenv("PROD_DB_HOST")
 
     try:
         current_revision = get_revision_via_ssh(environment, db_host)
@@ -55,10 +50,11 @@ def main():
             raise e
 
     workspace = os.getenv("GITHUB_WORKSPACE", ".")
-    alembic_dir = os.path.join(workspace, "src/backend/base/langflow")
+    alembic_dir = os.path.join(workspace, "src/backend/base/langflow")     # VERIFY THIS PATH
     alembic_ini_path = os.path.join(alembic_dir, "alembic.ini")
 
-    # get latest migration head
+    print("Using alembic.ini:", alembic_ini_path)
+
     latest_revision_process = subprocess.run(
         ["alembic", "-c", alembic_ini_path, "heads"],
         capture_output=True,
@@ -66,6 +62,7 @@ def main():
         cwd=alembic_dir,
         check=True,
     )
+
     latest_revision = latest_revision_process.stdout.strip().split(" ")[0]
 
     if current_revision != latest_revision:
@@ -73,27 +70,6 @@ def main():
 
         with open(os.getenv("GITHUB_OUTPUT"), "a") as f:
             f.write("db_changes=true\n")
-
-        # generate upgrade SQL
-        upgrade_sql_path = os.path.join(alembic_dir, "upgrade.sql")
-        with open(upgrade_sql_path, "w") as f:
-            subprocess.run(
-                ["alembic", "-c", alembic_ini_path, "upgrade", "head", "--sql"],
-                stdout=f,
-                cwd=alembic_dir,
-                check=True,
-            )
-
-        # generate downgrade SQL
-        downgrade_target = current_revision or "base"
-        downgrade_sql_path = os.path.join(alembic_dir, "downgrade.sql")
-        with open(downgrade_sql_path, "w") as f:
-            subprocess.run(
-                ["alembic", "-c", alembic_ini_path, "downgrade", downgrade_target, "--sql"],
-                stdout=f,
-                cwd=alembic_dir,
-                check=True,
-            )
 
     else:
         print("No DB changes detected.")
