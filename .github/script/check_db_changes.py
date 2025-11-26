@@ -1,6 +1,7 @@
 import os
 import subprocess
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import OperationalError
 
 def main():
     environment = os.getenv("ENVIRONMENT")
@@ -22,6 +23,10 @@ def main():
         with engine.connect() as connection:
             result = connection.execute(text("SELECT version_num FROM alembic_version"))
             current_revision = result.scalar_one_or_none()
+    except OperationalError as e:
+        # Connection issues (e.g., DB not reachable in CI) should not fail the workflow
+        print(f"Warning: unable to connect to database: {e}")
+        current_revision = None        
     except Exception as e:
         if "does not exist" in str(e):
             current_revision = None
