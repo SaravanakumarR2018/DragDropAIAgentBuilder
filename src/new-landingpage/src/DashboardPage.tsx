@@ -2,10 +2,12 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { LANDING_BASENAME } from "./landingRoutes";
 import { useCookies } from "react-cookie";
-
-const LANGFLOW_ACCESS_TOKEN = "access_token_lf";
-const LANGFLOW_REFRESH_TOKEN = "refresh_token_lf";
-const ACTIVE_ORG_STORAGE_KEY = "lf-active-org";
+import {
+  ACTIVE_ORG_STORAGE_KEY,
+  hasWorkspaceSession,
+  LANGFLOW_ACCESS_TOKEN,
+  LANGFLOW_REFRESH_TOKEN,
+} from "./session";
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -13,11 +15,7 @@ export default function DashboardPage() {
 
   // Validate minimal session
   useEffect(() => {
-    const token = cookies[LANGFLOW_ACCESS_TOKEN];
-    const orgSelected = sessionStorage.getItem("isOrgSelected") === "true";
-    const orgId = localStorage.getItem(ACTIVE_ORG_STORAGE_KEY);
-
-    if (!token || !orgSelected || !orgId) {
+    if (!hasWorkspaceSession(cookies)) {
       // Missing session → go to login
       console.log("[DashboardPage] Missing session, redirecting to", `${LANDING_BASENAME}/login`);
       navigate("/login", { replace: true });
