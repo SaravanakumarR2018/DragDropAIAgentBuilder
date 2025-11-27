@@ -1,34 +1,25 @@
 import { SignIn, SignedIn, SignedOut, useAuth } from "@clerk/clerk-react";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useCookies } from "react-cookie";
 import { LANDING_BASENAME } from "./landingRoutes";
-import {
-  hasWorkspaceSession,
-  LANGFLOW_ACCESS_TOKEN,
-  LANGFLOW_REFRESH_TOKEN,
-} from "./session";
+import { ACTIVE_ORG_STORAGE_KEY, ORG_SELECTED_KEY } from "./session";
 
 export default function NewLandingPageLogin() {
   const { isSignedIn, isLoaded } = useAuth();
   const navigate = useNavigate();
-  const [cookies] = useCookies([LANGFLOW_ACCESS_TOKEN, LANGFLOW_REFRESH_TOKEN]);
 
   console.log("[NewLandingPageLogin] render", { isLoaded, isSignedIn });
 
   useEffect(() => {
     if (isLoaded && isSignedIn) {
-      const workspaceReady = hasWorkspaceSession(cookies);
-      const destination = workspaceReady ? "/dashboard" : "/organization";
+      localStorage.removeItem(ORG_SELECTED_KEY);
+      localStorage.removeItem(ACTIVE_ORG_STORAGE_KEY);
 
-      console.log(
-        "[NewLandingPageLogin] User signed in, redirecting based on session",
-        { workspaceReady, destination },
-      );
+      console.log("[NewLandingPageLogin] User signed in, redirecting to organization");
 
-      navigate(destination, { replace: true });
+      navigate("/organization", { replace: true });
     }
-  }, [cookies, isLoaded, isSignedIn, navigate]);
+  }, [isLoaded, isSignedIn, navigate]);
 
   return (
     <div

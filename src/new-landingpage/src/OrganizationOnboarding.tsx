@@ -10,7 +10,6 @@ import {
 import {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
@@ -275,11 +274,6 @@ export default function OrganizationOnboarding() {
   const loadingMessage =
     status || "Preparing your workspace. This will only take a moment...";
 
-  const hasExistingOrgSelection = useMemo(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem(ORG_SELECTED_KEY) === "true";
-  }, []);
-
   /**
    * Persist session like old component (cookies + storage)
    * This is what the main app /flows logic expects.
@@ -398,39 +392,6 @@ export default function OrganizationOnboarding() {
     persistSession,
     user,
   ]);
-
-  useEffect(() => {
-    if (!isLoaded || !isSignedIn || !organization?.id) return;
-    if (!hasExistingOrgSelection || bootstrappedRef.current) return;
-
-    console.log(
-      "[OrganizationOnboarding] Existing org selection detected; bootstrapping",
-    );
-
-    bootstrapSession();
-  }, [
-    bootstrapSession,
-    hasExistingOrgSelection,
-    isLoaded,
-    isSignedIn,
-    organization?.id,
-  ]);
-
-  useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
-
-    const orgSelected = localStorage.getItem(ORG_SELECTED_KEY) === "true";
-    const activeOrgId = localStorage.getItem(ACTIVE_ORG_STORAGE_KEY);
-    const hasAccessToken = Boolean(cookies[LANGFLOW_ACCESS_TOKEN]);
-
-    if (orgSelected && activeOrgId && hasAccessToken) {
-      console.log("[OrganizationOnboarding] Session already present; routing to /dashboard", {
-        activeOrgId,
-      });
-      setShouldGoToDashboard(true);
-      navigate("/dashboard", { replace: true });
-    }
-  }, [cookies, isLoaded, isSignedIn, navigate]);
 
   /**
    * When Clerk redirects back with ?selected=true,
