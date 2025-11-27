@@ -1,20 +1,34 @@
 import { SignIn, SignedIn, SignedOut, useAuth } from "@clerk/clerk-react";
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useCookies } from "react-cookie";
 import { LANDING_BASENAME } from "./landingRoutes";
+import {
+  hasWorkspaceSession,
+  LANGFLOW_ACCESS_TOKEN,
+  LANGFLOW_REFRESH_TOKEN,
+} from "./session";
 
 export default function NewLandingPageLogin() {
   const { isSignedIn, isLoaded } = useAuth();
   const navigate = useNavigate();
+  const [cookies] = useCookies([LANGFLOW_ACCESS_TOKEN, LANGFLOW_REFRESH_TOKEN]);
 
   console.log("[NewLandingPageLogin] render", { isLoaded, isSignedIn });
 
   useEffect(() => {
     if (isLoaded && isSignedIn) {
-      console.log("[NewLandingPageLogin] User signed in, redirecting to /organization");
-      navigate("/organization", { replace: true });
+      const workspaceReady = hasWorkspaceSession(cookies);
+      const destination = workspaceReady ? "/dashboard" : "/organization";
+
+      console.log(
+        "[NewLandingPageLogin] User signed in, redirecting based on session",
+        { workspaceReady, destination },
+      );
+
+      navigate(destination, { replace: true });
     }
-  }, [isLoaded, isSignedIn, navigate]);
+  }, [cookies, isLoaded, isSignedIn, navigate]);
 
   return (
     <div
@@ -31,8 +45,8 @@ export default function NewLandingPageLogin() {
           <SignIn
             path={`${LANDING_BASENAME}/login`}
             routing="path"
-            afterSignInUrl={`${LANDING_BASENAME}/organization`}
-            redirectUrl={`${LANDING_BASENAME}/organization`}
+            afterSignInUrl={`${LANDING_BASENAME}/login`}
+            redirectUrl={`${LANDING_BASENAME}/login`}
           />
         </SignedOut>
         <SignedIn>

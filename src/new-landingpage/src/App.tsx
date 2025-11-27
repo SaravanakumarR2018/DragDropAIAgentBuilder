@@ -5,6 +5,12 @@ import NewLandingPageLogin from "./NewLandingPageLogin";
 import OrganizationOnboarding from "./OrganizationOnboarding";
 import "./App.css";
 import DashboardPage from "./DashboardPage";
+import { useCookies } from "react-cookie";
+import {
+  hasWorkspaceSession,
+  LANGFLOW_ACCESS_TOKEN,
+  LANGFLOW_REFRESH_TOKEN,
+} from "./session";
 
 const features = [
   "Visual builder for complex AI flows",
@@ -49,15 +55,20 @@ function LandingHero() {
 
 function RootRoute() {
   const { isSignedIn } = useAuth();
+  const [cookies] = useCookies([LANGFLOW_ACCESS_TOKEN, LANGFLOW_REFRESH_TOKEN]);
 
   console.log("[App] RootRoute render", { isSignedIn });
 
   if (isSignedIn) {
-    console.log(
-      "[App] Redirecting signed-in user from root to",
-      `${LANDING_BASENAME}/organization`,
-    );
-    return <Navigate to="/organization" replace />;
+    const workspaceReady = hasWorkspaceSession(cookies);
+    const destination = workspaceReady ? "/dashboard" : "/organization";
+
+    console.log("[App] Redirecting signed-in user from root", {
+      workspaceReady,
+      destination,
+    });
+
+    return <Navigate to={destination} replace />;
   }
 
   return <LandingHero />;

@@ -24,16 +24,19 @@ import { useCookies } from "react-cookie";
 import { LANDING_BASENAME } from "./landingRoutes";
 import logoicon from "./new-assets/visualailogo.png";
 import ProgressBar from "./ProgressBar";
+import {
+  ACTIVE_ORG_STORAGE_KEY,
+  LANGFLOW_ACCESS_TOKEN,
+  LANGFLOW_REFRESH_TOKEN,
+  ORG_SELECTED_KEY,
+} from "./session";
 /**
  * ==========
  * Constants
  * ==========
  */
 const CLERK_DUMMY_PASSWORD = "clerk_dummy_password";
-const LANGFLOW_ACCESS_TOKEN = "access_token_lf";
-const LANGFLOW_REFRESH_TOKEN = "refresh_token_lf";
 const LANGFLOW_AUTO_LOGIN_OPTION = "auto_login_lf";
-const ACTIVE_ORG_STORAGE_KEY = "lf-active-org";
 
 const API_BASE = (import.meta.env.VITE_LANGFLOW_API_BASE ?? "/api/v1/")
   .replace(/\/?$/, "/");
@@ -274,7 +277,7 @@ export default function OrganizationOnboarding() {
 
   const hasExistingOrgSelection = useMemo(() => {
     if (typeof window === "undefined") return false;
-    return sessionStorage.getItem("isOrgSelected") === "true";
+    return localStorage.getItem(ORG_SELECTED_KEY) === "true";
   }, []);
 
   /**
@@ -292,7 +295,7 @@ export default function OrganizationOnboarding() {
         setCookie(LANGFLOW_REFRESH_TOKEN, refreshToken, cookieOptions);
       }
 
-      sessionStorage.setItem("isOrgSelected", "true");
+      localStorage.setItem(ORG_SELECTED_KEY, "true");
       setStoredActiveOrgId(activeOrgId);
 
       console.log("[OrganizationOnboarding] Session persisted", {
@@ -308,7 +311,7 @@ export default function OrganizationOnboarding() {
     removeCookie(LANGFLOW_ACCESS_TOKEN, { path: "/" });
     removeCookie(LANGFLOW_REFRESH_TOKEN, { path: "/" });
     removeCookie(LANGFLOW_AUTO_LOGIN_OPTION, { path: "/" });
-    sessionStorage.removeItem("isOrgSelected");
+    localStorage.removeItem(ORG_SELECTED_KEY);
     setStoredActiveOrgId(null);
 
     try {
@@ -416,7 +419,7 @@ export default function OrganizationOnboarding() {
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
 
-    const orgSelected = sessionStorage.getItem("isOrgSelected") === "true";
+    const orgSelected = localStorage.getItem(ORG_SELECTED_KEY) === "true";
     const activeOrgId = localStorage.getItem(ACTIVE_ORG_STORAGE_KEY);
     const hasAccessToken = Boolean(cookies[LANGFLOW_ACCESS_TOKEN]);
 
