@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useCookies } from "react-cookie";
 import { LANDING_BASENAME } from "./landingRoutes";
 import {
+  clearStoredOrgSelection,
   hasWorkspaceSession,
   LANGFLOW_ACCESS_TOKEN,
   LANGFLOW_REFRESH_TOKEN,
@@ -15,6 +16,10 @@ export default function NewLandingPageLogin() {
   const [cookies] = useCookies([LANGFLOW_ACCESS_TOKEN, LANGFLOW_REFRESH_TOKEN]);
 
   console.log("[NewLandingPageLogin] render", { isLoaded, isSignedIn });
+
+  useEffect(() => {
+    clearStoredOrgSelection();
+  }, []);
 
   useEffect(() => {
     if (isLoaded && isSignedIn) {

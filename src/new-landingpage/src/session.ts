@@ -10,3 +10,14 @@ export function hasWorkspaceSession(cookies: Record<string, any>) {
 
   return Boolean(token && orgSelected && orgId);
 }
+
+export function clearStoredOrgSelection() {
+  if (typeof window === "undefined") return;
+
+  try {
+    localStorage.removeItem(ORG_SELECTED_KEY);
+    localStorage.removeItem(ACTIVE_ORG_STORAGE_KEY);
+  } catch (error) {
+    console.warn("[session] Unable to clear organization selection", error);
+  }
+}
