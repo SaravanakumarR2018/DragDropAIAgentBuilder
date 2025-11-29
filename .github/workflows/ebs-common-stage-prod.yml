@@ -126,8 +126,10 @@ jobs:
           echo "🔐 Ensuring Clerk admin user ${ADMIN_EMAIL} exists"
 
           # === LOOKUP USER ===
-          LOOKUP=$(curl -s -H "$AUTH_HEADER" "https://api.clerk.com/v1/users?email_address=${ADMIN_EMAIL}")
-          USER_ID=$(echo "$LOOKUP" | jq -r '.[0].id // empty')
+          LOOKUP=$(curl -s -H "$AUTH_HEADER" \
+            "https://api.clerk.com/v1/users?email_address=${ADMIN_EMAIL}")
+
+          USER_ID=$(echo "$LOOKUP" | jq -r '.[0]?.id // empty')
 
           if [ -z "$USER_ID" ] || [ "$USER_ID" = "null" ]; then
             echo "➕ Admin not found. Creating user..."
@@ -141,7 +143,7 @@ jobs:
               }")
 
             USER_ID=$(echo "$CREATE" | jq -r '.id // empty')
-            EMAIL_ID=$(echo "$CREATE" | jq -r '.email_addresses[0].id // empty')
+            EMAIL_ID=$(echo "$CREATE" | jq -r '.email_addresses[0]?.id // empty')
 
             if [ -z "$USER_ID" ] || [ "$USER_ID" = "null" ]; then
               echo "❌ User creation failed"
@@ -166,10 +168,14 @@ jobs:
 
             echo "🔄 Password updated"
 
-            # Fetch email ID after update
-            EMAIL_ID=$(curl -s -H "$AUTH_HEADER" \
-              "https://api.clerk.com/v1/users/${USER_ID}" \
-              | jq -r '.email_addresses[0].id // empty')
+            # Only fetch email ID once here
+            EMAIL_ID=$(echo "$UPDATE" | jq -r '.email_addresses[0]?.id // empty')
+
+            # If missing email array (rare), re-fetch
+            if [ -z "$EMAIL_ID" ] || [ "$EMAIL_ID" = "null" ]; then
+              USER=$(curl -s -H "$AUTH_HEADER" "https://api.clerk.com/v1/users/${USER_ID}")
+              EMAIL_ID=$(echo "$USER" | jq -r '.email_addresses[0]?.id // empty')
+            fi
           fi
 
           if [ -z "$EMAIL_ID" ] || [ "$EMAIL_ID" = "null" ]; then
@@ -184,7 +190,8 @@ jobs:
             -X PATCH "https://api.clerk.com/v1/email_addresses/${EMAIL_ID}" \
             -d '{"verified": true}')
 
-          STATUS=$(echo "$VERIFY" | jq -r '.verification.status // empty')
+          # Updated jq (recommended)
+          STATUS=$(echo "$VERIFY" | jq -r '.verification?.status // empty')
 
           if [ "$STATUS" = "verified" ]; then
             echo "✅ Email marked as verified"
