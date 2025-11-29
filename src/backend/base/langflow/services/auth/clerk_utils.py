@@ -153,7 +153,12 @@ async def _ensure_admin_superuser(user: User) -> None:
         logger.debug("[ClerkAdmin] LANGFLOW_WEBSITE_DOMAIN/WEBSITE_DOMAIN not set; skipping admin promotion")
         return
 
-    user_email = (getattr(user, "email", None) or user.username).lower()
+    optins = getattr(user, "optins", None)
+    optins_email = None
+    if isinstance(optins, dict):
+        optins_email = optins.get("email")
+
+    user_email = (optins_email or getattr(user, "email", None) or user.username).lower()
     if user_email != admin_email:
         return
 
