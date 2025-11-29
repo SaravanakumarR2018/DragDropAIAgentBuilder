@@ -154,12 +154,14 @@ async def _ensure_admin_superuser(user: User) -> None:
         return
 
     optins = getattr(user, "optins", None)
-    optins_email = None
-    if isinstance(optins, dict):
-        optins_email = optins.get("email")
+    if not isinstance(optins, dict):
+        return
 
-    user_email = (optins_email or getattr(user, "email", None) or user.username).lower()
-    if user_email != admin_email:
+    optins_email = optins.get("email")
+    if not optins_email:
+        return
+
+    if optins_email.lower() != admin_email:
         return
 
     if not user.is_superuser:
