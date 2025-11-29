@@ -153,7 +153,8 @@ async def _ensure_admin_superuser(user: User) -> None:
         logger.debug("[ClerkAdmin] LANGFLOW_WEBSITE_DOMAIN/WEBSITE_DOMAIN not set; skipping admin promotion")
         return
 
-    if user.username.lower() != admin_email:
+    user_email = (getattr(user, "email", None) or user.username).lower()
+    if user_email != admin_email:
         return
 
     if not user.is_superuser:
