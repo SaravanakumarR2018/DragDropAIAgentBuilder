@@ -3,6 +3,7 @@ import {
   useOrganization,
   useUser,
 } from "@clerk/clerk-react";
+import { cn } from "@/utils/cn";
 import { IS_CLERK_AUTH } from "@/clerk/auth";
 import {
   Dialog,
@@ -31,7 +32,15 @@ export function OrganizationMembersDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl">
+      <DialogContent
+        className={cn(
+          "w-full",
+          "sm:max-w-3xl max-w-lg", // responsive width
+          "max-h-[90vh]", // always fits inside viewport
+          "overflow-y-auto", // enable scrolling
+          "p-4 sm:p-6" // responsive padding
+        )}
+      >
         <DialogHeader>
           <DialogTitle>Members</DialogTitle>
           <DialogDescription>
@@ -39,12 +48,18 @@ export function OrganizationMembersDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-3 rounded-lg border bg-muted/40 px-4 py-3 text-sm sm:grid-cols-2">
+        {/* User + Org IDs */}
+        <div
+          className={cn(
+            "grid gap-3 text-sm sm:grid-cols-2",
+            "rounded-lg border bg-muted/40 px-4 py-3"
+          )}
+        >
           <div className="space-y-1">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               User ID
             </p>
-            <p className="font-mono break-all text-foreground">
+            <p className="font-mono break-all text-foreground select-all">
               {userId ?? (isUserLoaded ? "Unavailable" : "Loading...")}
             </p>
           </div>
@@ -52,19 +67,26 @@ export function OrganizationMembersDialog({
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Org ID
             </p>
-            <p className="font-mono break-all text-foreground">
+            <p className="font-mono break-all text-foreground select-all">
               {orgId ?? (isOrganizationLoaded ? "Unavailable" : "Loading...")}
             </p>
           </div>
         </div>
 
-        <div className="rounded-lg border shadow-sm">
+        {/* Organization profile (Scrollable) */}
+        <div
+          className={cn(
+            "rounded-lg border shadow-sm",
+            "overflow-hidden" // prevent internal overflow clipping
+          )}
+        >
           <OrganizationProfile
             routing="hash"
             appearance={{
               elements: {
-                rootBox: "shadow-none border-0",
-                card: "shadow-none border-0",
+                rootBox: "shadow-none border-0 !w-full",
+                card: "shadow-none border-0 !w-full",
+                scrollBox: "!overflow-y-auto", // ensure Clerk internal scroll
               },
             }}
           />
