@@ -1,108 +1,67 @@
 import os
 import subprocess
 
-def get_revision_via_ssh(environment: str, host: str):
-    """Fetch current alembic revision by SSH into the remote server."""
 
-    vm_password = os.getenv("STAGING_VM_PASSWORD") if environment == "staging" else os.getenv("PROD_VM_PASSWORD")
+def get_remote_revision(environment: str, host: str):
+    """Get current alembic revision from Postgres container inside VM."""
 
-    if not vm_password or not host:
-        print("Warning: VM credentials not provided; skipping SSH DB check.")
-        return None
-
-    container_cmd = (
-        "container=$(docker ps --filter 'ancestor=postgres' --format '{{.Names}}' | head -n1); "
-        "if [ -z \"$container\" ]; then exit 1; fi; "
-        "docker exec -i \"$container\" psql -U langflow -d langflow -t -c \"select version_num from alembic_version;\""
+    vm_password = (
+        os.getenv("STAGING_VM_PASSWORD")
+        if environment == "staging"
+        else os.getenv("PROD_VM_PASSWORD")
     )
 
-    ssh_command = [
+    if not vm_password:
+        print("Missing VM password")
+        return None
+
+    # Command to run on the VM
+    cmd = (
+        "container=$(docker ps --filter 'ancestor=postgres' --format '{{.Names}}' | head -n1); "
+        "if [ -z \"$container\" ]; then echo 'NO_CONTAINER'; exit 1; fi; "
+        "docker exec -i \"$container\" psql -U langflow -d langflow -t -c "
+        "\"select version_num from alembic_version;\""
+    )
+
+    ssh_cmd = [
         "sshpass",
         "-p", vm_password,
         "ssh",
         "-o", "StrictHostKeyChecking=no",
         f"root@{host}",
-        container_cmd,
+        cmd,
     ]
 
     try:
-        result = subprocess.run(ssh_command, capture_output=True, text=True, check=True)
-        revision = result.stdout.strip()
-        return revision or None
-
-    except subprocess.CalledProcessError as ssh_err:
-        print("Warning: SSH failed.")
-        print("Output:", ssh_err.stderr or ssh_err.stdout)
+        result = subprocess.run(
+            ssh_cmd,
+            text=True,
+            capture_output=True,
+            check=True
+        )
+        return result.stdout.strip()
+    except subprocess.CalledProcessError as e:
+        print("SSH error:", e.stderr or e.stdout)
         return None
 
 
 def main():
     environment = os.getenv("ENVIRONMENT", "staging")
+    host = (
+        os.getenv("STAGING_DB_HOST")
+        if environment == "staging"
+        else os.getenv("PROD_DB_HOST")
+    )
 
-    db_host = os.getenv("STAGING_DB_HOST") if environment == "staging" else os.getenv("PROD_DB_HOST")
+    revision = get_remote_revision(environment, host)
 
-    try:
-        current_revision = get_revision_via_ssh(environment, db_host)
-    except Exception as e:
-        if "does not exist" in str(e):
-            current_revision = None
-        else:
-            raise e
+    print(f"VM Alembic revision: {revision}")
 
-    workspace = os.getenv("GITHUB_WORKSPACE", ".")
-    alembic_dir = os.path.join(workspace, "src/backend/base/langflow")     # VERIFY THIS PATH
-    alembic_ini_path = os.path.join(alembic_dir, "alembic.ini")
-
-    print("Using alembic.ini:", alembic_ini_path)
-
-    alembic_command = ["alembic", "-c", alembic_ini_path, "heads"]
-
-    def write_output_flag(value: str):
-        output_path = os.getenv("GITHUB_OUTPUT")
-        if not output_path:
-            return
-        with open(output_path, "a") as f:
-            f.write(f"db_changes={value}\n")
-
-    def run_alembic(command: list[str]):
-        try:
-            return subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                cwd=alembic_dir,
-                check=True,
-            )
-        except subprocess.CalledProcessError as err:
-            print("Alembic command failed.")
-            if err.stdout:
-                print("Stdout:", err.stdout)
-            if err.stderr:
-                print("Stderr:", err.stderr)
-            raise
-
-    try:
-        latest_revision_process = run_alembic(alembic_command)
-    except FileNotFoundError:
-        print("Alembic CLI not found; retrying with uv.")
-        uv_command = [
-            "uv",
-            "run",
-            "--project",
-            os.path.join(workspace, "src/backend/base"),
-            *alembic_command,
-        ]
-        latest_revision_process = run_alembic(uv_command)
-
-    latest_revision = latest_revision_process.stdout.strip().split(" ")[0]
-
-    if current_revision != latest_revision:
-        print(f"DB changes detected → current: {current_revision}, latest: {latest_revision}")
-
-        write_output_flag("true")
-
-    else:
-        write_output_flag("false")
+    # Write output so GitHub Actions can read it
+    github_output = os.getenv("GITHUB_OUTPUT")
+    if github_output:
+        with open(github_output, "a") as f:
+            f.write(f"vm_alembic_version={revision}\n")
 
 
 if __name__ == "__main__":

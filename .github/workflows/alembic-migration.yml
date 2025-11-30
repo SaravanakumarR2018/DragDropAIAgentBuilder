@@ -43,22 +43,19 @@ jobs:
           pip install alembic psycopg2-binary google-generativeai
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass    
-      - name: Check for DB changes
-        id: check_changes
-        env:
-          ENVIRONMENT: ${{ github.event.inputs.environment }}
-          STAGING_DB_USER: ${{ secrets.POSTGRES_USER }}
-          STAGING_DB_PASSWORD: ${{ secrets.POSTGRES_PASSWD }}
-          STAGING_DB_NAME: ${{ secrets.POSTGRES_DB }}
-          STAGING_DB_HOST: ${{ env.STAGING_HOST }}
-          STAGING_VM_PASSWORD: ${{ secrets.VM_PASSWORD }}
-          PROD_DB_USER: ${{ secrets.PROD_POSTGRES_USER }}
-          PROD_DB_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWD }}
-          PROD_DB_NAME: ${{ secrets.PROD_POSTGRES_DB }}
-          PROD_DB_HOST: ${{ env.PROD_HOST }}
-          PROD_VM_PASSWORD: ${{ secrets.PROD_VM_PASSWORD }}
-
-        run: python .github/script/check_db_changes.py
+      - name: Get VM alembic version
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
+          username: root
+          password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
+        script: |  
+          export ENVIRONMENT=${{ github.event.inputs.environment }}
+          export STAGING_VM_PASSWORD=${{ secrets.VM_PASSWORD }}
+          export PROD_VM_PASSWORD=${{ secrets.PROD_VM_PASSWORD }}
+          export STAGING_DB_HOST=${{ env.STAGING_HOST }}
+          export PROD_DB_HOST=${{ env.PROD_HOST }}
+          python /root/workspace/.github/script/check_db_changes.py
       - name: Install Bytebase CLI
         if: steps.check_changes.outputs.db_changes == 'true'
         run: |
