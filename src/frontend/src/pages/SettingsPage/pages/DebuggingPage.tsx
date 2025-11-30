@@ -1,6 +1,5 @@
 import { IS_CLERK_AUTH } from "@/clerk/auth";
 import ForwardedIconComponent from "@/components/common/genericIconComponent";
-import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -8,16 +7,36 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { useOrganization, useUser } from "@clerk/clerk-react";
+import { useCallback, useMemo, useState } from "react";
 
 function ClerkDebuggingContent() {
+  const [copiedId, setCopiedId] = useState<"user" | "org" | null>(null);
   const { user, isLoaded: isUserLoaded } = useUser();
   const { organization, isLoaded: isOrganizationLoaded } = useOrganization();
 
-  const userId = isUserLoaded ? user?.id ?? "Unavailable" : "Loading...";
-  const orgId = isOrganizationLoaded
-    ? organization?.id ?? "No active organization"
-    : "Loading...";
+  const userId = useMemo(
+    () => (isUserLoaded ? user?.id ?? "Unavailable" : "Loading..."),
+    [isUserLoaded, user?.id],
+  );
+
+  const orgId = useMemo(
+    () =>
+      isOrganizationLoaded
+        ? organization?.id ?? "No active organization"
+        : "Loading...",
+    [isOrganizationLoaded, organization?.id],
+  );
+
+  const handleCopy = useCallback((value: string, key: "user" | "org") => {
+    if (typeof navigator === "undefined" || !navigator.clipboard) return;
+
+    navigator.clipboard.writeText(value).then(() => {
+      setCopiedId(key);
+      setTimeout(() => setCopiedId(null), 1500);
+    });
+  }, []);
 
   return (
     <div className="flex h-full w-full flex-col gap-6">
@@ -29,55 +48,57 @@ function ClerkDebuggingContent() {
             className="ml-2 h-5 w-5 text-primary"
           />
         </h2>
-        <p className="text-sm text-muted-foreground">
-          Inspect the Clerk identifiers currently in use to help troubleshoot
-          authentication or organization access.
-        </p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <Card className="h-full bg-card/60 backdrop-blur">
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>User ID</CardTitle>
-                <CardDescription>
-                  Unique identifier for the signed-in Clerk user.
-                </CardDescription>
-              </div>
-              <Badge variant="outline" className="font-normal">
-                {isUserLoaded ? "Loaded" : "Pending"}
-              </Badge>
-            </div>
+            <CardTitle>User ID</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between rounded-md border border-border bg-background/80 px-3 py-2 font-mono text-sm">
               <span className="truncate" title={userId}>
                 {userId}
               </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => handleCopy(userId, "user")}
+                className="ml-3"
+                disabled={!isUserLoaded}
+              >
+                <ForwardedIconComponent
+                  name={copiedId === "user" ? "Check" : "Copy"}
+                  className="h-4 w-4"
+                />
+                <span className="sr-only">Copy user id</span>
+              </Button>
             </div>
           </CardContent>
         </Card>
 
         <Card className="h-full bg-card/60 backdrop-blur">
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Organization ID</CardTitle>
-                <CardDescription>
-                  Active organization identifier from Clerk.
-                </CardDescription>
-              </div>
-              <Badge variant="outline" className="font-normal">
-                {isOrganizationLoaded ? "Loaded" : "Pending"}
-              </Badge>
-            </div>
+            <CardTitle>Organization ID</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between rounded-md border border-border bg-background/80 px-3 py-2 font-mono text-sm">
               <span className="truncate" title={orgId}>
                 {orgId}
               </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => handleCopy(orgId, "org")}
+                className="ml-3"
+                disabled={!isOrganizationLoaded}
+              >
+                <ForwardedIconComponent
+                  name={copiedId === "org" ? "Check" : "Copy"}
+                  className="h-4 w-4"
+                />
+                <span className="sr-only">Copy organization id</span>
+              </Button>
             </div>
           </CardContent>
         </Card>
