@@ -14,6 +14,7 @@ import ForwardedIconComponent from "../../components/common/genericIconComponent
 import PageLayout from "../../components/common/pageLayout";
 import { useClerk, useOrganization } from "@clerk/clerk-react";
 import { IS_CLERK_AUTH } from "@/clerk/auth";
+import useAuthStore from "@/stores/authStore";
 
 type SettingsPageBaseProps = {
   headerActions?: ReactNode;
@@ -107,6 +108,7 @@ const SettingsPageBase = ({
 const SettingsPageWithClerk = () => {
   const { openUserProfile, openOrganizationProfile } = useClerk();
   const { organization, isLoaded: isOrganizationLoaded } = useOrganization();
+  const isAdmin = useAuthStore((state) => state.isAdmin);
 
   const canManageMembers = Boolean(
     isOrganizationLoaded && organization?.id && openOrganizationProfile,
@@ -145,6 +147,19 @@ const SettingsPageWithClerk = () => {
       disabled: !canManageMembers,
     },
   ];
+
+  if (isAdmin) {
+    clerkNavItems.push({
+      title: "Admin Settings",
+      icon: (
+        <ForwardedIconComponent
+          name="Shield"
+          className="w-4 flex-shrink-0 justify-start stroke-[1.5]"
+        />
+      ),
+      href: "/new/landingpage/admin_settings",
+    });
+  }
 
   // Pass Clerk items so they show at the bottom
   return <SettingsPageBase additionalNavItems={clerkNavItems} />;

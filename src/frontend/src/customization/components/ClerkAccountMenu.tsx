@@ -1,6 +1,6 @@
 import { UserButton, useClerk, useUser } from "@clerk/clerk-react";
 import { IS_CLERK_AUTH, useLogout } from "@/clerk/auth";
-import { LogOut, Users, Settings, User } from "lucide-react";
+import { LogOut, Users, Settings, User, ShieldCheck } from "lucide-react";
 import { AccountMenu } from "@/components/core/appHeaderComponent/components/AccountMenu";
 import { cn } from "@/utils/utils";
 import {
@@ -11,12 +11,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useState } from "react";
 import ThemeButtons from "@/components/core/appHeaderComponent/components/ThemeButtons";
+import useAuthStore from "@/stores/authStore";
 
 export function ClerkAccountMenu() {
   const { mutate: mutationLogout } = useLogout();
   const { openUserProfile, openOrganizationProfile } = useClerk();
   const { user } = useUser();
   const [menuOpen, setMenuOpen] = useState(false);
+  const isAdmin = useAuthStore((state) => state.isAdmin);
 
   const handleLogout = () => {
     mutationLogout();
@@ -89,6 +91,19 @@ export function ClerkAccountMenu() {
             <Users className="h-4 w-4" />
             Members
           </DropdownMenuItem>
+
+          {/* Admin Settings */}
+          {isAdmin && (
+            <DropdownMenuItem asChild>
+              <a
+                href="/new/landingpage/admin_settings"
+                className="flex items-center gap-3 px-5 py-3 rounded-lg hover:bg-muted/30 transition"
+              >
+                <ShieldCheck className="h-4 w-4" />
+                Admin Settings
+              </a>
+            </DropdownMenuItem>
+          )}
 
           {/* Settings */}
           <DropdownMenuItem asChild>
