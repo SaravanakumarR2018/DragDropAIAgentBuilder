@@ -15,6 +15,7 @@ import PageLayout from "../../components/common/pageLayout";
 import { useClerk, useOrganization } from "@clerk/clerk-react";
 import { IS_CLERK_AUTH } from "@/clerk/auth";
 import { OrganizationMembersDialog } from "@/components/clerk/OrganizationMembersDialog";
+import { clerkAppearance } from "@/clerk/appearance";
 
 type SettingsPageBaseProps = {
   headerActions?: ReactNode;
@@ -115,7 +116,7 @@ const SettingsPageWithClerk = () => {
   );
 
   const handleManageAccount = () => {
-    openUserProfile?.();
+    openUserProfile?.({ appearance: clerkAppearance });
   };
 
   const handleManageMembers = () => {

@@ -12,6 +12,7 @@ import {
 import { useState } from "react";
 import ThemeButtons from "@/components/core/appHeaderComponent/components/ThemeButtons";
 import { OrganizationMembersDialog } from "@/components/clerk/OrganizationMembersDialog";
+import { clerkAppearance } from "@/clerk/appearance";
 
 export function ClerkAccountMenu() {
   const { mutate: mutationLogout } = useLogout();
@@ -24,7 +25,8 @@ export function ClerkAccountMenu() {
     mutationLogout();
   };
 
-  const handleOpenUserProfile = () => openUserProfile?.();
+  const handleOpenUserProfile = () =>
+    openUserProfile?.({ appearance: clerkAppearance });
 
   const handleOpenMembers = () => {
     setMenuOpen(false);

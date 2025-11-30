@@ -5,6 +5,7 @@ import {
 } from "@clerk/clerk-react";
 import { cn } from "@/utils/cn";
 import { IS_CLERK_AUTH } from "@/clerk/auth";
+import { clerkAppearance } from "@/clerk/appearance";
 import {
   Dialog,
   DialogContent,
@@ -83,7 +84,9 @@ export function OrganizationMembersDialog({
           <OrganizationProfile
             routing="hash"
             appearance={{
+              ...clerkAppearance,
               elements: {
+                ...clerkAppearance.elements,
                 rootBox: "shadow-none border-0 !w-full",
                 card: "shadow-none border-0 !w-full",
                 scrollBox: "!overflow-y-auto", // ensure Clerk internal scroll
