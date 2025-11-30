@@ -124,16 +124,6 @@ const SettingsPageWithClerk = () => {
 
   const clerkNavItems: SidebarNavItem[] = [
     {
-      title: "Debugging",
-      href: "/settings/debugging",
-      icon: (
-        <ForwardedIconComponent
-          name="Bug"
-          className="w-4 flex-shrink-0 justify-start stroke-[1.5]"
-        />
-      ),
-    },
-    {
       title: "Manage Account",
       icon: (
         <ForwardedIconComponent
@@ -153,6 +143,16 @@ const SettingsPageWithClerk = () => {
       ),
       onClick: handleManageMembers,
       disabled: !canManageMembers,
+    },
+    {
+      title: "Debugging",
+      href: "/settings/debugging",
+      icon: (
+        <ForwardedIconComponent
+          name="Bug"
+          className="w-4 flex-shrink-0 justify-start stroke-[1.5]"
+        />
+      ),
     },
   ];
 
