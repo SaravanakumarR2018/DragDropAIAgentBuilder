@@ -50,11 +50,6 @@ jobs:
           username: root
           password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
         script: |  
-          export ENVIRONMENT=${{ github.event.inputs.environment }}
-          export STAGING_VM_PASSWORD=${{ secrets.VM_PASSWORD }}
-          export PROD_VM_PASSWORD=${{ secrets.PROD_VM_PASSWORD }}
-          export STAGING_DB_HOST=${{ env.STAGING_HOST }}
-          export PROD_DB_HOST=${{ env.PROD_HOST }}
           python /root/workspace/.github/script/check_db_changes.py
       - name: Install Bytebase CLI
         if: steps.check_changes.outputs.db_changes == 'true'

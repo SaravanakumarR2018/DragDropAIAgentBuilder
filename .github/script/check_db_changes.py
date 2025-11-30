@@ -1,63 +1,30 @@
-import os
 import subprocess
 
 
-def get_remote_revision(environment: str, host: str):
-    """Get current alembic revision from Postgres container inside VM."""
-
-    vm_password = (
-        os.getenv("STAGING_VM_PASSWORD")
-        if environment == "staging"
-        else os.getenv("PROD_VM_PASSWORD")
-    )
-
-    if not vm_password:
-        print("Missing VM password")
-        return None
-
-    # Command to run on the VM
+def get_revision():
+    """Get alembic version from Postgres container inside VM."""
     cmd = (
         "container=$(docker ps --filter 'ancestor=postgres' --format '{{.Names}}' | head -n1); "
         "if [ -z \"$container\" ]; then echo 'NO_CONTAINER'; exit 1; fi; "
-        "docker exec -i \"$container\" psql -U langflow -d langflow -t -c "
-        "\"select version_num from alembic_version;\""
+        "docker exec -i \"$container\" "
+        "psql -U langflow -d langflow -t -c \"select version_num from alembic_version;\""
     )
 
-    ssh_cmd = [
-        "sshpass",
-        "-p", vm_password,
-        "ssh",
-        "-o", "StrictHostKeyChecking=no",
-        f"root@{host}",
+    result = subprocess.run(
         cmd,
-    ]
+        shell=True,
+        capture_output=True,
+        text=True
+    )
 
-    try:
-        result = subprocess.run(
-            ssh_cmd,
-            text=True,
-            capture_output=True,
-            check=True
-        )
-        return result.stdout.strip()
-    except subprocess.CalledProcessError as e:
-        print("SSH error:", e.stderr or e.stdout)
-        return None
+    return result.stdout.strip()
 
 
 def main():
-    environment = os.getenv("ENVIRONMENT", "staging")
-    host = (
-        os.getenv("STAGING_DB_HOST")
-        if environment == "staging"
-        else os.getenv("PROD_DB_HOST")
-    )
+    revision = get_revision()
+    print(f"VM Alembic Revision: {revision}")
 
-    revision = get_remote_revision(environment, host)
-
-    print(f"VM Alembic revision: {revision}")
-
-    # Write output so GitHub Actions can read it
+    # Write to GitHub output if available
     github_output = os.getenv("GITHUB_OUTPUT")
     if github_output:
         with open(github_output, "a") as f:
