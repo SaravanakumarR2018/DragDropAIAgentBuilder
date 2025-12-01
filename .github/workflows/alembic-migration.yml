@@ -43,7 +43,13 @@ jobs:
           pip install alembic psycopg2-binary google-generativeai
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass    
+      - name: Get repo alembic version
+        id: repo_version
+        run: |
+          python .github/script/detect_alembic_revision.py
+        shell: bash  
       - name: Get VM alembic version
+        id: vm_version
         uses: appleboy/ssh-action@v1.1.0
         with:
           host: ${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
@@ -51,6 +57,17 @@ jobs:
           password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
         script: |  
           python /root/workspace/.github/script/check_db_changes.py
+      - name: Compare alembic versions
+        run: |
+          echo "Repo Revision: ${{ steps.repo_version.outputs.repo_alembic_version }}"
+          echo "VM Revision: ${{ steps.vm_version.outputs.vm_alembic_version }}"
+
+          if [ "${{ steps.repo_version.outputs.repo_alembic_version }}" != "${{ steps.vm_version.outputs.vm_alembic_version }}" ]; then
+            echo "Alembic versions differ — database upgrade needed."
+            exit 1
+          else
+            echo "Alembic versions match — OK."
+          fi    
       - name: Install Bytebase CLI
         if: steps.check_changes.outputs.db_changes == 'true'
         run: |

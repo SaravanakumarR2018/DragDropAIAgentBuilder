@@ -1,10 +1,11 @@
+import os
 import subprocess
 
 
 def get_revision():
     """Get alembic version from Postgres container inside VM."""
     cmd = (
-        "container=$(docker ps --filter 'ancestor=postgres' --format '{{.Names}}' | head -n1); "
+        "container=$(docker ps --filter 'name=postgres' --format '{{.Names}}' | head -n1); "
         "if [ -z \"$container\" ]; then echo 'NO_CONTAINER'; exit 1; fi; "
         "docker exec -i \"$container\" "
         "psql -U langflow -d langflow -t -c \"select version_num from alembic_version;\""
@@ -24,7 +25,6 @@ def main():
     revision = get_revision()
     print(f"VM Alembic Revision: {revision}")
 
-    # Write to GitHub output if available
     github_output = os.getenv("GITHUB_OUTPUT")
     if github_output:
         with open(github_output, "a") as f:
