@@ -18,8 +18,10 @@ export default function NewLandingPageLogin() {
   console.log("[NewLandingPageLogin] render", { isLoaded, isSignedIn });
 
   useEffect(() => {
-    clearStoredOrgSelection();
-  }, []);
+    if (isLoaded && !isSignedIn) {
+      clearStoredOrgSelection();
+    }
+  }, [isLoaded, isSignedIn]);
 
   useEffect(() => {
     if (isLoaded && isSignedIn) {
