@@ -52,6 +52,11 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 COPY ./src /app/src
 
+
+# Install alembic explicitly into .venv
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv add alembic
+
 ARG VITE_AUTO_LOGIN=true
 ENV VITE_AUTO_LOGIN=$VITE_AUTO_LOGIN
     
@@ -103,10 +108,27 @@ RUN apt-get update \
 
 COPY --from=builder --chown=1000 /app/.venv /app/.venv
 COPY --from=builder --chown=1000 /app/new-landingpage /app/new-landingpage
+# ⭐ REQUIRED: copy backend source code
+COPY --from=builder --chown=1000 /app/src /app/src
 COPY docker/nginx/nginx.conf /etc/nginx/nginx.conf.template
 COPY docker/supervisord.conf /etc/supervisor/supervisord.conf
 COPY docker/entrypoint.sh /usr/local/bin/langflow-entrypoint.sh
 RUN chmod +x /usr/local/bin/langflow-entrypoint.sh
+
+################################
+# ⭐ ALEMBIC MIGRATION SUPPORT ⭐
+################################
+
+# Copy Alembic migrations INTO the runtime container
+# (THIS is the MOST IMPORTANT part)
+COPY src/backend/base/langflow/alembic /app/alembic
+COPY src/backend/base/langflow/alembic.ini /app/alembic.ini
+
+# Ensure the backend code is on PYTHONPATH so env.py imports work
+ENV PYTHONPATH="/app/src/backend/base:$PYTHONPATH"
+
+# Alembic CLI config
+ENV ALEMBIC_CONFIG=/app/alembic.ini
 
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
