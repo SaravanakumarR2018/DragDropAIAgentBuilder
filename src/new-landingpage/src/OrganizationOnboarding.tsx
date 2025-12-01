@@ -272,8 +272,6 @@ export default function OrganizationOnboarding() {
   const isMobile = typeof window !== "undefined" && window.innerWidth < 640;
 
   const showLoadingOverlay = isBootstrapping;
-  const loadingMessage =
-    status || "Preparing your workspace. This will only take a moment...";
 
   const hasExistingOrgSelection = useMemo(() => {
     if (typeof window === "undefined") return false;
@@ -507,9 +505,8 @@ export default function OrganizationOnboarding() {
       {showLoadingOverlay && (
         <div className="loading-overlay" role="status" aria-live="polite">
           <div className="loading-card">
-            <div className="loading-title">Setting up your organization</div>
+            <div className="loading-title">Setting up things for you</div>
             <ProgressBar remSize={18} />
-            <div className="loading-subtitle">{loadingMessage}</div>
           </div>
         </div>
       )}
