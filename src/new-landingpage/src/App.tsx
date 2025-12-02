@@ -3,6 +3,7 @@ import { BrowserRouter, Link, Navigate, Route, Routes } from "react-router-dom";
 import { LANDING_BASENAME } from "./landingRoutes";
 import NewLandingPageLogin from "./NewLandingPageLogin";
 import OrganizationOnboarding from "./OrganizationOnboarding";
+import AdminDetails from "./AdminDetails";
 import "./App.css";
 import DashboardPage from "./DashboardPage";
 import { useCookies } from "react-cookie";
@@ -83,6 +84,7 @@ export default function App() {
         <Route path="/" element={<RootRoute />} />
         <Route path="/login" element={<NewLandingPageLogin />} />
         <Route path="/organization" element={<OrganizationOnboarding />} />
+        <Route path="/admin_details" element={<AdminDetails />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
