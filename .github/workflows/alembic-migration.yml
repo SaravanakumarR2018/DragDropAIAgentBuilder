@@ -85,7 +85,7 @@ jobs:
 
       - name: Upload SQL files
         if: steps.compare.outputs.db_changes == 'true'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: alembic-sql
           path: src/backend/base/langflow/alembic_sql/
