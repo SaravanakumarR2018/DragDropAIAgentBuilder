@@ -125,8 +125,47 @@ jobs:
             src/backend/base/langflow/alembic_sql/upgrade.sql
             src/backend/base/langflow/alembic_sql/downgrade.sql
 
+  apply-db-changes:
+    runs-on: ubuntu-latest
+    needs: check-db-changes
+    if: needs.check-db-changes.outputs.db_changes == 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download SQL artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: sql-migrations
+          path: migrations
+
+      - name: Install DB dependencies
+        run: pip install sqlalchemy psycopg2-binary alembic
+
+      - name: Manual approval to apply DB changes
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ secrets.GITHUB_TOKEN }}
+          approvers: ${{ github.actor }}
+          minimum-approvals: 1
+
+      - name: Apply DB changes
+        env:
+          ENVIRONMENT: ${{ github.event.inputs.environment }}
+          STAGING_DB_USER: ${{ secrets.POSTGRES_USER }}
+          STAGING_DB_PASSWORD: ${{ secrets.POSTGRES_PASSWD }}
+          STAGING_DB_NAME: ${{ secrets.POSTGRES_DB }}
+          STAGING_DB_HOST: ${{ env.STAGING_HOST }}
+          PROD_DB_USER: ${{ secrets.PROD_POSTGRES_USER }}
+          PROD_DB_PASSWORD: ${{ secrets.PROD_POSTGRES_PASSWD }}
+          PROD_DB_NAME: ${{ secrets.PROD_POSTGRES_DB }}
+          PROD_DB_HOST: ${{ env.PROD_HOST }}
+        run: python .github/script/apply_db_changes.py          
+
   build-and-push:
     runs-on: ubuntu-latest
+    needs: apply-db-changes
+    if: needs.apply-db-changes.result == 'success' || needs.check-db-changes.outputs.db_changes == 'false'
 
     steps:
       - name: Checkout selected branch
