@@ -65,7 +65,7 @@ jobs:
           host: ${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
           username: root
           password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
-          script: python3 /root/workspace/check_db_changes.py
+          script: python3 /root/workspace/.github/script/check_db_changes.py
 
       - name: Compare alembic versions
         id: compare
