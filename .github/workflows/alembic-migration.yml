@@ -67,20 +67,27 @@ jobs:
           password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
           script: python3 /root/workspace/.github/script/check_db_changes.py
 
+      - name: Parse VM alembic version
+        id: vm_version_parsed
+        run: |
+          raw_output="${{ steps.vm_version.outputs.stdout || steps.vm_version.outputs.output || '' }}"
+          vm_revision=$(echo "$raw_output" | grep -oE 'VM Alembic Revision: [^ ]+' | awk '{print $4}')
+
+          echo "vm_alembic_version=$vm_revision" >> "$GITHUB_OUTPUT"
+
       - name: Compare alembic versions
         id: compare
         run: |
           echo "Repo Revision: ${{ steps.repo_version.outputs.repo_alembic_version }}"
-          echo "VM Revision:   ${{ steps.vm_version.outputs.vm_alembic_version }}"
+          echo "VM Revision:   ${{ steps.vm_version_parsed.vm_alembic_version }}"
 
-          if [ "${{ steps.repo_version.outputs.repo_alembic_version }}" != "${{ steps.vm_version.outputs.vm_alembic_version }}" ]; then
+          if [ "${{ steps.repo_version.outputs.repo_alembic_version }}" != "${{ steps.vm_version_parsed.vm_alembic_version }}" ]; then
             echo "db_changes=true" >> $GITHUB_OUTPUT
           else
             echo "db_changes=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Generate SQL Migration Files
-        if: steps.compare.outputs.db_changes == 'true'
         run: |
           cd src/backend/base/langflow
           mkdir -p alembic_sql
