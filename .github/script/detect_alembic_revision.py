@@ -1,5 +1,6 @@
 import argparse
 import pathlib
+import os
 import re
 import subprocess
 from collections.abc import Iterable
@@ -67,6 +68,11 @@ def main() -> None:
 
     revision = parse_revision(current_output.splitlines())
     print(revision)
+
+    github_output = os.getenv("GITHUB_OUTPUT")
+    if github_output:
+        with open(github_output, "a") as output_file:
+            output_file.write(f"repo_alembic_version={revision}\n")
 
 
 if __name__ == "__main__":
