@@ -1,4 +1,4 @@
-name: Alembic Migration-Staging/Prod Deploy
+name: Alembic Migration - Deploy
 
 on:
   workflow_dispatch:
@@ -18,7 +18,7 @@ on:
       commit_id:
         description: "Commit ID to deploy (leave blank for latest on branch)"
         required: false
-        default: ""  
+        default: ""
 
 env:
   STAGING_HOST: staging.visualaiagentsbuilder.com
@@ -44,22 +44,15 @@ jobs:
       - name: Install dependencies
         run: |
           pip install \
-            alembic \
-            SQLAlchemy \
-            psycopg2-binary \
-            fastapi \
-            pydantic \
-            google-generativeai \
-            python-dotenv
+            alembic SQLAlchemy psycopg2-binary \
+            fastapi pydantic google-generativeai python-dotenv
 
       - name: Install sshpass
         run: sudo apt-get update && sudo apt-get install -y sshpass    
 
       - name: Get repo alembic version
         id: repo_version
-        run: |
-          python .github/script/detect_alembic_revision.py
-        shell: bash  
+        run: python .github/script/detect_alembic_revision.py
 
       - name: Copy check_db_changes.py to VM
         uses: appleboy/scp-action@v0.1.7
@@ -77,14 +70,13 @@ jobs:
           host: ${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
           username: root
           password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
-        script: |
-          python /root/workspace/check_db_changes.py    
+        script: python /root/workspace/check_db_changes.py    
 
       - name: Compare alembic versions
         id: compare
         run: |
           echo "Repo Revision: ${{ steps.repo_version.outputs.repo_alembic_version }}"
-          echo "VM Revision: ${{ steps.vm_version.outputs.vm_alembic_version }}"
+          echo "VM Revision:   ${{ steps.vm_version.outputs.vm_alembic_version }}"
 
           if [ "${{ steps.repo_version.outputs.repo_alembic_version }}" != "${{ steps.vm_version.outputs.vm_alembic_version }}" ]; then
             echo "Alembic versions differ — database upgrade needed."
@@ -99,48 +91,49 @@ jobs:
           echo "Generating SQL files..."
           cd src/backend/base/langflow
           mkdir -p alembic_sql
-
           alembic upgrade head --sql > alembic_sql/upgrade.sql
           alembic downgrade -1 --sql > alembic_sql/downgrade.sql
-
-          echo "SQL files generated in src/backend/base/langflow/alembic_sql/"
 
       - name: Upload SQL files
         uses: actions/upload-artifact@v3
         with:
           name: alembic-sql
           path: src/backend/base/langflow/alembic_sql/
-      
+
       - name: Install Bytebase CLI
-        if: steps.check_changes.outputs.db_changes == 'true'
+        if: steps.compare.outputs.db_changes == 'true'
         run: |
           /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/bytebase/install/HEAD/install.sh)"
           sudo mv bb /usr/local/bin
+
       - name: Verify with Bytebase
-        if: steps.check_changes.outputs.db_changes == 'true'
+        if: steps.compare.outputs.db_changes == 'true'
         run: |
-          bb check-sql --file src/backend/base/langflow/upgrade.sql
-          bb check-sql --file src/backend/base/langflow/downgrade.sql
+          bb check-sql --file src/backend/base/langflow/alembic_sql/upgrade.sql
+          bb check-sql --file src/backend/base/langflow/alembic_sql/downgrade.sql
+
       - name: Verify with Gemini AI
-        if: steps.check_changes.outputs.db_changes == 'true'
+        if: steps.compare.outputs.db_changes == 'true'
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: python .github/script/verify_sql_with_gemini.py src/backend/base/langflow/upgrade.sql src/backend/base/langflow/downgrade.sql
+        run: python .github/script/verify_sql_with_gemini.py src/backend/base/langflow/alembic_sql/upgrade.sql src/backend/base/langflow/alembic_sql/downgrade.sql
+
       - name: Manual approval for DB changes
-        if: steps.check_changes.outputs.db_changes == 'true'
+        if: steps.compare.outputs.db_changes == 'true'
         uses: trstringer/manual-approval@v1
         with:
           secret: ${{ secrets.GITHUB_TOKEN }}
           approvers: ${{ github.actor }}
           minimum-approvals: 1
-      - name: Upload SQL artifacts
-        if: steps.check_changes.outputs.db_changes == 'true'
+
+      - name: Upload SQL artifacts (final bundle)
+        if: steps.compare.outputs.db_changes == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: sql-migrations
           path: |
-            src/backend/base/langflow/upgrade.sql
-            src/backend/base/langflow/downgrade.sql
+            src/backend/base/langflow/alembic_sql/upgrade.sql
+            src/backend/base/langflow/alembic_sql/downgrade.sql
 
   apply-db-changes:
     runs-on: ubuntu-latest
@@ -149,21 +142,26 @@ jobs:
       name: ${{ github.event.inputs.environment }}-db-apply
       url: https://${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
     if: needs.check-db-changes.outputs.db_changes == 'true'
+
     steps:
       - uses: actions/checkout@v4
+
       - name: Download SQL artifacts
         uses: actions/download-artifact@v4
         with:
           name: sql-migrations
           path: migrations
+
       - name: Install dependencies
         run: pip install sqlalchemy psycopg2-binary alembic
+
       - name: Manual approval to apply changes
         uses: trstringer/manual-approval@v1
         with:
           secret: ${{ secrets.GITHUB_TOKEN }}
           approvers: ${{ github.actor }}
           minimum-approvals: 1
+
       - name: Apply DB changes
         env:
           ENVIRONMENT: ${{ github.event.inputs.environment }}
@@ -181,6 +179,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: apply-db-changes
     if: needs.check-db-changes.result == 'success' && needs.apply-db-changes.result == 'success'
+
     steps:
       - name: Checkout selected branch
         uses: actions/checkout@v4
