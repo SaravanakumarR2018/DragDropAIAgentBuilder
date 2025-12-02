@@ -67,9 +67,6 @@ jobs:
           password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
           script: python3 /root/workspace/.github/script/check_db_changes.py
 
-      - name: Debug VM alembic version outputs
-        run: echo "vm_version outputs: ${{ toJson(steps.vm_version.outputs) }}"
-
       - name: Parse VM alembic version
         id: vm_version_parsed
         run: |
