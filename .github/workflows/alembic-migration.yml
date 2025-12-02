@@ -20,6 +20,10 @@ on:
         required: false
         default: ""
 
+env:
+  STAGING_HOST: staging.visualaiagentsbuilder.com
+  PROD_HOST: visualaiagentsbuilder.com
+
 jobs:
   check-db-changes:
     runs-on: ubuntu-latest
