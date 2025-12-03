@@ -87,6 +87,7 @@ jobs:
           fi
 
       - name: Generate SQL Migration Files
+        if: steps.compare.outputs.db_changes == 'true'
         run: |
           cd src/backend/base/langflow
           mkdir -p alembic_sql
