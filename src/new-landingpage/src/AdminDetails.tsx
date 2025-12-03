@@ -69,9 +69,9 @@ export default function AdminDetails() {
     );
   }
 
-  // If not a superuser, redirect to dashboard inside the landing app
+  // If not a superuser, redirect to the main app flows page
   if (!whoami?.is_superuser && !whoami?.is_super) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/flows" replace />;
   }
 
   // Render admin details
