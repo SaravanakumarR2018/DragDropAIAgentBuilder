@@ -65,10 +65,11 @@ jobs:
           host: ${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
           username: root
           password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
+          output: true
           script: |
             REVISION=$(python3 /root/workspace/.github/script/check_db_changes.py | grep "VM Alembic Revision" | awk '{print $4}')
             echo "VM Alembic Revision: $REVISION"
-            
+
             echo "OUTPUT_VM_VERSION<<EOF"
             echo "$REVISION"
             echo "EOF"
