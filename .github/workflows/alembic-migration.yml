@@ -65,22 +65,22 @@ jobs:
           host: ${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
           username: root
           password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
-          script: python3 /root/workspace/.github/script/check_db_changes.py
-          script_stop: true
+          script: |
+            REV=$(python3 /root/workspace/.github/script/check_db_changes.py | grep "VM Alembic Revision" | awk '{print $4}')
+            echo "VM Alembic Revision: $REV"
+            echo "::set-output name=vm_alembic_version::$REV"
 
       - name: Store VM alembic version output
         id: vm_out
         run: |
-          REVISION="${{ steps.vm_version.outputs.stdout }}"
-          echo "vm_alembic_version=$REVISION" >> $GITHUB_OUTPUT    
+          echo "vm_alembic_version=${{ steps.vm_version.outputs.vm_alembic_version }}" >> $GITHUB_OUTPUT   
       
       - name: Compare alembic versions
         id: compare
         run: |
           echo "Repo Revision: ${{ steps.repo_version.outputs.repo_alembic_version }}"
-          echo "VM Revision:   ${{ steps.vm_out.outputs.vm_alembic_version }}"
-
-          if [ "${{ steps.repo_version.outputs.repo_alembic_version }}" != "${{ steps.vm_out.outputs.vm_alembic_version }}" ]; then
+          echo "VM Revision:   ${{ steps.vm_version.outputs.vm_alembic_version }}"
+          if [ "${{ steps.repo_version.outputs.repo_alembic_version }}" != "${{ steps.vm_version.outputs.vm_alembic_version }}" ]; then
             echo "db_changes=true" >> $GITHUB_OUTPUT
           else
             echo "db_changes=false" >> $GITHUB_OUTPUT
