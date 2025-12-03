@@ -81,7 +81,7 @@ jobs:
           username: root
           password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
           source: "/root/vm_revision.txt"
-          target: "./vm_revision.txt"    
+          target: "./"    
 
       - name: Store VM alembic version output
         id: vm_out
