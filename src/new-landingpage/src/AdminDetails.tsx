@@ -13,6 +13,7 @@ export default function AdminDetails() {
   const [loading, setLoading] = useState(true);
   const [whoami, setWhoami] = useState<Record<string, any> | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [redirectingToFlows, setRedirectingToFlows] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -71,8 +72,16 @@ export default function AdminDetails() {
 
   // If not a superuser, redirect to the main app flows page
   if (!whoami?.is_superuser && !whoami?.is_super) {
-    const flowsUrl = `${window.location.origin}/flows`;
-    return <Navigate to={flowsUrl} replace />;
+    if (!redirectingToFlows) {
+      setRedirectingToFlows(true);
+      window.location.replace("/flows");
+    }
+
+    return (
+      <div style={{ padding: "2rem", textAlign: "center" }}>
+        <div>Redirecting to flows…</div>
+      </div>
+    );
   }
 
   // Render admin details
