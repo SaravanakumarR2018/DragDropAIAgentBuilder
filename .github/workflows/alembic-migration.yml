@@ -65,11 +65,14 @@ jobs:
           host: ${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
           username: root
           password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
-          output: true
           script: |
-            REVISION=$(python3 /root/workspace/.github/script/check_db_changes.py | awk '{print $4}')
-            echo "$REVISION" > /root/vm_revision.txt
+            REVISION=$(python3 /root/workspace/.github/script/check_db_changes.py | grep -oE '[0-9a-f]{12,40}')
             echo "VM Alembic Revision: $REVISION"
+            echo "$REVISION" > /root/vm_revision.txt
+
+            echo "Verifying file:"
+            ls -l /root/vm_revision.txt || echo "FILE NOT FOUND"
+            cat /root/vm_revision.txt || echo "CANNOT READ FILE"
 
       - name: Download revision file from VM
         uses: appleboy/scp-action@v0.1.7
@@ -78,13 +81,12 @@ jobs:
           username: root
           password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
           source: "/root/vm_revision.txt"
-          target: "./"    
+          target: "./vm_revision.txt"    
 
       - name: Store VM alembic version output
         id: vm_out
         run: |
-          REVISION=$(cat vm_revision.txt)
-          echo "vm_alembic_version=$REVISION" >> $GITHUB_OUTPUT   
+          echo "vm_alembic_version=$(cat vm_revision.txt)" >> $GITHUB_OUTPUT   
       
       - name: Compare alembic versions
         id: compare
