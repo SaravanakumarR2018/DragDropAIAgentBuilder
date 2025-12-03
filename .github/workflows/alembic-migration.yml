@@ -71,7 +71,7 @@ jobs:
             echo "$REVISION" > /root/workspace/vm_revision.txt
             chmod 644 /root/workspace/vm_revision.txt
 
-      - name: Download revision file from VM
+      - name: Move revision file from VM to Github
         uses: appleboy/scp-action@v0.1.4
         with:
           host: ${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
@@ -79,6 +79,7 @@ jobs:
           password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
           source: "/root/workspace/vm_revision.txt"
           target: "./"
+          tar_tmp_path: ""  
 
       - name: Store VM alembic version output
         id: vm_out
