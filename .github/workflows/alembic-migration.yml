@@ -66,12 +66,14 @@ jobs:
           username: root
           password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
           script: |
-            python3 /root/workspace/.github/script/check_db_changes.py | grep "VM Alembic Revision" | awk '{print $4}'
+            REVISION=$(python3 /root/workspace/.github/script/check_db_changes.py | grep "VM Alembic Revision" | awk '{print $4}')
+            echo "VM Alembic Revision: $REVISION"
+            echo "OUTPUT_VM_VERSION=$REVISION"
 
       - name: Store VM alembic version output
         id: vm_out
         run: |
-          echo "vm_alembic_version=${{ steps.vm_version.outputs.stdout }}" >> $GITHUB_OUTPUT   
+          echo "vm_alembic_version=${{ steps.vm_version.outputs.OUTPUT_VM_VERSION }}" >> $GITHUB_OUTPUT   
       
       - name: Compare alembic versions
         id: compare
