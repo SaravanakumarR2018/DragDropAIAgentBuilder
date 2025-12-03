@@ -69,6 +69,7 @@ jobs:
             REVISION=$(python3 /root/workspace/.github/script/check_db_changes.py | grep -oE '[0-9a-f]{12,40}')
             echo "VM Alembic Revision: $REVISION"
             echo "$REVISION" > /root/workspace/vm_revision.txt
+            chmod 644 /root/workspace/vm_revision.txt
 
       - name: Download revision file from VM
         uses: appleboy/scp-action@v0.1.4
@@ -78,8 +79,6 @@ jobs:
           password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
           source: "/root/workspace/vm_revision.txt"
           target: "./"
-          overwrite: true
-          strip_components: 0   
 
       - name: Store VM alembic version output
         id: vm_out
