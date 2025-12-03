@@ -78,6 +78,7 @@ jobs:
           username: root
           password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
           source: "/root/workspace/vm_revision.txt"
+          direction: download
           target: "./"
           tar_tmp_path: ""  
 
