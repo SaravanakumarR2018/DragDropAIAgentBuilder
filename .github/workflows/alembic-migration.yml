@@ -68,7 +68,10 @@ jobs:
           script: |
             REVISION=$(python3 /root/workspace/.github/script/check_db_changes.py | grep "VM Alembic Revision" | awk '{print $4}')
             echo "VM Alembic Revision: $REVISION"
-            echo "OUTPUT_VM_VERSION=$REVISION"
+            
+            echo "OUTPUT_VM_VERSION<<EOF"
+            echo "$REVISION"
+            echo "EOF"
 
       - name: Store VM alembic version output
         id: vm_out
