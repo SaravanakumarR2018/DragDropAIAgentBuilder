@@ -66,20 +66,23 @@ jobs:
           username: root
           password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
           script: |
-            echo "Fetching VM Alembic revision..."
-            VM_REVISION=$(python3 /root/workspace/.github/script/check_db_changes.py | grep -oE '[0-9a-f]{12,40}')
-            echo "VM Alembic Revision: $VM_REVISION"
+            VM_REV=$(python3 /root/workspace/.github/script/check_db_changes.py | grep -oE '[0-9a-f]{12,40}')
+            echo "$VM_REV"
 
-            REPO_REVISION="${{ steps.repo_version.outputs.repo_alembic_version }}"
-            echo "Repo Alembic Revision: $REPO_REVISION" 
+      - name: Compare Alembic versions
+        id: compare
+        run: |
+          VM_REVISION=$(echo "${{ steps.vm_version.outputs.stdout }}" | tr -d '\r' | head -n 1)
+          REPO_REVISION="${{ steps.repo_version.outputs.repo_alembic_version }}"
 
-            if [ "$REPO_REVISION" != "$VM_REVISION" ]; then
-              echo "Database schema differs. db_changes=true"
-              echo "db_changes=true" >> $GITHUB_OUTPUT
-            else
-              echo "No DB changes detected. db_changes=false"
-              echo "db_changes=false" >> $GITHUB_OUTPUT
-            fi
+          echo "Repo Revision: $REPO_REVISION"
+          echo "VM Revision:   $VM_REVISION"
+
+          if [ "$REPO_REVISION" != "$VM_REVISION" ]; then
+            echo "db_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "db_changes=false" >> $GITHUB_OUTPUT
+          fi      
 
       - name: Generate SQL Migration Files
         if: steps.compare.outputs.db_changes == 'true'
