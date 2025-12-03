@@ -68,11 +68,11 @@ jobs:
           script: |
             REVISION=$(python3 /root/workspace/.github/script/check_db_changes.py | grep -oE '[0-9a-f]{12,40}')
             echo "VM Alembic Revision: $REVISION"
-            echo "$REVISION" > /root/vm_revision.txt
+            echo "$REVISION" > /tmp/vm_revision.txt
 
             echo "Verifying file:"
-            ls -l /root/vm_revision.txt || echo "FILE NOT FOUND"
-            cat /root/vm_revision.txt || echo "CANNOT READ FILE"
+            ls -l /tmp/vm_revision.txt
+            cat /tmp/vm_revision.txt
 
       - name: Download revision file from VM
         uses: appleboy/scp-action@v0.1.7
@@ -80,8 +80,8 @@ jobs:
           host: ${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
           username: root
           password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
-          source: "/root/vm_revision.txt"
-          target: "./"    
+          source: "/tmp/vm_revision.txt"
+          target: "./"   
 
       - name: Store VM alembic version output
         id: vm_out
