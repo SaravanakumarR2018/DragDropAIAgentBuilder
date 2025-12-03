@@ -71,7 +71,8 @@ export default function AdminDetails() {
 
   // If not a superuser, redirect to the main app flows page
   if (!whoami?.is_superuser && !whoami?.is_super) {
-    return <Navigate to="/flows" replace />;
+    const flowsUrl = `${window.location.origin}/flows`;
+    return <Navigate to={flowsUrl} replace />;
   }
 
   // Render admin details
