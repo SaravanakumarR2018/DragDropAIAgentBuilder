@@ -58,39 +58,28 @@ jobs:
           source: ".github/script/check_db_changes.py"
           target: "/root/workspace/"
 
-      - name: Get VM alembic version
+      - name: Get & compare VM alembic version
         id: vm_version
         uses: appleboy/ssh-action@v1.1.0
         with:
           host: ${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
           username: root
           password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
-          result-encoding: string
           script: |
-            set -euo pipefail
-            REVISION=$(python3 /root/workspace/.github/script/check_db_changes.py | grep -oE '[0-9a-f]{12,40}' | head -n 1)
-            if [ -z "$REVISION" ]; then
-              echo "No Alembic revision detected" >&2
-              exit 1
+            echo "Fetching VM Alembic revision..."
+            VM_REVISION=$(python3 /root/workspace/.github/script/check_db_changes.py | grep -oE '[0-9a-f]{12,40}')
+            echo "VM Alembic Revision: $VM_REVISION"
+
+            REPO_REVISION="${{ steps.repo_version.outputs.repo_alembic_version }}"
+            echo "Repo Alembic Revision: $REPO_REVISION" 
+
+            if [ "$REPO_REVISION" != "$VM_REVISION" ]; then
+              echo "Database schema differs. db_changes=true"
+              echo "db_changes=true" >> $GITHUB_OUTPUT
+            else
+              echo "No DB changes detected. db_changes=false"
+              echo "db_changes=false" >> $GITHUB_OUTPUT
             fi
-            echo "$REVISION"
-            echo "VM Alembic Revision: $REVISION" >&2   
-      
-      - name: Compare alembic versions
-        id: compare
-        run: |
-          VM_REVISION=$(echo "${{ steps.vm_version.outputs.stdout }}" | grep -oE '[0-9a-f]{12,40}' | head -n 1)
-          if [ -z "$VM_REVISION" ]; then
-            echo "Unable to read VM Alembic revision" >&2
-            exit 1
-          fi
-          echo "Repo Revision: ${{ steps.repo_version.outputs.repo_alembic_version }}"
-          eecho "VM Revision:   $VM_REVISION"
-          if [ "${{ steps.repo_version.outputs.repo_alembic_version }}" != "$VM_REVISION" ]; then
-            echo "db_changes=true" >> $GITHUB_OUTPUT
-          else
-            echo "db_changes=false" >> $GITHUB_OUTPUT
-          fi
 
       - name: Generate SQL Migration Files
         if: steps.compare.outputs.db_changes == 'true'
