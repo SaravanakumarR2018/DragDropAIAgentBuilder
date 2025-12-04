@@ -27,6 +27,20 @@ env:
 jobs:
   check-db-changes:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres@sha256:d0f363f8366fbc3f52d172c6e76bc27151c3d643b870e1062b4e8bfe65baf609
+        env:
+          POSTGRES_USER: langflow
+          POSTGRES_PASSWORD: langflow
+          POSTGRES_DB: langflow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U langflow"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     outputs:
       db_changes: ${{ steps.compare.outputs.db_changes }}
 
@@ -91,6 +105,7 @@ jobs:
         if: steps.compare.outputs.db_changes == 'true'
         run: |
           cd src/backend/base/langflow
+          sed -i "s|^sqlalchemy.url =.*|sqlalchemy.url = postgresql+psycopg2://langflow:langflow@localhost:5432/langflow|" alembic.ini
           mkdir -p alembic_sql
           alembic upgrade head --sql > alembic_sql/upgrade.sql
           alembic downgrade -1 --sql > alembic_sql/downgrade.sql
