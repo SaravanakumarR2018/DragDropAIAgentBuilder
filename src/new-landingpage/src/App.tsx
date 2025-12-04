@@ -12,6 +12,7 @@ import {
   LANGFLOW_ACCESS_TOKEN,
   LANGFLOW_REFRESH_TOKEN,
 } from "./session";
+import AdminSettingsPage from "./AdminSettingsPage";
 
 const features = [
   "Visual builder for complex AI flows",
@@ -86,6 +87,7 @@ export default function App() {
         <Route path="/organization" element={<OrganizationOnboarding />} />
         <Route path="/adminsettings" element={<AdminSettings />} />
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/admin_settings" element={<AdminSettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
