@@ -19,6 +19,10 @@ config = context.config
 override_url = os.getenv("ALEMBIC_SQLALCHEMY_URL")
 if override_url:
     config.set_main_option("sqlalchemy.url", override_url)
+
+def _uses_psycopg(url: str | None) -> bool:
+    return bool(url and "postgresql" in url and "asyncpg" not in url)
+
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:
@@ -65,7 +69,7 @@ def run_migrations_offline() -> None:
     }
 
     # Only add prepare_threshold for PostgreSQL
-    if url and "postgresql" in url:
+    if _uses_psycopg(url):
         configure_kwargs["prepare_threshold"] = None
 
     context.configure(**configure_kwargs)
@@ -97,7 +101,7 @@ def _do_run_migrations(connection):
     }
 
     # Only add prepare_threshold for PostgreSQL
-    if connection.dialect.name == "postgresql":
+    if _uses_psycopg(str(connection.engine.url)):
         configure_kwargs["prepare_threshold"] = None
 
     context.configure(**configure_kwargs)
@@ -115,7 +119,7 @@ async def _run_async_migrations() -> None:
     connect_args: dict[str, Any] = {}
 
     # Only add prepare_threshold for PostgreSQL
-    if url and "postgresql" in url:
+    if _uses_psycopg(url):
         connect_args["prepare_threshold"] = None
 
     connectable = async_engine_from_config(
