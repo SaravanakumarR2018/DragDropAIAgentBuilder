@@ -109,6 +109,7 @@ jobs:
           sed -i "s|^sqlalchemy.url =.*|sqlalchemy.url = postgresql+psycopg2://langflow:langflow@localhost:5432/langflow|" alembic.ini
           mkdir -p alembic_sql
           export ALEMBIC_FORCE_ONLINE=1
+          export ALEMBIC_SQLALCHEMY_URL=postgresql+asyncpg://langflow:langflow@localhost:5432/langflow
           alembic upgrade head --sql > alembic_sql/upgrade.sql
           alembic downgrade -1 --sql > alembic_sql/downgrade.sql
 
