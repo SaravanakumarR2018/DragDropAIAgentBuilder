@@ -59,7 +59,7 @@ jobs:
         run: |
           cd src/backend/base
           pip install uv
-          pip install psycopg2-binary
+          pip install psycopg2-binary asyncpg
           pip install .
 
       - name: Get repo alembic version
