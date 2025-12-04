@@ -8,7 +8,7 @@ function apiUrl(path: string) {
   return `${API_BASE}${path.replace(/^\/+/, "")}`;
 }
 
-export default function AdminDetails() {
+export default function AdminSettings() {
   const { isLoaded, isSignedIn, getToken } = useAuth();
   const [loading, setLoading] = useState(true);
   const [whoami, setWhoami] = useState<Record<string, any> | null>(null);
