@@ -43,7 +43,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install alembic SQLAlchemy psycopg2-binary fastapi pydantic python-dotenv google-generativeai uv
+          cd src/backend/base
+          pip install .
 
       - name: Get repo alembic version
         id: repo_version
