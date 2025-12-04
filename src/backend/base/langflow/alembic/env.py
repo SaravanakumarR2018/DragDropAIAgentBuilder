@@ -1,4 +1,5 @@
 # noqa: INP001
+import os
 import asyncio
 from logging.config import fileConfig
 from typing import Any
@@ -140,8 +141,10 @@ def run_migrations_online() -> None:
     """
     asyncio.run(_run_async_migrations())
 
-
-if context.is_offline_mode():
+force_online = os.getenv("ALEMBIC_FORCE_ONLINE") == "1"
+if force_online:
+    run_migrations_online()
+elif context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
