@@ -164,16 +164,19 @@ jobs:
         if: steps.compare.outputs.db_changes == 'true'
         env:
           LANGFLOW_DATABASE_URL: ${{ env.DATABASE_URL }}
+        working-directory: src/backend/base/langflow  
         run: |
-          cd src/backend/base/langflow
+          set -euo pipefail
           mkdir -p alembic_sql
 
-          alembic -c alembic.ini downgrade $VM_REVISION --sql \
+          alembic -c alembic.ini downgrade ${REPO_REVISION}:${VM_REVISION} --sql \
             > "alembic_sql/downgrade_${REPO_REVISION}_to_${VM_REVISION}.sql"
 
-          alembic -c alembic.ini downgrade $VM_REVISION  
-          alembic -c alembic.ini upgrade $REPO_REVISION --sql \
-              > "alembic_sql/upgrade_${VM_REVISION}_to_${REPO_REVISION}.sql"
+          alembic -c alembic.ini upgrade ${VM_REVISION}:${REPO_REVISION} --sql \
+            > "alembic_sql/upgrade_${VM_REVISION}_to_${REPO_REVISION}.sql"
+          
+          cp "alembic_sql/downgrade_${REPO_REVISION}_to_${VM_REVISION}.sql" alembic_sql/downgrade.sql
+          cp "alembic_sql/upgrade_${VM_REVISION}_to_${REPO_REVISION}.sql" alembic_sql/upgrade.sql  
 
       - name: Upload SQL files
         if: steps.compare.outputs.db_changes == 'true'
