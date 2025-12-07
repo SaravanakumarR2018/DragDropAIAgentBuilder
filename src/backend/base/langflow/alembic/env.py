@@ -16,6 +16,7 @@ from langflow.services.database.service import SQLModel
 config = context.config
 
 env_database_url = os.environ.get("LANGFLOW_DATABASE_URL")
+print(env_database_url)
 if env_database_url:
     config.set_main_option("sqlalchemy.url", env_database_url)
 
