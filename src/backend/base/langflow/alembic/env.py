@@ -76,8 +76,8 @@ def run_migrations_offline() -> None:
     }
 
     # Only add prepare_threshold for PostgreSQL
-    if url and "postgresql" in url:
-        configure_kwargs["prepare_threshold"] = None
+    # if url and "postgresql" in url:
+    #     configure_kwargs["prepare_threshold"] = None
 
     context.configure(**configure_kwargs)
 
@@ -108,8 +108,8 @@ def _do_run_migrations(connection):
     }
 
     # Only add prepare_threshold for PostgreSQL
-    if connection.dialect.name == "postgresql":
-        configure_kwargs["prepare_threshold"] = None
+    # if connection.dialect.name == "postgresql":
+    #     configure_kwargs["prepare_threshold"] = None
 
     context.configure(**configure_kwargs)
 
@@ -122,18 +122,18 @@ def _do_run_migrations(connection):
 
 async def _run_async_migrations() -> None:
     # Get database URL to determine dialect
-    url = config.get_main_option("sqlalchemy.url")
-    connect_args: dict[str, Any] = {}
+    # url = config.get_main_option("sqlalchemy.url")
+    # connect_args: dict[str, Any] = {}
 
-    # Only add prepare_threshold for PostgreSQL
-    if url and "postgresql" in url:
-        connect_args["prepare_threshold"] = None
+    # # Only add prepare_threshold for PostgreSQL
+    # if url and "postgresql" in url:
+    #     connect_args["prepare_threshold"] = None
 
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
-        connect_args=connect_args,
+        # connect_args=connect_args,
     )
 
     if connectable.dialect.name == "sqlite":
