@@ -148,12 +148,10 @@ jobs:
           cd src/backend/base/langflow
           mkdir -p alembic_sql
 
-          alembic -c alembic.ini upgrade \
-            --sql --rev-range "$VM_REVISION":"$REPO_REVISION" "$REPO_REVISION" \
-            > "alembic_sql/upgrade_${VM_REVISION}_to_${REPO_REVISION}.sql"
+          alembic -c alembic.ini upgrade "$REPO_REVISION" --sql \
+            > "alembic_sql/upgrade_${VM_REVISION}_to_${REPO_REVISION}.sql
 
-          alembic -c alembic.ini downgrade \
-            --sql --rev-range "$REPO_REVISION":"$VM_REVISION" "$VM_REVISION" \
+          alembic -c alembic.ini downgrade "$VM_REVISION" --sql \
             > "alembic_sql/downgrade_${REPO_REVISION}_to_${VM_REVISION}.sql"
 
       - name: Upload SQL files
