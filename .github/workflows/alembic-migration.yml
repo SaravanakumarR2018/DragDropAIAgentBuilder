@@ -94,7 +94,7 @@ jobs:
         env:
           LANGFLOW_DATABASE_URL: ${{ env.DATABASE_URL }}
         run: |
-          alembic -c alembic.ini upgrade head --sqlalchemy-url "$DATABASE_URL"
+          alembic -c alembic.ini upgrade head
 
       - name: Get repo alembic version
         id: repo_version
