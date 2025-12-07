@@ -89,6 +89,13 @@ jobs:
           psql "postgresql://$PGUSER:$PGPASSWORD@$PGHOST:$PGPORT/postgres" \
           -c "CREATE DATABASE \"$DB_NAME\";"
 
+      - name: Print Alembic current revision
+        working-directory: src/backend/base/langflow
+        env:
+          LANGFLOW_DATABASE_URL: ${{ env.DATABASE_URL }}
+        run: |
+          alembic -c alembic.ini current    
+
       - name: Apply migrations to PostgreSQL
         working-directory: src/backend/base/langflow
         env:
