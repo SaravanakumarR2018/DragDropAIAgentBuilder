@@ -82,8 +82,10 @@ jobs:
           done
           exit 1
 
-      - name: Create database
+      - name: Create database (safe)
         run: |
+          psql "postgresql://$PGUSER:$PGPASSWORD@$PGHOST:$PGPORT/postgres" \
+          -tc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" | grep -q 1 || \
           psql "postgresql://$PGUSER:$PGPASSWORD@$PGHOST:$PGPORT/postgres" \
           -c "CREATE DATABASE \"$DB_NAME\";"
 
