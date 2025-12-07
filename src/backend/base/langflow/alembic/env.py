@@ -6,6 +6,7 @@ import os
 
 from alembic import context
 from sqlalchemy import pool, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.event import listen
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
@@ -16,9 +17,18 @@ from langflow.services.database.service import SQLModel
 config = context.config
 
 env_database_url = os.environ.get("LANGFLOW_DATABASE_URL")
-print(env_database_url)
 if env_database_url:
     config.set_main_option("sqlalchemy.url", env_database_url)
+
+database_url = make_url(config.get_main_option("sqlalchemy.url"))
+
+# Ensure an async driver is used when creating the async engine
+if database_url.drivername.startswith("postgresql") and "+asyncpg" not in database_url.drivername:
+    database_url = database_url.set(drivername="postgresql+asyncpg")
+elif database_url.drivername.startswith("sqlite") and "+aiosqlite" not in database_url.drivername:
+    database_url = database_url.set(drivername="sqlite+aiosqlite")
+
+config.set_main_option("sqlalchemy.url", database_url.render_as_string())
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
