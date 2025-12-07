@@ -1,5 +1,4 @@
 # noqa: INP001
-import os
 import asyncio
 from logging.config import fileConfig
 from typing import Any
@@ -14,14 +13,6 @@ from langflow.services.database.service import SQLModel
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
-
-# Allow workflows to override the connection URL without modifying alembic.ini
-override_url = os.getenv("ALEMBIC_SQLALCHEMY_URL")
-if override_url:
-    config.set_main_option("sqlalchemy.url", override_url)
-
-def _uses_psycopg(url: str | None) -> bool:
-    return bool(url and "postgresql" in url and "asyncpg" not in url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -69,7 +60,7 @@ def run_migrations_offline() -> None:
     }
 
     # Only add prepare_threshold for PostgreSQL
-    if _uses_psycopg(url):
+    if url and "postgresql" in url:
         configure_kwargs["prepare_threshold"] = None
 
     context.configure(**configure_kwargs)
@@ -101,7 +92,7 @@ def _do_run_migrations(connection):
     }
 
     # Only add prepare_threshold for PostgreSQL
-    if _uses_psycopg(str(connection.engine.url)):
+    if connection.dialect.name == "postgresql":
         configure_kwargs["prepare_threshold"] = None
 
     context.configure(**configure_kwargs)
@@ -119,7 +110,7 @@ async def _run_async_migrations() -> None:
     connect_args: dict[str, Any] = {}
 
     # Only add prepare_threshold for PostgreSQL
-    if _uses_psycopg(url):
+    if url and "postgresql" in url:
         connect_args["prepare_threshold"] = None
 
     connectable = async_engine_from_config(
@@ -149,10 +140,8 @@ def run_migrations_online() -> None:
     """
     asyncio.run(_run_async_migrations())
 
-force_online = os.getenv("ALEMBIC_FORCE_ONLINE") == "1"
-if force_online:
-    run_migrations_online()
-elif context.is_offline_mode():
+
+if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()

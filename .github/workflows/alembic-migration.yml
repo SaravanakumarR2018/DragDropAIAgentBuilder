@@ -27,6 +27,7 @@ env:
 jobs:
   check-db-changes:
     runs-on: ubuntu-latest
+
     services:
       postgres:
         image: postgres@sha256:d0f363f8366fbc3f52d172c6e76bc27151c3d643b870e1062b4e8bfe65baf609
@@ -41,8 +42,17 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+
     outputs:
       db_changes: ${{ steps.compare.outputs.db_changes }}
+
+    env:
+      PGUSER: langflow
+      PGPASSWORD: langflow
+      PGHOST: localhost
+      PGPORT: 5432
+      DB_NAME: langflow
+      DATABASE_URL: postgresql://langflow:langflow@localhost:5432/langflow
 
     steps:
       - name: Checkout selected branch
@@ -61,6 +71,28 @@ jobs:
           pip install uv
           pip install psycopg2-binary asyncpg
           pip install .
+
+      - name: Wait for PostgreSQL
+        run: |
+          for i in {1..10}; do
+            if pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER"; then
+              exit 0
+            fi
+            sleep 3
+          done
+          exit 1
+
+      - name: Create database
+        run: |
+          psql "postgresql://$PGUSER:$PGPASSWORD@$PGHOST:$PGPORT/postgres" \
+          -c "CREATE DATABASE \"$DB_NAME\";"
+
+      - name: Apply migrations to PostgreSQL
+        working-directory: src/backend/base/langflow
+        env:
+          LANGFLOW_DATABASE_URL: ${{ env.DATABASE_URL }}
+        run: |
+          alembic -c alembic.ini upgrade head --sqlalchemy-url "$DATABASE_URL"
 
       - name: Get repo alembic version
         id: repo_version
@@ -102,16 +134,27 @@ jobs:
             echo "db_changes=false" >> $GITHUB_OUTPUT
           fi      
 
+          # ✅ Export for later SQL generation
+          echo "VM_REVISION=$VM_REVISION" >> $GITHUB_ENV
+          echo "REPO_REVISION=$REPO_REVISION" >> $GITHUB_ENV      
+
       - name: Generate SQL Migration Files
         if: steps.compare.outputs.db_changes == 'true'
+        env:
+          LANGFLOW_DATABASE_URL: ${{ env.DATABASE_URL }}
         run: |
           cd src/backend/base/langflow
-          sed -i "s|^sqlalchemy.url =.*|sqlalchemy.url = postgresql+psycopg2://langflow:langflow@localhost:5432/langflow|" alembic.ini
           mkdir -p alembic_sql
-          export ALEMBIC_FORCE_ONLINE=1
-          export ALEMBIC_SQLALCHEMY_URL=postgresql+asyncpg://langflow:langflow@localhost:5432/langflow
-          alembic upgrade head --sql > alembic_sql/upgrade.sql
-          alembic downgrade -1 --sql > alembic_sql/downgrade.sql
+
+          alembic -c alembic.ini upgrade \
+            --sql --rev-range "$VM_REVISION":"$REPO_REVISION" "$REPO_REVISION" \
+            --sqlalchemy-url "$DATABASE_URL" \
+            > "alembic_sql/upgrade_${VM_REVISION}_to_${REPO_REVISION}.sql"
+
+          alembic -c alembic.ini downgrade \
+            --sql --rev-range "$REPO_REVISION":"$VM_REVISION" "$VM_REVISION" \
+            --sqlalchemy-url "$DATABASE_URL" \
+            > "alembic_sql/downgrade_${REPO_REVISION}_to_${VM_REVISION}.sql"
 
       - name: Upload SQL files
         if: steps.compare.outputs.db_changes == 'true'
