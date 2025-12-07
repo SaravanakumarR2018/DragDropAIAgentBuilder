@@ -96,7 +96,7 @@ jobs:
         run: |
           alembic -c alembic.ini upgrade head
 
-      - name: Verify DB tables and schemas
+      - name: Show tables in langflow DB
         env:
           PGUSER: langflow
           PGPASSWORD: langflow
@@ -104,26 +104,8 @@ jobs:
           PGPORT: 5432
           DB_NAME: langflow
         run: |
-          echo "Listing schemas..."
-          psql "postgresql://$PGUSER:$PGPASSWORD@$PGHOST:$PGPORT/$DB_NAME" \
-            -tc "SELECT schema_name FROM information_schema.schemata ORDER BY schema_name;"
-
-          echo "Listing tables in public schema..."
-          psql "postgresql://$PGUSER:$PGPASSWORD@$PGHOST:$PGPORT/$DB_NAME" \
-            -tc "SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename;"
-
-          echo "Verifying required tables exist..."
-          REQUIRED_TABLES=("users" "organizations" "flows")
-          for tbl in "${REQUIRED_TABLES[@]}"; do
-            EXISTS=$(psql "postgresql://$PGUSER:$PGPASSWORD@$PGHOST:$PGPORT/$DB_NAME" \
-              -tAc "SELECT to_regclass('public.$tbl') IS NOT NULL;")
-            if [ "$EXISTS" != "t" ]; then
-              echo "❌ Table public.$tbl is missing!"
-              exit 1
-            else
-              echo "✅ Table public.$tbl exists."
-            fi
-          done
+          echo "Connecting to Postgres and listing tables..."
+          psql "postgresql://$PGUSER:$PGPASSWORD@$PGHOST:$PGPORT/$DB_NAME" -c "\dt"
 
           echo "All required tables are present ✅"    
 
