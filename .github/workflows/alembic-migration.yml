@@ -149,7 +149,7 @@ jobs:
           mkdir -p alembic_sql
 
           alembic -c alembic.ini upgrade "$REPO_REVISION" --sql \
-            > "alembic_sql/upgrade_${VM_REVISION}_to_${REPO_REVISION}.sql
+            > "alembic_sql/upgrade_${VM_REVISION}_to_${REPO_REVISION}.sql"
 
           alembic -c alembic.ini downgrade "$VM_REVISION" --sql \
             > "alembic_sql/downgrade_${REPO_REVISION}_to_${VM_REVISION}.sql"
