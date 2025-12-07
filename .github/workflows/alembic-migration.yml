@@ -150,12 +150,10 @@ jobs:
 
           alembic -c alembic.ini upgrade \
             --sql --rev-range "$VM_REVISION":"$REPO_REVISION" "$REPO_REVISION" \
-            --sqlalchemy-url "$DATABASE_URL" \
             > "alembic_sql/upgrade_${VM_REVISION}_to_${REPO_REVISION}.sql"
 
           alembic -c alembic.ini downgrade \
             --sql --rev-range "$REPO_REVISION":"$VM_REVISION" "$VM_REVISION" \
-            --sqlalchemy-url "$DATABASE_URL" \
             > "alembic_sql/downgrade_${REPO_REVISION}_to_${VM_REVISION}.sql"
 
       - name: Upload SQL files
