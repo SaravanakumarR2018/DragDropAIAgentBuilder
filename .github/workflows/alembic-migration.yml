@@ -212,14 +212,16 @@ jobs:
       - name: Install Bytebase CLI
         if: steps.compare.outputs.db_changes == 'true'
         run: |
-          curl -fsSL https://www.bytebase.com/cli-install.sh | bash
-          bb --version
+          docker pull bytebase/bytebase:latest
 
-      - name: Validate SQL with Bytebase
-        if: steps.compare.outputs.db_changes == 'true'
-        run: |
-          bb check-sql --file src/backend/base/langflow/alembic_sql/upgrade.sql
-          bb check-sql --file src/backend/base/langflow/alembic_sql/downgrade.sql
+          docker run --rm \
+            -v "$PWD:/workspace" \
+            -w /workspace \
+            bytebase/bytebase:latest sh -c "
+              bb check-sql --file src/backend/base/langflow/alembic_sql/upgrade.sql &&
+              bb check-sql --file src/backend/base/langflow/alembic_sql/downgrade.sql
+            " 
+          
 
       - name: Validate SQL with Gemini
         if: steps.compare.outputs.db_changes == 'true'
