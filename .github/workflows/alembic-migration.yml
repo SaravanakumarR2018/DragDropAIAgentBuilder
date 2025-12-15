@@ -209,14 +209,6 @@ jobs:
           name: alembic-sql
           path: src/backend/base/langflow/alembic_sql/
 
-      - name: Install Bytebase CLI and CLI
-        if: steps.compare.outputs.db_changes == 'true'
-        run: |
-          docker pull bytebase/bytebase:latest
-
-          docker run --rm -v "$PWD:/workspace"  
-          
-
       - name: Validate SQL with Gemini
         if: steps.compare.outputs.db_changes == 'true'
         env:
