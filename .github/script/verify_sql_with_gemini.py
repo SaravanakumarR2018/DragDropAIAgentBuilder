@@ -36,7 +36,7 @@ def main():
         sys.exit(1)
 
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("models/gemini-1.5-pro")
+    model = genai.GenerativeModel("gemini-1.5-flash")
 
     prompt = f"""
 You are a senior database migration reviewer.
