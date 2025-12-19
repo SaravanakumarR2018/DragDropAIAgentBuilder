@@ -33,14 +33,15 @@ def main():
     prompt = f"""
 You are a senior database migration reviewer.
 
-We are validating ONLY upgrade forward compatibility.
+We are validating ONLY forward compatibility.
 
-Definition:
-Upgrade Forward Compatible means:
+Definitions:
+
+UPGRADE FORWARD COMPATIBLE:
 - After applying upgrade.sql
-- BOTH Version 1 (old application) and Version 2 (new application) must work
+- BOTH version 1 (old app) and version 2 (new app) must work
 - Against the SAME database
-- Assume the old application may read or write ANY existing column
+- Assume the old app may read or write ANY existing column
 
 Analyze STRICTLY.
 
@@ -51,7 +52,7 @@ Respond EXACTLY as:
 
 UPGRADE_FORWARD: YES or NO
 
-If NO, explain clearly why Version 1 would break.
+Explain each NO clearly and precisely.
 """
 
     response = model.generate_content(prompt)
