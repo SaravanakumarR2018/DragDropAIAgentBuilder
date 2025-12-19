@@ -145,7 +145,7 @@ jobs:
       - name: Compare Alembic versions
         id: compare
         run: |
-          VM_REVISION="d37bc4322900"
+          VM_REVISION=$(echo "${{ steps.vm_version.outputs.stdout }}" | grep -oE '[0-9a-f]{12,40}' | head -n 1)
           REPO_REVISION="${{ steps.repo_version.outputs.repo_alembic_version }}"
 
           echo "Repo Revision: $REPO_REVISION"
@@ -172,11 +172,14 @@ jobs:
 
           echo "Generating downgrade SQL: ${REPO_REVISION} -> ${VM_REVISION}"
           alembic -c alembic.ini downgrade ${REPO_REVISION}:${VM_REVISION} --sql \
-            > alembic_sql/downgrade.sql
+            > "alembic_sql/downgrade_${REPO_REVISION}_to_${VM_REVISION}.sql"
 
           echo "Generating upgrade SQL: ${VM_REVISION} -> ${REPO_REVISION}"
           alembic -c alembic.ini upgrade ${VM_REVISION}:${REPO_REVISION} --sql \
-           > alembic_sql/upgrade.sql  
+            > "alembic_sql/upgrade_${VM_REVISION}_to_${REPO_REVISION}.sql"
+          
+          cp "alembic_sql/downgrade_${REPO_REVISION}_to_${VM_REVISION}.sql" alembic_sql/downgrade.sql
+          cp "alembic_sql/upgrade_${VM_REVISION}_to_${REPO_REVISION}.sql" alembic_sql/upgrade.sql  
 
       - name: Verify generated SQL files
         if: steps.compare.outputs.db_changes == 'true'
