@@ -154,13 +154,12 @@ export default function LandingPage(): JSX.Element {
                 >
                   Book a Demo
                 </a>
-
-                <Link
-                  to="/login"
+                <a
+                  href="/login"
                   className="whitespace-nowrap rounded-xl bg-white px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:opacity-90"
                 >
                   Log in
-                </Link>
+                </a>
               </>
             )}
           </div>
