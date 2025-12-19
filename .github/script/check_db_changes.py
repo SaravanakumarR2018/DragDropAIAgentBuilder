@@ -7,13 +7,13 @@ def get_revision():
     cmd = (
         "container=$(docker ps --filter 'name=postgres' --format '{{.Names}}' | head -n1); "
         "if [ -z \"$container\" ]; then echo 'NO_CONTAINER'; exit 1; fi; "
-        "docker exec -i \"$container\" "
-        "psql -U langflow -d langflow -t -c \"select version_num from alembic_version;\""
+        'docker exec -i "$container" '
+        'psql -U langflow -d langflow -t -c "select version_num from alembic_version;"'
     )
 
     result = subprocess.run(
         cmd,
-        shell=True,
+        check=False, shell=True,
         capture_output=True,
         text=True
     )
