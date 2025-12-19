@@ -2,35 +2,27 @@ import os
 import sys
 import google.generativeai as genai
 
-# ===== MANUAL API KEY (LOCAL TESTING ONLY) =====
-# DO NOT COMMIT A REAL KEY TO SOURCE CONTROL
-MANUAL_GEMINI_API_KEY = "AIzaSyBJeffmuYafp45iKeLNMFXkmx74TNeA6w8"
-# ==============================================
 
 def main():
-    if len(sys.argv) != 3:
+    if len(sys.argv) != 2:
         print(
-            "Usage: python verify_sql_with_gemini.py "
-            "<upgrade_sql_path> <downgrade_sql_path>"
+            "Usage: python verify_forward_compatible_migration.py "
+            "<upgrade_sql_path>"
         )
         sys.exit(1)
 
     upgrade_sql_path = sys.argv[1]
-    downgrade_sql_path = sys.argv[2]
 
-    # Read SQL files
+    # Read upgrade SQL file
     try:
         with open(upgrade_sql_path, "r", encoding="utf-8") as f:
             upgrade_sql = f.read()
-        with open(downgrade_sql_path, "r", encoding="utf-8") as f:
-            downgrade_sql = f.read()
     except Exception as e:
-        print(f"Error reading SQL files: {e}")
+        print(f"Error reading upgrade SQL file: {e}")
         sys.exit(1)
 
-    # Resolve API key: ENV first, manual fallback second
-    api_key = os.getenv("GEMINI_API_KEY") or MANUAL_GEMINI_API_KEY
-
+    # Resolve API key
+    api_key = os.getenv("GEMINI_API_KEY")
     if not api_key or api_key == "PUT_YOUR_API_KEY_HERE":
         print("Gemini API key is not configured.")
         sys.exit(1)
@@ -41,47 +33,37 @@ def main():
     prompt = f"""
 You are a senior database migration reviewer.
 
-Definitions:
-- Upgrade forward compatible: does not break previous app versions
-- Upgrade backward compatible: fully reversible via downgrade
-- Downgrade forward compatible: can run immediately after upgrade
-- Downgrade backward compatible: restores previous app compatibility
+Definition:
+Forward compatible migration means:
+- BOTH the OLD and NEW versions of the application must work
+- Against the SAME database schema
+- Without coordinated application upgrades
+- Without requiring downgrade or rollback
+- Assume the old application may read or write ANY existing column
 
-Analyze strictly.
+Analyze STRICTLY.
 
 upgrade.sql:
 {upgrade_sql}
 
-downgrade.sql:
-{downgrade_sql}
-
 Respond EXACTLY as:
 
-UPGRADE_FORWARD: YES or NO
-UPGRADE_BACKWARD: YES or NO
-DOWNGRADE_FORWARD: YES or NO
-DOWNGRADE_BACKWARD: YES or NO
+FORWARD_COMPATIBLE: YES or NO
 
-Explain each NO.
+If NO, explain precisely why the old application would break.
 """
 
     response = model.generate_content(prompt)
-    result = response.text.upper()
+    result_text = response.text.strip()
+    result_upper = result_text.upper()
 
-    print(response.text)
+    print(result_text)
 
-    required = [
-        "UPGRADE_FORWARD: YES",
-        "UPGRADE_BACKWARD: YES",
-        "DOWNGRADE_FORWARD: YES",
-        "DOWNGRADE_BACKWARD: YES",
-    ]
-
-    if not all(r in result for r in required):
-        print("\nMigration compatibility check FAILED.")
+    if "FORWARD_COMPATIBLE: YES" not in result_upper:
+        print("\nForward compatibility check FAILED.")
         sys.exit(1)
 
-    print("\nMigration compatibility check PASSED.")
+    print("\nForward compatibility check PASSED.")
     sys.exit(0)
 
 
