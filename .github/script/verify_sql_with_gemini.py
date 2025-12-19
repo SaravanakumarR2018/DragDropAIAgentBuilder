@@ -4,24 +4,21 @@ import google.generativeai as genai
 
 
 def main():
-    if len(sys.argv) != 3:
+    if len(sys.argv) != 2:
         print(
-            "Usage: python verify_sql_with_gemini.py "
-            "<upgrade_sql_path> <downgrade_sql_path>"
+            "Usage: python verify_upgrade_forward_with_gemini.py "
+            "<upgrade_sql_path>"
         )
         sys.exit(1)
 
     upgrade_sql_path = sys.argv[1]
-    downgrade_sql_path = sys.argv[2]
 
-    # Read SQL files
+    # Read upgrade SQL file
     try:
         with open(upgrade_sql_path, "r", encoding="utf-8") as f:
             upgrade_sql = f.read()
-        with open(downgrade_sql_path, "r", encoding="utf-8") as f:
-            downgrade_sql = f.read()
     except Exception as e:
-        print(f"Error reading SQL files: {e}")
+        print(f"Error reading upgrade SQL file: {e}")
         sys.exit(1)
 
     # Resolve API key
@@ -36,36 +33,25 @@ def main():
     prompt = f"""
 You are a senior database migration reviewer.
 
-We are validating ONLY forward compatibility.
+We are validating ONLY upgrade forward compatibility.
 
-Definitions:
-
-UPGRADE FORWARD COMPATIBLE:
+Definition:
+Upgrade Forward Compatible means:
 - After applying upgrade.sql
-- BOTH version 1 (old app) and version 2 (new app) must work
+- BOTH Version 1 (old application) and Version 2 (new application) must work
 - Against the SAME database
-- Assume the old app may read or write ANY existing column
-
-DOWNGRADE FORWARD COMPATIBLE:
-- After applying downgrade.sql
-- BOTH version 2 (new app) and version 1 (old app) must work
-- Against the SAME database
-- Assume the new app may read or write ANY existing column
+- Assume the old application may read or write ANY existing column
 
 Analyze STRICTLY.
 
 upgrade.sql:
 {upgrade_sql}
 
-downgrade.sql:
-{downgrade_sql}
-
 Respond EXACTLY as:
 
 UPGRADE_FORWARD: YES or NO
-DOWNGRADE_FORWARD: YES or NO
 
-Explain each NO clearly and precisely.
+If NO, explain clearly why Version 1 would break.
 """
 
     response = model.generate_content(prompt)
@@ -74,14 +60,11 @@ Explain each NO clearly and precisely.
 
     print(output)
 
-    if (
-        "UPGRADE_FORWARD: YES" not in output_upper
-        or "DOWNGRADE_FORWARD: YES" not in output_upper
-    ):
-        print("\nForward compatibility check FAILED.")
+    if "UPGRADE_FORWARD: YES" not in output_upper:
+        print("\nUpgrade forward compatibility check FAILED.")
         sys.exit(1)
 
-    print("\nForward compatibility check PASSED.")
+    print("\nUpgrade forward compatibility check PASSED.")
     sys.exit(0)
 
 
