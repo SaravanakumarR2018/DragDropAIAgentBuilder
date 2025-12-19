@@ -4,21 +4,24 @@ import google.generativeai as genai
 
 
 def main():
-    if len(sys.argv) != 2:
+    if len(sys.argv) != 3:
         print(
-            "Usage: python verify_forward_compatible_migration.py "
-            "<upgrade_sql_path>"
+            "Usage: python verify_sql_with_gemini.py "
+            "<upgrade_sql_path> <downgrade_sql_path>"
         )
         sys.exit(1)
 
     upgrade_sql_path = sys.argv[1]
+    downgrade_sql_path = sys.argv[2]
 
-    # Read upgrade SQL file
+    # Read SQL files
     try:
         with open(upgrade_sql_path, "r", encoding="utf-8") as f:
             upgrade_sql = f.read()
+        with open(downgrade_sql_path, "r", encoding="utf-8") as f:
+            downgrade_sql = f.read()
     except Exception as e:
-        print(f"Error reading upgrade SQL file: {e}")
+        print(f"Error reading SQL files: {e}")
         sys.exit(1)
 
     # Resolve API key
@@ -33,33 +36,48 @@ def main():
     prompt = f"""
 You are a senior database migration reviewer.
 
-Definition:
-Forward compatible migration means:
-- BOTH the OLD and NEW versions of the application must work
-- Against the SAME database schema
-- Without coordinated application upgrades
-- Without requiring downgrade or rollback
-- Assume the old application may read or write ANY existing column
+We are validating ONLY forward compatibility.
+
+Definitions:
+
+UPGRADE FORWARD COMPATIBLE:
+- After applying upgrade.sql
+- BOTH version 1 (old app) and version 2 (new app) must work
+- Against the SAME database
+- Assume the old app may read or write ANY existing column
+
+DOWNGRADE FORWARD COMPATIBLE:
+- After applying downgrade.sql
+- BOTH version 2 (new app) and version 1 (old app) must work
+- Against the SAME database
+- Assume the new app may read or write ANY existing column
 
 Analyze STRICTLY.
 
 upgrade.sql:
 {upgrade_sql}
 
+downgrade.sql:
+{downgrade_sql}
+
 Respond EXACTLY as:
 
-FORWARD_COMPATIBLE: YES or NO
+UPGRADE_FORWARD: YES or NO
+DOWNGRADE_FORWARD: YES or NO
 
-If NO, explain precisely why the old application would break.
+Explain each NO clearly and precisely.
 """
 
     response = model.generate_content(prompt)
-    result_text = response.text.strip()
-    result_upper = result_text.upper()
+    output = response.text.strip()
+    output_upper = output.upper()
 
-    print(result_text)
+    print(output)
 
-    if "FORWARD_COMPATIBLE: YES" not in result_upper:
+    if (
+        "UPGRADE_FORWARD: YES" not in output_upper
+        or "DOWNGRADE_FORWARD: YES" not in output_upper
+    ):
         print("\nForward compatibility check FAILED.")
         sys.exit(1)
 
