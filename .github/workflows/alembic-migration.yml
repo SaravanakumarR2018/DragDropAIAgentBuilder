@@ -172,14 +172,11 @@ jobs:
 
           echo "Generating downgrade SQL: ${REPO_REVISION} -> ${VM_REVISION}"
           alembic -c alembic.ini downgrade ${REPO_REVISION}:${VM_REVISION} --sql \
-            > "alembic_sql/downgrade_${REPO_REVISION}_to_${VM_REVISION}.sql"
+            > alembic_sql/downgrade.sql
 
-           echo "Generating upgrade SQL: ${VM_REVISION} -> ${REPO_REVISION}"
+          echo "Generating upgrade SQL: ${VM_REVISION} -> ${REPO_REVISION}"
           alembic -c alembic.ini upgrade ${VM_REVISION}:${REPO_REVISION} --sql \
-            > "alembic_sql/upgrade_${VM_REVISION}_to_${REPO_REVISION}.sql"
-          
-          cp "alembic_sql/downgrade_${REPO_REVISION}_to_${VM_REVISION}.sql" alembic_sql/downgrade.sql
-          cp "alembic_sql/upgrade_${VM_REVISION}_to_${REPO_REVISION}.sql" alembic_sql/upgrade.sql  
+           > alembic_sql/upgrade.sql  
 
       - name: Verify generated SQL files
         if: steps.compare.outputs.db_changes == 'true'
