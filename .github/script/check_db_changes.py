@@ -54,17 +54,25 @@ def get_revision_from_db_url(database_url: str) -> str:
     )
     if result.returncode != 0:
         stderr = result.stderr.strip()
-        if "relation \"alembic_version\" does not exist" in stderr and os.getenv(
-            "ALEMBIC_FALLBACK_TO_HEADS"
+        stdout = result.stdout.strip()
+        combined = f"{stderr}\n{stdout}".lower()
+        if os.getenv("ALEMBIC_FALLBACK_TO_HEADS") and "alembic_version" in combined and (
+            "does not exist" in combined
+            or "undefined table" in combined
+            or "no such table" in combined
         ):
             logging.warning("alembic_version missing; falling back to alembic heads")
             return get_revision_from_alembic()
 
-        logging.error("psql failed: %s", stderr)
+        logging.error("psql failed: %s", stderr or stdout)
         raise SystemExit(1)
 
     revision = result.stdout.strip()
     if not revision:
+        if os.getenv("ALEMBIC_FALLBACK_TO_HEADS"):
+            logging.warning("No alembic revision found in database; using alembic heads")
+            return get_revision_from_alembic()
+
         logging.error("No alembic revision found in database")
         raise SystemExit(1)
 

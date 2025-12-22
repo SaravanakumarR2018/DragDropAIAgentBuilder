@@ -91,6 +91,8 @@ jobs:
 
       - name: Install dependencies
         run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
           cd src/backend/base
           pip install uv
           pip install psycopg2-binary asyncpg
@@ -153,6 +155,9 @@ jobs:
         env:
           LOCAL_GITHUB_POSTGRES_DATABASE_URL: ${{ env.LOCAL_GITHUB_POSTGRES_DATABASE_URL }}
           ALEMBIC_OUTPUT_KEY: repo_alembic_version
+          ALEMBIC_FALLBACK_TO_HEADS: "true"
+          ALEMBIC_WORKDIR: src/backend/base/langflow
+          ALEMBIC_INI: alembic.ini
         run: python .github/script/check_db_changes.py
 
       - name: Copy check_db_changes.py to VM
