@@ -10,6 +10,7 @@ def get_revision_from_db_url(database_url: str) -> str:
         [
             "psql",
             database_url,
+            "-A",
             "-t",
             "-c",
             "select version_num from alembic_version;",
@@ -18,7 +19,16 @@ def get_revision_from_db_url(database_url: str) -> str:
         capture_output=True,
         text=True,
     )
-    return result.stdout.strip()
+    if result.returncode != 0:
+        logging.error("psql failed: %s", result.stderr.strip())
+        raise SystemExit(1)
+
+    revision = result.stdout.strip()
+    if not revision:
+        logging.error("No alembic revision found in database")
+        raise SystemExit(1)
+
+    return revision
 
 def get_revision_from_docker() -> str:
     """Get alembic version from Postgres container inside VM."""
@@ -73,6 +83,8 @@ def main():
     else:
         revision = get_revision_from_docker()
         logging.info("VM Alembic Revision: %s", revision)
+
+    print(revision)
 
     github_output = os.getenv("GITHUB_OUTPUT")
     if github_output:
