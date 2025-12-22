@@ -70,7 +70,7 @@ jobs:
           git checkout ${{ github.event.inputs.commit_id }}
           echo "✅ Checked out commit ${{ github.event.inputs.commit_id }}"
 
-      - name: Determine Commit ID}
+      - name: Determine Commit ID
         id: commit
         run: |
           if [ -n "${{ github.event.inputs.commit_id }}" ]; then
@@ -130,6 +130,8 @@ jobs:
 
       - name: Verify Alembic head revision applied
         working-directory: src/backend/base/langflow
+        env:
+          LANGFLOW_DATABASE_URL: ${{ env.LOCAL_GITHUB_POSTGRES_DATABASE_URL }}
         run: |
           set -euo pipefail
 
