@@ -23,6 +23,7 @@ on:
 env:
   STAGING_HOST: staging.visualaiagentsbuilder.com
   PROD_HOST: visualaiagentsbuilder.com
+  LOCAL_GITHUB_POSTGRES_IMAGE: postgres@sha256:d0f363f8366fbc3f52d172c6e76bc27151c3d643b870e1062b4e8bfe65baf609
 
 jobs:
   check-db-changes:
@@ -30,35 +31,59 @@ jobs:
 
     services:
       postgres:
-        image: postgres@sha256:d0f363f8366fbc3f52d172c6e76bc27151c3d643b870e1062b4e8bfe65baf609
+        image: ${{ env.LOCAL_GITHUB_POSTGRES_IMAGE }}
         env:
-          POSTGRES_USER: langflow
-          POSTGRES_PASSWORD: langflow
-          POSTGRES_DB: langflow
+          POSTGRES_USER: ${{ env.LOCAL_GITHUB_POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ env.LOCAL_GITHUB_POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ env.LOCAL_GITHUB_POSTGRES_DB_NAME }}
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U langflow"
+          --health-cmd "pg_isready -U ${{ env.LOCAL_GITHUB_POSTGRES_USER }}"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
 
     outputs:
       db_changes: ${{ steps.compare.outputs.db_changes }}
+      repo_revision: ${{ steps.repo_version.outputs.repo_alembic_version }}
+      vm_revision: ${{ steps.vm_output.outputs.vm_alembic_version }}
+      commit_id: ${{ steps.commit.outputs.commit_id }}
 
     env:
-      PGUSER: langflow
-      PGPASSWORD: langflow
-      PGHOST: localhost
-      PGPORT: 5432
-      DB_NAME: langflow
-      DATABASE_URL: postgresql://langflow:langflow@localhost:5432/langflow
+      LOCAL_GITHUB_POSTGRES_USER: langflow
+      LOCAL_GITHUB_POSTGRES_PASSWORD: langflow
+      LOCAL_GITHUB_POSTGRES_HOST: localhost
+      LOCAL_GITHUB_POSTGRES_PORT: 5432
+      LOCAL_GITHUB_POSTGRES_DB_NAME: langflow
+      LOCAL_GITHUB_POSTGRES_DATABASE_URL: postgresql://langflow:langflow@localhost:5432/langflow
 
     steps:
       - name: Checkout selected branch
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.branch }}
+
+      - name: Checkout specific commit if provided
+        if: ${{ github.event.inputs.commit_id != '' }}
+        run: |
+          git fetch --depth=1 origin ${{ github.event.inputs.commit_id }}
+          git checkout ${{ github.event.inputs.commit_id }}
+          echo "✅ Checked out commit ${{ github.event.inputs.commit_id }}"
+
+      - name: Determine Commit ID
+        id: commit
+        run: |
+          if [ -n "${{ github.event.inputs.commit_id }}" ]; then
+            echo "commit_id=${{ github.event.inputs.commit_id }}" >> $GITHUB_OUTPUT
+          else
+            if [ "${{ github.event.inputs.branch }}" = "main" ]; then
+              COMMIT_ID=$(git rev-parse HEAD)
+            else
+              COMMIT_ID=$(git log -1 --format="%H")
+            fi
+              echo "commit_id=$COMMIT_ID" >> $GITHUB_OUTPUT
+          fi    
 
       - name: Set up Python
         uses: actions/setup-python@v3
@@ -76,7 +101,7 @@ jobs:
       - name: Wait for PostgreSQL
         run: |
           for i in {1..10}; do
-            if pg_isready -h "$PGHOST" -p "$PGPORT" -U "$PGUSER"; then
+            if pg_isready -h "$LOCAL_GITHUB_POSTGRES_HOST" -p "$LOCAL_GITHUB_POSTGRES_PORT" -U "$LOCAL_GITHUB_POSTGRES_USER"; then
               exit 0
             fi
             sleep 3
@@ -85,41 +110,49 @@ jobs:
 
       - name: Create database (safe)
         run: |
-          psql "postgresql://$PGUSER:$PGPASSWORD@$PGHOST:$PGPORT/postgres" \
-          -tc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" | grep -q 1 || \
-          psql "postgresql://$PGUSER:$PGPASSWORD@$PGHOST:$PGPORT/postgres" \
-          -c "CREATE DATABASE \"$DB_NAME\";"
+          psql "postgresql://$LOCAL_GITHUB_POSTGRES_USER:$LOCAL_GITHUB_POSTGRES_PASSWORD@$LOCAL_GITHUB_POSTGRES_HOST:$LOCAL_GITHUB_POSTGRES_PORT/postgres" \
+          -tc "SELECT 1 FROM pg_database WHERE datname = '$LOCAL_GITHUB_POSTGRES_DB_NAME'" | grep -q 1 || \
+          psql "postgresql://$LOCAL_GITHUB_POSTGRES_USER:$LOCAL_GITHUB_POSTGRES_PASSWORD@$LOCAL_GITHUB_POSTGRES_HOST:$LOCAL_GITHUB_POSTGRES_PORT/postgres" \
+          -c "CREATE DATABASE \"$LOCAL_GITHUB_POSTGRES_DB_NAME\";"
 
       - name: Print Alembic current revision
         working-directory: src/backend/base/langflow
         env:
-          LANGFLOW_DATABASE_URL: ${{ env.DATABASE_URL }}
+          LANGFLOW_DATABASE_URL: ${{ env.LOCAL_GITHUB_POSTGRES_DATABASE_URL }}
         run: |
           alembic -c alembic.ini current    
 
       - name: Apply migrations to PostgreSQL
         working-directory: src/backend/base/langflow
         env:
-          LANGFLOW_DATABASE_URL: ${{ env.DATABASE_URL }}
+          LANGFLOW_DATABASE_URL: ${{ env.LOCAL_GITHUB_POSTGRES_DATABASE_URL }}
         run: |
           alembic -c alembic.ini upgrade head
 
-      - name: Show tables in langflow DB
-        env:
-          PGUSER: langflow
-          PGPASSWORD: langflow
-          PGHOST: localhost
-          PGPORT: 5432
-          DB_NAME: langflow
+      - name: Verify Alembic head revision applied
+        working-directory: src/backend/base/langflow
         run: |
-          echo "Connecting to Postgres and listing tables..."
-          psql "postgresql://$PGUSER:$PGPASSWORD@$PGHOST:$PGPORT/$DB_NAME" -c "\dt"
+          set -euo pipefail
 
-          echo "All required tables are present ✅"    
+          HEAD_REVISION=$(alembic -c alembic.ini heads | grep -oE '[0-9a-f]{12,40}' | head -n 1)
+          CURRENT_REVISION=$(alembic -c alembic.ini current | grep -oE '[0-9a-f]{12,40}' | head -n 1)
+
+          echo "Head Revision:    $HEAD_REVISION"
+          echo "Current Revision: $CURRENT_REVISION"
+
+          if [ "$HEAD_REVISION" != "$CURRENT_REVISION" ]; then
+            echo "❌ Alembic revision mismatch after upgrade"
+            exit 1
+          fi
+
+          echo "✅ Alembic revision is at head"        
 
       - name: Get repo alembic version
         id: repo_version
-        run: python .github/script/detect_alembic_revision.py
+        env:
+          LOCAL_GITHUB_POSTGRES_DATABASE_URL: ${{ env.LOCAL_GITHUB_POSTGRES_DATABASE_URL }}
+          ALEMBIC_OUTPUT_KEY: repo_alembic_version
+        run: python .github/script/check_db_changes.py
 
       - name: Copy check_db_changes.py to VM
         uses: appleboy/scp-action@v0.1.4
@@ -140,7 +173,7 @@ jobs:
           capture_stdout: 'true'
           script: |
             REVISION=$(python3 /root/workspace/.github/script/check_db_changes.py | grep -oE '[0-9a-f]{12,40}')
-            echo "$REVISION"
+            echo "vm_alembic_version=$REVISION"
 
       - name: Compare Alembic versions
         id: compare
@@ -159,12 +192,43 @@ jobs:
 
           # ✅ Export for later SQL generation
           echo "VM_REVISION=$VM_REVISION" >> $GITHUB_ENV
-          echo "REPO_REVISION=$REPO_REVISION" >> $GITHUB_ENV      
+          echo "REPO_REVISION=$REPO_REVISION" >> $GITHUB_ENV
 
+      - name: Export VM revision output
+        id: vm_output
+        run: |
+          VM_REVISION=$(echo "${{ steps.vm_version.outputs.stdout }}" | grep -oE '[0-9a-f]{12,40}' | head -n 1)
+          echo "vm_alembic_version=$VM_REVISION" >> $GITHUB_OUTPUT          
+
+  migration-flow:
+    runs-on: ubuntu-latest
+    needs: check-db-changes
+    if: needs.check-db-changes.outputs.db_changes == 'true'
+    env:
+      VM_REVISION: ${{ needs.check-db-changes.outputs.vm_revision }}
+      REPO_REVISION: ${{ needs.check-db-changes.outputs.repo_revision }}
+      LOCAL_GITHUB_POSTGRES_DATABASE_URL: postgresql://langflow:langflow@localhost:5432/langflow
+    steps:
+      - name: Checkout selected commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.check-db-changes.outputs.commit_id }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          cd src/backend/base
+          pip install uv
+          pip install psycopg2-binary asyncpg
+          pip install google-generativeai
+          pip install .
       - name: Generate SQL Migration Files
-        if: steps.compare.outputs.db_changes == 'true'
         env:
-          LANGFLOW_DATABASE_URL: ${{ env.DATABASE_URL }}
+          LANGFLOW_DATABASE_URL: ${{ env.LOCAL_GITHUB_POSTGRES_DATABASE_URL }}
         working-directory: src/backend/base/langflow  
         run: |
           set -euo pipefail
@@ -182,7 +246,6 @@ jobs:
           cp "alembic_sql/upgrade_${VM_REVISION}_to_${REPO_REVISION}.sql" alembic_sql/upgrade.sql  
 
       - name: Verify generated SQL files
-        if: steps.compare.outputs.db_changes == 'true'
         working-directory: src/backend/base/langflow
         run: |
           set -euo pipefail
@@ -204,20 +267,17 @@ jobs:
           head -n 20 alembic_sql/upgrade.sql || true   
 
       - name: Upload SQL files
-        if: steps.compare.outputs.db_changes == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: alembic-sql
           path: src/backend/base/langflow/alembic_sql/
 
       - name: Validate SQL with Gemini
-        if: steps.compare.outputs.db_changes == 'true'
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python .github/script/verify_sql_with_gemini.py src/backend/base/langflow/alembic_sql/upgrade.sql
 
       - name: Manual approval for DB changes
-        if: steps.compare.outputs.db_changes == 'true'
         uses: trstringer/manual-approval@v1
         with:
           secret: ${{ secrets.GITHUB_TOKEN }}
@@ -225,7 +285,6 @@ jobs:
           minimum-approvals: 1
 
       - name: Upload SQL artifacts
-        if: steps.compare.outputs.db_changes == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: sql-migrations
