@@ -185,6 +185,11 @@ jobs:
           echo "Repo Revision: $REPO_REVISION"
           echo "VM Revision:   $VM_REVISION"
 
+          if [ -z "$REPO_REVISION" ] || [ -z "$VM_REVISION" ]; then
+            echo "❌ Missing Alembic revision(s)"
+            exit 1
+          fi
+
           if [ "$REPO_REVISION" != "$VM_REVISION" ]; then
             echo "db_changes=true" >> $GITHUB_OUTPUT
           else
@@ -234,6 +239,11 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p alembic_sql
+
+          if [ -z "${REPO_REVISION}" ] || [ -z "${VM_REVISION}" ]; then
+            echo "❌ Missing Alembic revision(s)"
+            exit 1
+          fi
 
           echo "Generating downgrade SQL: ${REPO_REVISION} -> ${VM_REVISION}"
           alembic -c alembic.ini downgrade ${REPO_REVISION}:${VM_REVISION} --sql \
