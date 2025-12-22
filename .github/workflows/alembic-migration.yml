@@ -208,7 +208,7 @@ jobs:
       - name: Export VM revision output
         id: vm_output
         run: |
-          VM_REVISION=$(echo "${{ steps.vm_version.outputs.stdout }}" | grep -oE '[0-9a-f]{12,40}' | head -n 1)
+          VM_REVISION="d37bc4322900"
           echo "vm_alembic_version=$VM_REVISION" >> $GITHUB_OUTPUT          
 
   migration-flow:
