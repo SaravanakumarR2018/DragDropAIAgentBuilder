@@ -1,11 +1,26 @@
+import logging
 import os
 import subprocess
-import logging
 from pathlib import Path
 
 logging.basicConfig(level=logging.INFO)
 
-def get_revision():
+def get_revision_from_db_url(database_url: str) -> str:
+    result = subprocess.run(
+        [
+            "psql",
+            database_url,
+            "-t",
+            "-c",
+            "select version_num from alembic_version;",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
+
+def get_revision_from_docker() -> str:
     """Get alembic version from Postgres container inside VM."""
     ps_result = subprocess.run(
         [
@@ -51,14 +66,20 @@ def get_revision():
 
 
 def main():
-    revision = get_revision()
-    logging.info("VM Alembic Revision: %s", revision)
+    database_url = os.getenv("LOCAL_GITHUB_POSTGRES_DATABASE_URL") or os.getenv("DATABASE_URL")
+    if database_url:
+        revision = get_revision_from_db_url(database_url)
+        logging.info("Database Alembic Revision: %s", revision)
+    else:
+        revision = get_revision_from_docker()
+        logging.info("VM Alembic Revision: %s", revision)
 
     github_output = os.getenv("GITHUB_OUTPUT")
     if github_output:
+        output_key = os.getenv("ALEMBIC_OUTPUT_KEY", "alembic_version")
         output_path = Path(github_output)
         with output_path.open("a") as file:
-            file.write(f"vm_alembic_version={revision}\n")
+            file.write(f"{output_key}={revision}\n")
 
 
 if __name__ == "__main__":
