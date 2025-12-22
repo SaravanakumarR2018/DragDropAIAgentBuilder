@@ -1,9 +1,42 @@
 import logging
+import re
+
 import os
 import subprocess
 from pathlib import Path
 
 logging.basicConfig(level=logging.INFO)
+
+REVISION_PATTERN = re.compile(r"([0-9a-f]{12,})", re.IGNORECASE)
+
+def parse_revision(output: str) -> str:
+    for line in reversed(output.splitlines()):
+        match = REVISION_PATTERN.search(line)
+        if match:
+            return match.group(1)
+    return ""
+
+def get_revision_from_alembic() -> str:
+    workdir = Path(os.getenv("ALEMBIC_WORKDIR", ".")).resolve()
+    alembic_ini = os.getenv("ALEMBIC_INI", "alembic.ini")
+
+    result = subprocess.run(
+        ["alembic", "-c", alembic_ini, "heads"],
+        check=False,
+        cwd=workdir,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        logging.error("alembic heads failed: %s", result.stderr.strip())
+        raise SystemExit(1)
+
+    revision = parse_revision(result.stdout)
+    if not revision:
+        logging.error("No alembic head revision found")
+        raise SystemExit(1)
+
+    return revision
 
 def get_revision_from_db_url(database_url: str) -> str:
     result = subprocess.run(
@@ -20,7 +53,14 @@ def get_revision_from_db_url(database_url: str) -> str:
         text=True,
     )
     if result.returncode != 0:
-        logging.error("psql failed: %s", result.stderr.strip())
+        stderr = result.stderr.strip()
+        if "relation \"alembic_version\" does not exist" in stderr and os.getenv(
+            "ALEMBIC_FALLBACK_TO_HEADS"
+        ):
+            logging.warning("alembic_version missing; falling back to alembic heads")
+            return get_revision_from_alembic()
+
+        logging.error("psql failed: %s", stderr)
         raise SystemExit(1)
 
     revision = result.stdout.strip()
