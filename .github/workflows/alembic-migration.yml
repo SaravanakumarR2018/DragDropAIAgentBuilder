@@ -23,7 +23,6 @@ on:
 env:
   STAGING_HOST: staging.visualaiagentsbuilder.com
   PROD_HOST: visualaiagentsbuilder.com
-  LOCAL_GITHUB_POSTGRES_IMAGE: postgres@sha256:d0f363f8366fbc3f52d172c6e76bc27151c3d643b870e1062b4e8bfe65baf609
 
 jobs:
   check-db-changes:
@@ -31,15 +30,15 @@ jobs:
 
     services:
       postgres:
-        image: ${{ env.LOCAL_GITHUB_POSTGRES_IMAGE }}
+        image: postgres@sha256:d0f363f8366fbc3f52d172c6e76bc27151c3d643b870e1062b4e8bfe65baf609
         env:
-          POSTGRES_USER: ${{ env.LOCAL_GITHUB_POSTGRES_USER }}
-          POSTGRES_PASSWORD: ${{ env.LOCAL_GITHUB_POSTGRES_PASSWORD }}
-          POSTGRES_DB: ${{ env.LOCAL_GITHUB_POSTGRES_DB_NAME }}
+          POSTGRES_USER: langflow
+          POSTGRES_PASSWORD: langflow
+          POSTGRES_DB: langflow
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U ${{ env.LOCAL_GITHUB_POSTGRES_USER }}"
+          --health-cmd "pg_isready -U langflow"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -71,7 +70,7 @@ jobs:
           git checkout ${{ github.event.inputs.commit_id }}
           echo "✅ Checked out commit ${{ github.event.inputs.commit_id }}"
 
-      - name: Determine Commit ID
+      - name: Determine Commit ID}
         id: commit
         run: |
           if [ -n "${{ github.event.inputs.commit_id }}" ]; then
