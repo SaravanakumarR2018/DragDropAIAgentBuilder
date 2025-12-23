@@ -15,7 +15,7 @@ def main():
 
     # Read upgrade SQL file
     try:
-        with open(upgrade_sql_path, "r", encoding="utf-8") as f:
+        with open(upgrade_sql_path, encoding="utf-8") as f:
             upgrade_sql = f.read()
     except Exception as e:
         print(f"Error reading upgrade SQL file: {e}")
@@ -41,7 +41,9 @@ UPGRADE FORWARD COMPATIBLE:
 - After applying upgrade.sql
 - BOTH version 1 (old app) and version 2 (new app) must work
 - Against the SAME database
-- Assume the old app may read or write ANY existing column
+- Assume the old app ALWAYS uses INSERT statements with explicit column names
+- Assume the old app does NOT rely on positional INSERTs or column order
+- The old app may read or write any existing column
 
 Analyze STRICTLY.
 
