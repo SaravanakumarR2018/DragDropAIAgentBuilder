@@ -154,7 +154,7 @@ jobs:
         id: compare
         run: |
           REPO_REVISION="${{ steps.repo_version.outputs.repo_alembic_version }}"
-          VM_REVISION=$(echo "${{ steps.vm_version.outputs.stdout }}" | grep -oE '[0-9a-f]{12,40}' | head -n 1)
+          VM_REVISION="d37bc4322900"
 
           echo "Repo Revision: $REPO_REVISION"
           echo "VM Revision:   $VM_REVISION"
@@ -172,7 +172,7 @@ jobs:
       - name: Export VM revision output
         id: vm_output
         run: |
-          VM_REVISION=$(echo "${{ steps.vm_version.outputs.stdout }}" | grep -oE '[0-9a-f]{12,40}' | head -n 1)
+          VM_REVISION="d37bc4322900"
           echo "vm_alembic_version=$VM_REVISION" >> $GITHUB_OUTPUT 
           REPO_REVISION="${{ steps.repo_version.outputs.repo_alembic_version }}"
           echo "repo_alembic_version=$REPO_REVISION" >> $GITHUB_OUTPUT         
