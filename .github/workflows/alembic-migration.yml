@@ -146,6 +146,7 @@ jobs:
           username: root
           password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
           capture_stdout: "true"
+          envs: PGUSER,PGPASSWORD,DB_NAME
           script: |
             python3 /root/workspace/.github/script/check_db_changes.py
 
