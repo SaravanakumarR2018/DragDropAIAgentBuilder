@@ -1,13 +1,12 @@
 import logging
-import re
-
 import os
+import re
 import subprocess
 from pathlib import Path
 
 logging.basicConfig(level=logging.INFO)
 
-REVISION_PATTERN = re.compile(r"([0-9a-f]{12,})", re.IGNORECASE)
+REVISION_PATTERN = re.compile(r"([0-9a-f]{12,40})", re.IGNORECASE)
 
 def parse_revision(output: str) -> str:
     for line in reversed(output.splitlines()):
@@ -22,7 +21,6 @@ def get_revision_from_alembic() -> str:
 
     result = subprocess.run(
         ["alembic", "-c", alembic_ini, "heads"],
-        check=False,
         cwd=workdir,
         capture_output=True,
         text=True,
@@ -38,7 +36,7 @@ def get_revision_from_alembic() -> str:
 
     return revision
 
-def get_revision_from_db_url(database_url: str) -> str:
+def get_revision_from_database_url(database_url: str) -> str:
     result = subprocess.run(
         [
             "psql",
@@ -48,77 +46,73 @@ def get_revision_from_db_url(database_url: str) -> str:
             "-c",
             "select version_num from alembic_version;",
         ],
-        check=False,
         capture_output=True,
         text=True,
     )
     if result.returncode != 0:
-        stderr = result.stderr.strip()
-        stdout = result.stdout.strip()
-        combined = f"{stderr}\n{stdout}".lower()
-        if os.getenv("ALEMBIC_FALLBACK_TO_HEADS") and "alembic_version" in combined and (
-            "does not exist" in combined
-            or "undefined table" in combined
-            or "no such table" in combined
-        ):
-            logging.warning("alembic_version missing; falling back to alembic heads")
+        combined = (result.stdout + result.stderr).lower()
+        if os.getenv("ALEMBIC_FALLBACK_TO_HEADS") and "alembic_version" in combined:
+            logging.warning("alembic_version missing, falling back to heads")
             return get_revision_from_alembic()
 
-        logging.error("psql failed: %s", stderr or stdout)
+        logging.error(result.stderr.strip())
         raise SystemExit(1)
 
     revision = result.stdout.strip()
     if not revision:
         if os.getenv("ALEMBIC_FALLBACK_TO_HEADS"):
-            logging.warning("No alembic revision found in database; using alembic heads")
             return get_revision_from_alembic()
-
-        logging.error("No alembic revision found in database")
         raise SystemExit(1)
 
     return revision
 
 def get_revision_from_docker() -> str:
-    """Get alembic version from Postgres container inside VM."""
-    ps_result = subprocess.run(
-        [
-            "docker",
-            "ps",
-            "--filter",
-            "name=postgres",
-            "--format",
-            "{{.Names}}",
-        ],
-        check=False,
+    pg_user = os.getenv("PGUSER")
+    pg_password = os.getenv("PGPASSWORD")
+    db_name = os.getenv("DB_NAME")
+
+    if not all([pg_user, pg_password, db_name]):
+        logging.error("Missing PGUSER / PGPASSWORD / DB_NAME env vars")
+        raise SystemExit(1)
+
+    env = os.environ.copy()
+    env["PGPASSWORD"] = pg_password
+
+    container_result = subprocess.run(
+        ["docker", "ps", "--filter", "name=postgres", "--format", "{{.Names}}"],
         capture_output=True,
         text=True,
     )
 
-    containers = ps_result.stdout.strip().splitlines()
+    containers = container_result.stdout.strip().splitlines()
     if not containers:
-        return "NO CONTAINERS"
-    
-    container_name = containers[0]
+        logging.error("No postgres container found")
+        raise SystemExit(1)
+
+    container = containers[0]
 
     exec_result = subprocess.run(
         [
             "docker",
             "exec",
+            "-e", "PGPASSWORD",
             "-i",
-            container_name,
+            container,
             "psql",
-            "-U",
-            "langflow",
-            "-d",
-            "langflow",
+            "-U", pg_user,
+            "-d", db_name,
             "-t",
             "-c",
             "select version_num from alembic_version;",
         ],
-        check=False,
+        env=env,
         capture_output=True,
         text=True,
     )
+
+    if exec_result.returncode != 0:
+        logging.error(exec_result.stderr.strip())
+        raise SystemExit(1)
 
     return exec_result.stdout.strip()
 
@@ -126,20 +120,17 @@ def get_revision_from_docker() -> str:
 def main():
     database_url = os.getenv("LOCAL_GITHUB_POSTGRES_DATABASE_URL") or os.getenv("DATABASE_URL")
     if database_url:
-        revision = get_revision_from_db_url(database_url)
-        logging.info("Database Alembic Revision: %s", revision)
+        revision = get_revision_from_database_url(database_url)
     else:
         revision = get_revision_from_docker()
-        logging.info("VM Alembic Revision: %s", revision)
 
     print(revision)
 
     github_output = os.getenv("GITHUB_OUTPUT")
     if github_output:
-        output_key = os.getenv("ALEMBIC_OUTPUT_KEY", "alembic_version")
-        output_path = Path(github_output)
-        with output_path.open("a") as file:
-            file.write(f"{output_key}={revision}\n")
+        key = os.getenv("ALEMBIC_OUTPUT_KEY", "alembic_version")
+        with Path(github_output).open("a") as f:
+            f.write(f"{key}={revision}\n")
 
 
 if __name__ == "__main__":
