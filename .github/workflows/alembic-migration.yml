@@ -182,7 +182,7 @@ jobs:
     needs: check-db-changes
     if: needs.check-db-changes.outputs.db_changes == 'true'
     env:
-      VM_REVISION: ${{ needs.check-db-changes.outputs.vm_revision }}
+      VM_REVISION: "d37bc4322900"
       REPO_REVISION: ${{ needs.check-db-changes.outputs.repo_revision }}
       LOCAL_GITHUB_POSTGRES_DATABASE_URL: postgresql://langflow:langflow@localhost:5432/langflow
 
