@@ -150,16 +150,17 @@ export default function LandingPage(): JSX.Element {
               <>
                 <a
                   href="#demo"
-                  className="hidden lg:inline-block rounded-xl bg-white px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:opacity-90"
+                  className="hidden md:inline-block rounded-xl bg-white px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:opacity-90"
                 >
                   Book a Demo
                 </a>
-                <a
-                  href="/login"
+
+                <Link
+                  to="/login"
                   className="whitespace-nowrap rounded-xl bg-white px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:opacity-90"
                 >
                   Log in
-                </a>
+                </Link>
               </>
             )}
           </div>
