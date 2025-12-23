@@ -5,7 +5,7 @@ import { useAuth } from "@clerk/clerk-react";
 import { Link } from "react-router-dom";
 import VisualWorkflow from "./new-assets/VisualWorkflow.webp";
 import demoWalkthrough from "./new-assets/demo-walkthrough.webp";
-import logoicon from "./new-assets/visualailogo.webp?inline";
+import logoicon from "./new-assets/visualailogo.webp";
 import {
   clearStoredOrgSelection,
   LANGFLOW_ACCESS_TOKEN,

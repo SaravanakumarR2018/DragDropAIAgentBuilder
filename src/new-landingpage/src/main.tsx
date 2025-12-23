@@ -2,7 +2,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { ClerkProvider } from "@clerk/clerk-react";
 import { CookiesProvider } from "react-cookie";
-import faviconUrl from "./new-assets/visualailogo.webp?inline";
+import faviconUrl from "./new-assets/visualailogo.webp";
 import App from "./App";
 import "./index.css";
 
