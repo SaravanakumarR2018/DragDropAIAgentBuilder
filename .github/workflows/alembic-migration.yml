@@ -30,7 +30,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres@sha256:d0f363f8366fbc3f52d172c6e76bc27151c3d643b870e1062b4e8bfe65baf609
+        image: ${{ vars.POSTGRESQL_DOCKER_VERSION }}
         env:
           POSTGRES_USER: langflow
           POSTGRES_PASSWORD: langflow
