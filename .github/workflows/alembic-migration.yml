@@ -23,6 +23,7 @@ on:
 env:
   STAGING_HOST: staging.visualaiagentsbuilder.com
   PROD_HOST: visualaiagentsbuilder.com
+  LOCAL_GITHUB_POSTGRES_DATABASE_URL: postgresql://langflow:langflow@localhost:5432/langflow
 
 jobs:
   check-db-changes:
@@ -32,13 +33,13 @@ jobs:
       postgres:
         image: ${{ vars.POSTGRESQL_DOCKER_VERSION }}
         env:
-          POSTGRES_USER: "${{ secrets.POSTGRES_USER }}"
-          POSTGRES_PASSWORD: "${{ secrets.POSTGRES_PASSWD  }}"
-          POSTGRES_DB: "${{ secrets.POSTGRES_DB }}"
+          POSTGRES_USER: langflow
+          POSTGRES_PASSWORD: langflow
+          POSTGRES_DB: langflow
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U ${{ secrets.POSTGRES_USER }}"
+          --health-cmd "pg_isready -U langflow"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -48,13 +49,6 @@ jobs:
       repo_revision: ${{ steps.repo_version.outputs.repo_alembic_version }}
       vm_revision: ${{ steps.vm_version.outputs.vm_alembic_version }}
       commit_id: ${{ steps.commit.outputs.commit_id }}
-
-    env:
-      LOCAL_GITHUB_POSTGRES_DATABASE_URL: postgresql://langflow:langflow@localhost:5432/langflow
-
-      PGUSER: ${{ github.event.inputs.environment == 'staging' && secrets.POSTGRES_USER || secrets.PROD_POSTGRES_USER }}
-      PGPASSWORD: ${{ github.event.inputs.environment == 'staging' && secrets.POSTGRES_PASSWD || PROD_POSTGRES_PASSWD}}
-      DB_NAME: ${{ github.event.inputs.environment == 'staging' && secrets.POSTGRES_DB || secrets.PROD_POSTGRES_DB }}
 
     steps:
       - name: Checkout selected branch
@@ -67,7 +61,6 @@ jobs:
         run: |
           git fetch --depth=1 origin ${{ github.event.inputs.commit_id }}
           git checkout ${{ github.event.inputs.commit_id }}
-          echo "✅ Checked out commit ${{ github.event.inputs.commit_id }}"
 
       - name: Determine Commit ID
         id: commit
@@ -75,13 +68,24 @@ jobs:
           if [ -n "${{ github.event.inputs.commit_id }}" ]; then
             echo "commit_id=${{ github.event.inputs.commit_id }}" >> $GITHUB_OUTPUT
           else
-            if [ "${{ github.event.inputs.branch }}" = "main" ]; then
-              COMMIT_ID=$(git rev-parse HEAD)
-            else
-              COMMIT_ID=$(git log -1 --format="%H")
-            fi
-              echo "commit_id=$COMMIT_ID" >> $GITHUB_OUTPUT
-          fi    
+            echo "commit_id=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Resolve DB credentials
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "staging" ]; then
+            echo "PGUSER=${{ secrets.POSTGRES_USER }}" >> $GITHUB_ENV
+            echo "PGPASSWORD=${{ secrets.POSTGRES_PASSWD }}" >> $GITHUB_ENV
+            echo "DB_NAME=${{ secrets.POSTGRES_DB }}" >> $GITHUB_ENV
+            echo "VM_HOST=${{ env.STAGING_HOST }}" >> $GITHUB_ENV
+            echo "VM_PASSWORD=${{ secrets.VM_PASSWORD }}" >> $GITHUB_ENV
+          else
+            echo "PGUSER=${{ secrets.PROD_POSTGRES_USER }}" >> $GITHUB_ENV
+            echo "PGPASSWORD=${{ secrets.PROD_POSTGRES_PASSWD }}" >> $GITHUB_ENV
+            echo "DB_NAME=${{ secrets.PROD_POSTGRES_DB }}" >> $GITHUB_ENV
+            echo "VM_HOST=${{ env.PROD_HOST }}" >> $GITHUB_ENV
+            echo "VM_PASSWORD=${{ secrets.PROD_VM_PASSWORD }}" >> $GITHUB_ENV
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v3
@@ -108,21 +112,7 @@ jobs:
           done
           exit 1
 
-      - name: Create database (safe)
-        run: |
-          psql "postgresql://$LOCAL_GITHUB_POSTGRES_USER:$LOCAL_GITHUB_POSTGRES_PASSWORD@$LOCAL_GITHUB_POSTGRES_HOST:$LOCAL_GITHUB_POSTGRES_PORT/postgres" \
-          -tc "SELECT 1 FROM pg_database WHERE datname = '$LOCAL_GITHUB_POSTGRES_DB_NAME'" | grep -q 1 || \
-          psql "postgresql://$LOCAL_GITHUB_POSTGRES_USER:$LOCAL_GITHUB_POSTGRES_PASSWORD@$LOCAL_GITHUB_POSTGRES_HOST:$LOCAL_GITHUB_POSTGRES_PORT/postgres" \
-          -c "CREATE DATABASE \"$LOCAL_GITHUB_POSTGRES_DB_NAME\";"
-
-      - name: Print Alembic current revision
-        working-directory: src/backend/base/langflow
-        env:
-          LANGFLOW_DATABASE_URL: ${{ env.LOCAL_GITHUB_POSTGRES_DATABASE_URL }}
-        run: |
-          alembic -c alembic.ini current    
-
-      - name: Apply migrations to PostgreSQL
+      - name: Apply migrations to GitHub PostgreSQL
         working-directory: src/backend/base/langflow
         env:
           LANGFLOW_DATABASE_URL: ${{ env.LOCAL_GITHUB_POSTGRES_DATABASE_URL }}
