@@ -23,7 +23,10 @@ on:
 env:
   STAGING_HOST: staging.visualaiagentsbuilder.com
   PROD_HOST: visualaiagentsbuilder.com
-  LOCAL_GITHUB_POSTGRES_DATABASE_URL: postgresql://langflow:langflow@localhost:5432/langflow
+  GA_POSTGRES_PGUSER: langflow
+  GA_POSTGRES_PGPASSWORD: langflow
+  GA_POSTGRES_DB_NAME: langflow
+  GA_POSTGRES_DATABASE_URL: postgresql://langflow:langflow@localhost:5432/langflow
 
 jobs:
   check-db-changes:
@@ -33,9 +36,9 @@ jobs:
       postgres:
         image: ${{ vars.POSTGRESQL_DOCKER_VERSION }}
         env:
-          POSTGRES_USER: langflow
-          POSTGRES_PASSWORD: langflow
-          POSTGRES_DB: langflow
+          POSTGRES_USER: ${{ env.GA_POSTGRES_PGUSER }}
+          POSTGRES_PASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}
+          POSTGRES_DB: ${{ env.GA_POSTGRES_DB_NAME }}
         ports:
           - 5432:5432
         options: >-
@@ -74,13 +77,13 @@ jobs:
       - name: Resolve DB credentials
         run: |
           if [ "${{ github.event.inputs.environment }}" = "staging" ]; then
-            echo "LOCAL_GITHUB_POSTGRES_PGUSER=${{ secrets.POSTGRES_USER }}" >> $GITHUB_ENV
-            echo "LOCAL_GITHUB_POSTGRES_PGPASSWORD=${{ secrets.POSTGRES_PASSWD }}" >> $GITHUB_ENV
-            echo "LOCAL_GITHUB_POSTGRES_DB_NAME=${{ secrets.POSTGRES_DB }}" >> $GITHUB_ENV
+            echo "VM_POSTGRES_PGUSER=${{ secrets.POSTGRES_USER }}" >> $GITHUB_ENV
+            echo "VM_POSTGRES_PGPASSWORD=${{ secrets.POSTGRES_PASSWD }}" >> $GITHUB_ENV
+            echo "VM_POSTGRES_DB_NAME=${{ secrets.POSTGRES_DB }}" >> $GITHUB_ENV
           else
-            echo "LOCAL_GITHUB_POSTGRES_PGUSER=${{ secrets.PROD_POSTGRES_USER }}" >> $GITHUB_ENV
-            echo "LOCAL_GITHUB_POSTGRES_PGPASSWORD=${{ secrets.PROD_POSTGRES_PASSWD }}" >> $GITHUB_ENV
-            echo "LOCAL_GITHUB_POSTGRES_DB_NAME=${{ secrets.PROD_POSTGRES_DB }}" >> $GITHUB_ENV
+            echo "VM_POSTGRES_PGUSER=${{ secrets.PROD_POSTGRES_USER }}" >> $GITHUB_ENV
+            echo "VM_POSTGRES_PGPASSWORD=${{ secrets.PROD_POSTGRES_PASSWD }}" >> $GITHUB_ENV
+            echo "VM_POSTGRES_DB_NAME=${{ secrets.PROD_POSTGRES_DB }}" >> $GITHUB_ENV
           fi
 
       - name: Set up Python
@@ -101,7 +104,7 @@ jobs:
       - name: Wait for PostgreSQL
         run: |
           for i in {1..10}; do
-            if pg_isready -d "$LOCAL_GITHUB_POSTGRES_DATABASE_URL"; then
+            if pg_isready -d "$GA_POSTGRES_DATABASE_URL"; then
               exit 0
             fi
             sleep 3
@@ -111,19 +114,22 @@ jobs:
       - name: Apply migrations to GitHub PostgreSQL
         working-directory: src/backend/base/langflow
         env:
-          LANGFLOW_DATABASE_URL: ${{ env.LOCAL_GITHUB_POSTGRES_DATABASE_URL }}
+          LANGFLOW_DATABASE_URL: ${{ env.GA_POSTGRES_DATABASE_URL }}
         run: |
           alembic -c alembic.ini upgrade head
 
       - name: Get repo alembic version
         id: repo_version
-        env:
-          LOCAL_GITHUB_POSTGRES_DATABASE_URL: ${{ env.LOCAL_GITHUB_POSTGRES_DATABASE_URL }}
-          ALEMBIC_OUTPUT_KEY: repo_alembic_version
-          ALEMBIC_FALLBACK_TO_HEADS: "true"
-          ALEMBIC_WORKDIR: src/backend/base/langflow
-          ALEMBIC_INI: alembic.ini
-        run: python .github/script/check_db_changes.py
+        run: >
+          python .github/script/check_db_changes.py
+          --database-url "${{ env.GA_POSTGRES_DATABASE_URL }}"
+          --db-user "${{ env.GA_POSTGRES_PGUSER }}"
+          --db-password "${{ env.GA_POSTGRES_PGPASSWORD }}"
+          --db-name "${{ env.GA_POSTGRES_DB_NAME }}"
+          --alembic-workdir src/backend/base/langflow
+          --alembic-ini alembic.ini
+          --fallback-to-heads
+          --output-key repo_alembic_version
 
       - name: Copy check_db_changes.py to VM
         uses: appleboy/scp-action@v0.1.4
@@ -142,9 +148,15 @@ jobs:
           username: root
           password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
           capture_stdout: "true"
-          envs: LOCAL_GITHUB_POSTGRES_PGUSER,LOCAL_GITHUB_POSTGRES_PGPASSWORD,LOCAL_GITHUB_POSTGRES_DB_NAME
+          envs: VM_POSTGRES_PGUSER,VM_POSTGRES_PGPASSWORD,VM_POSTGRES_DB_NAME
           script: |
-            python3 /root/workspace/.github/script/check_db_changes.py
+            python3 /root/workspace/.github/script/check_db_changes.py \
+              --db-user "$VM_POSTGRES_PGUSER" \
+              --db-password "$VM_POSTGRES_PGPASSWORD" \
+              --db-name "$VM_POSTGRES_DB_NAME" \
+              --alembic-workdir /root/workspace/src/backend/base/langflow \
+              --alembic-ini alembic.ini \
+              --fallback-to-heads
 
       - name: Compare Alembic versions
         id: compare
@@ -174,7 +186,7 @@ jobs:
     env:
       VM_REVISION: ${{ needs.check-db-changes.outputs.vm_revision }}
       REPO_REVISION: ${{ needs.check-db-changes.outputs.repo_revision }}
-      LOCAL_GITHUB_POSTGRES_DATABASE_URL: postgresql://langflow:langflow@localhost:5432/langflow
+      GA_POSTGRES_DATABASE_URL: postgresql://langflow:langflow@localhost:5432/langflow
 
     steps:
       - name: Print Alembic versions (VM vs Repo)
@@ -204,7 +216,7 @@ jobs:
 
       - name: Generate SQL Migration Files
         env:
-          LANGFLOW_DATABASE_URL: ${{ env.LOCAL_GITHUB_POSTGRES_DATABASE_URL }}
+          LANGFLOW_DATABASE_URL: ${{ env.GA_POSTGRES_DATABASE_URL }}
         working-directory: src/backend/base/langflow
         run: |
           mkdir -p alembic_sql
