@@ -150,7 +150,7 @@ jobs:
         id: compare
         run: |
           REPO_REVISION="${{ steps.repo_version.outputs.repo_alembic_version }}"
-          VM_REVISION="d37bc4322900"
+          VM_REVISION=$(echo "${{ steps.vm_version.outputs.stdout }}" | grep -oE '[0-9a-f]{12,40}' | head -n 1)
 
           echo "Repo Revision: $REPO_REVISION"
           echo "VM Revision:   $VM_REVISION"
@@ -161,28 +161,29 @@ jobs:
             echo "db_changes=false" >> $GITHUB_OUTPUT
           fi      
 
-          # ✅ Export for later SQL generation
-          echo "VM_REVISION=$VM_REVISION" >> $GITHUB_ENV
-          echo "REPO_REVISION=$REPO_REVISION" >> $GITHUB_ENV
-
       - name: Export VM revision output
         id: vm_output
         run: |
-          VM_REVISION="d37bc4322900"
-          echo "vm_alembic_version=$VM_REVISION" >> $GITHUB_OUTPUT 
-          REPO_REVISION="${{ steps.repo_version.outputs.repo_alembic_version }}"
-          echo "repo_alembic_version=$REPO_REVISION" >> $GITHUB_OUTPUT         
+          VM_REVISION=$(echo "${{ steps.vm_version.outputs.stdout }}" | grep -oE '[0-9a-f]{12,40}' | head -n 1)
+          echo "vm_alembic_version=$VM_REVISION" >> $GITHUB_OUTPUT         
 
   migration-flow:
     runs-on: ubuntu-latest
     needs: check-db-changes
     if: needs.check-db-changes.outputs.db_changes == 'true'
     env:
-      VM_REVISION: "d37bc4322900"
+      VM_REVISION: ${{ needs.check-db-changes.outputs.vm_revision }}
       REPO_REVISION: ${{ needs.check-db-changes.outputs.repo_revision }}
       LOCAL_GITHUB_POSTGRES_DATABASE_URL: postgresql://langflow:langflow@localhost:5432/langflow
 
     steps:
+      - name: Print Alembic versions (VM vs Repo)
+        run: |
+          echo "========== ALEMBIC VERSION CHECK =========="
+          echo "VM_REVISION   : ${VM_REVISION}"
+          echo "REPO_REVISION : ${REPO_REVISION}"
+          echo "=========================================="
+          
       - name: Checkout selected commit
         uses: actions/checkout@v4
         with:
