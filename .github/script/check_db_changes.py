@@ -63,9 +63,6 @@ def build_database_url(
 
 def get_revision_from_database_url(
     database_url: str,
-    fallback_to_heads: bool,
-    alembic_workdir: Path,
-    alembic_ini: str,
 ) -> str:
     result = subprocess.run(
         [
@@ -80,18 +77,11 @@ def get_revision_from_database_url(
         text=True,
     )
     if result.returncode != 0:
-        combined = (result.stdout + result.stderr).lower()
-        if fallback_to_heads and "alembic_version" in combined:
-            logging.warning("alembic_version missing, falling back to heads")
-            return get_revision_from_alembic(alembic_workdir, alembic_ini)
-
         logging.error(result.stderr.strip())
         raise SystemExit(1)
 
     revision = result.stdout.strip()
     if not revision:
-        if fallback_to_heads:
-            return get_revision_from_alembic(alembic_workdir, alembic_ini)
         raise SystemExit(1)
 
     return revision
@@ -115,23 +105,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--db-host", dest="db_host", default="localhost", help="Database host (default: localhost).")
     parser.add_argument("--db-port", dest="db_port", default="5432", help="Database port (default: 5432).")
     parser.add_argument(
-        "--fallback-to-heads",
-        action="store_true",
-        help="Fallback to alembic heads if alembic_version table is missing.",
-    )
-    parser.add_argument(
-        "--alembic-workdir",
-        dest="alembic_workdir",
-        default=".",
-        help="Path to run alembic from when falling back.",
-    )
-    parser.add_argument(
-        "--alembic-ini",
-        dest="alembic_ini",
-        default="alembic.ini",
-        help="Alembic ini file to use when falling back.",
-    )
-    parser.add_argument(
         "--output-key",
         dest="output_key",
         default="alembic_version",
@@ -153,9 +126,6 @@ def main() -> None:
     )
     revision = get_revision_from_database_url(
         database_url,
-        args.fallback_to_heads,
-        Path(args.alembic_workdir).resolve(),
-        args.alembic_ini,
     )
 
     print(revision)
