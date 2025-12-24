@@ -222,11 +222,24 @@ jobs:
             > alembic_sql/upgrade.sql
 
       - name: Validate SQL with Gemini
+        id: validate_sql
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: python .github/script/verify_sql_with_gemini.py src/backend/base/langflow/alembic_sql/upgrade.sql    
+        run: |
+          set -euo pipefail
+
+          OUTPUT=$(python .github/script/verify_sql_with_gemini.py src/backend/base/langflow/alembic_sql/upgrade.sql)
+          echo "$OUTPUT"
+
+          if echo "$OUTPUT" | grep -qi "UPGRADE_FORWARD: YES"; then
+            echo "gemini_pass=YES" >> "$GITHUB_OUTPUT"
+          else
+            echo "gemini_pass=NO" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
       
       - name: Manual approval for DB changes
+        if: steps.validate_sql.outputs.gemini_pass == 'YES'
         uses: trstringer/manual-approval@v1
         with:
           secret: ${{ secrets.GITHUB_TOKEN }}
@@ -234,6 +247,7 @@ jobs:
           minimum-approvals: 1
           
       - name: Upload SQL files
+        if: steps.validate_sql.outputs.gemini_pass == 'YES'
         uses: actions/upload-artifact@v4
         with:
           name: alembic-sql
