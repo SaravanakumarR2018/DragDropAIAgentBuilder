@@ -41,9 +41,6 @@ UPGRADE FORWARD COMPATIBLE:
 - After applying upgrade.sql
 - BOTH version 1 (old app) and version 2 (new app) must work
 - Against the SAME database
-- Assume the old app ALWAYS uses INSERT statements with explicit column names
-- Assume the old app does NOT rely on positional INSERTs or column order
-- The old app may read or write any existing column
 
 Analyze STRICTLY.
 
