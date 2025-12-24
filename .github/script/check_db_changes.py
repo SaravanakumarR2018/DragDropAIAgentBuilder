@@ -67,12 +67,12 @@ def get_revision_from_database_url(database_url: str) -> str:
     return revision
 
 def get_revision_from_docker() -> str:
-    pg_user = os.getenv("PGUSER")
-    pg_password = os.getenv("PGPASSWORD")
-    db_name = os.getenv("DB_NAME")
+    pg_user = os.getenv("LOCAL_GITHUB_POSTGRES_PGUSER")
+    pg_password = os.getenv("LOCAL_GITHUB_POSTGRES_PGPASSWORD")
+    db_name = os.getenv("LOCAL_GITHUB_POSTGRES_DB_NAME")
 
     if not all([pg_user, pg_password, db_name]):
-        logging.error("Missing PGUSER / PGPASSWORD / DB_NAME env vars")
+        logging.error("Missing LOCAL_GITHUB_POSTGRES_PGUSER / LOCAL_GITHUB_POSTGRES_PGPASSWORD / LOCAL_GITHUB_POSTGRES_DB_NAME env vars")
         raise SystemExit(1)
 
     env = os.environ.copy()
