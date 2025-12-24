@@ -1,12 +1,16 @@
+import argparse
 import logging
 import os
 import re
 import subprocess
 from pathlib import Path
+from typing import Optional
+from urllib.parse import quote_plus
 
 logging.basicConfig(level=logging.INFO)
 
 REVISION_PATTERN = re.compile(r"([0-9a-f]{12,40})", re.IGNORECASE)
+
 
 def parse_revision(output: str) -> str:
     for line in reversed(output.splitlines()):
@@ -15,10 +19,8 @@ def parse_revision(output: str) -> str:
             return match.group(1)
     return ""
 
-def get_revision_from_alembic() -> str:
-    workdir = Path(os.getenv("ALEMBIC_WORKDIR", ".")).resolve()
-    alembic_ini = os.getenv("ALEMBIC_INI", "alembic.ini")
 
+def get_revision_from_alembic(workdir: Path, alembic_ini: str) -> str:
     result = subprocess.run(
         ["alembic", "-c", alembic_ini, "heads"],
         cwd=workdir,
@@ -36,7 +38,32 @@ def get_revision_from_alembic() -> str:
 
     return revision
 
-def get_revision_from_database_url(database_url: str) -> str:
+
+def build_database_url(
+    database_url: Optional[str],
+    db_user: Optional[str],
+    db_password: Optional[str],
+    db_name: Optional[str],
+    db_host: str,
+    db_port: str,
+) -> str:
+    if database_url:
+        return database_url
+
+    missing = [field for field, value in {"db_user": db_user, "db_password": db_password, "db_name": db_name}.items() if not value]
+    if missing:
+        logging.error("Missing required database parameters: %s", ", ".join(missing))
+        raise SystemExit(1)
+
+    return (
+        f"postgresql://{quote_plus(db_user)}:{quote_plus(db_password)}"
+        f"@{db_host}:{db_port}/{quote_plus(db_name)}"
+    )
+
+
+def get_revision_from_database_url(
+    database_url: str,
+) -> str:
     result = subprocess.run(
         [
             "psql",
@@ -50,87 +77,59 @@ def get_revision_from_database_url(database_url: str) -> str:
         text=True,
     )
     if result.returncode != 0:
-        combined = (result.stdout + result.stderr).lower()
-        if os.getenv("ALEMBIC_FALLBACK_TO_HEADS") and "alembic_version" in combined:
-            logging.warning("alembic_version missing, falling back to heads")
-            return get_revision_from_alembic()
-
         logging.error(result.stderr.strip())
         raise SystemExit(1)
 
     revision = result.stdout.strip()
     if not revision:
-        if os.getenv("ALEMBIC_FALLBACK_TO_HEADS"):
-            return get_revision_from_alembic()
         raise SystemExit(1)
 
     return revision
 
-def get_revision_from_docker() -> str:
-    pg_user = os.getenv("LOCAL_GITHUB_POSTGRES_PGUSER")
-    pg_password = os.getenv("LOCAL_GITHUB_POSTGRES_PGPASSWORD")
-    db_name = os.getenv("LOCAL_GITHUB_POSTGRES_DB_NAME")
 
-    if not all([pg_user, pg_password, db_name]):
-        logging.error("Missing LOCAL_GITHUB_POSTGRES_PGUSER / LOCAL_GITHUB_POSTGRES_PGPASSWORD / LOCAL_GITHUB_POSTGRES_DB_NAME env vars")
-        raise SystemExit(1)
+def write_github_output(revision: str, output_key: str) -> None:
+    github_output = os.getenv("GITHUB_OUTPUT")
+    if not github_output:
+        return
 
-    env = os.environ.copy()
-    env["PGPASSWORD"] = pg_password
+    with Path(github_output).open("a") as f:
+        f.write(f"{output_key}={revision}\n")
 
-    container_result = subprocess.run(
-        ["docker", "ps", "--filter", "name=postgres", "--format", "{{.Names}}"],
-        capture_output=True,
-        text=True,
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Retrieve Alembic revision from PostgreSQL.")
+    parser.add_argument("--database-url", dest="database_url", help="Full PostgreSQL database URL.")
+    parser.add_argument("--db-user", dest="db_user", help="Database username.")
+    parser.add_argument("--db-password", dest="db_password", help="Database password.")
+    parser.add_argument("--db-name", dest="db_name", help="Database name.")
+    parser.add_argument("--db-host", dest="db_host", default="localhost", help="Database host (default: localhost).")
+    parser.add_argument("--db-port", dest="db_port", default="5432", help="Database port (default: 5432).")
+    parser.add_argument(
+        "--output-key",
+        dest="output_key",
+        default="alembic_version",
+        help="Key to use when writing to GITHUB_OUTPUT.",
     )
+    return parser.parse_args()
 
-    containers = container_result.stdout.strip().splitlines()
-    if not containers:
-        logging.error("No postgres container found")
-        raise SystemExit(1)
 
-    container = containers[0]
+def main() -> None:
+    args = parse_args()
 
-    exec_result = subprocess.run(
-        [
-            "docker",
-            "exec",
-            "-e", "PGPASSWORD",
-            "-i",
-            container,
-            "psql",
-            "-U", pg_user,
-            "-d", db_name,
-            "-t",
-            "-c",
-            "select version_num from alembic_version;",
-        ],
-        env=env,
-        capture_output=True,
-        text=True,
+    database_url = build_database_url(
+        args.database_url,
+        args.db_user,
+        args.db_password,
+        args.db_name,
+        args.db_host,
+        args.db_port,
     )
-
-    if exec_result.returncode != 0:
-        logging.error(exec_result.stderr.strip())
-        raise SystemExit(1)
-
-    return exec_result.stdout.strip()
-
-
-def main():
-    database_url = os.getenv("LOCAL_GITHUB_POSTGRES_DATABASE_URL") or os.getenv("DATABASE_URL")
-    if database_url:
-        revision = get_revision_from_database_url(database_url)
-    else:
-        revision = get_revision_from_docker()
+    revision = get_revision_from_database_url(
+        database_url,
+    )
 
     print(revision)
-
-    github_output = os.getenv("GITHUB_OUTPUT")
-    if github_output:
-        key = os.getenv("ALEMBIC_OUTPUT_KEY", "alembic_version")
-        with Path(github_output).open("a") as f:
-            f.write(f"{key}={revision}\n")
+    write_github_output(revision, args.output_key)
 
 
 if __name__ == "__main__":
