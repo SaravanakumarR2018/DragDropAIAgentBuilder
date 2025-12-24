@@ -16,8 +16,6 @@ import {
 } from "react";
 import {
   Navigate,
-  useLocation,
-  useNavigate,
   useSearchParams,
 } from "react-router-dom";
 import { useCookies } from "react-cookie";
@@ -228,8 +226,6 @@ export default function OrganizationOnboarding() {
     organizationId: organization?.id,
   });
 
-  const location = useLocation();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [cookies, setCookie, removeCookie] = useCookies([
@@ -241,7 +237,7 @@ export default function OrganizationOnboarding() {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
-  const [shouldGoToDashboard, setShouldGoToDashboard] = useState(false);
+  const [shouldGoToFlows, setShouldGoToFlows] = useState(false);
 
   const bootstrappedRef = useRef(false);
   const processedOrgRef = useRef<string | null>(null);
@@ -325,7 +321,7 @@ export default function OrganizationOnboarding() {
    * - ensureLangflowUser
    * - backendLogin
    * - persist cookies + storage
-   * - redirect to /dashboard
+   * - redirect to /flows
    */
   const bootstrapSession = useCallback(async () => {
     if (!isSignedIn || !organization?.id || bootstrappedRef.current) return;
@@ -367,13 +363,12 @@ export default function OrganizationOnboarding() {
 
       persistSession(orgToken, (tokens as any)?.refresh_token ?? null, activeOrgId);
 
-      setStatus("Redirecting to dashboard...");
+      setStatus("Redirecting to flows...");
       console.log(
-        "[OrganizationOnboarding] Redirecting to dashboard with org",
+        "[OrganizationOnboarding] Redirecting to flows with org",
         activeOrgId,
       );
-      setShouldGoToDashboard(true);
-      navigate("/dashboard", { replace: true });
+      setShouldGoToFlows(true);
     } catch (err: any) {
       console.error("[OrganizationOnboarding] Failed to bootstrap", err);
       const msg =
@@ -391,7 +386,6 @@ export default function OrganizationOnboarding() {
     clearSession,
     getToken,
     isSignedIn,
-    navigate,
     organization?.id,
     persistSession,
     user,
@@ -422,17 +416,16 @@ export default function OrganizationOnboarding() {
     const hasAccessToken = Boolean(cookies[LANGFLOW_ACCESS_TOKEN]);
 
     if (orgSelected && activeOrgId && hasAccessToken) {
-      console.log("[OrganizationOnboarding] Session already present; routing to /dashboard", {
+      console.log("[OrganizationOnboarding] Session already present; routing to /flows", {
         activeOrgId,
       });
-      setShouldGoToDashboard(true);
-      navigate("/dashboard", { replace: true });
+      setShouldGoToFlows(true);
     }
-  }, [cookies, isLoaded, isSignedIn, navigate]);
+  }, [cookies, isLoaded, isSignedIn]);
 
   /**
    * When Clerk redirects back with ?selected=true,
-   * create org + bootstrap session, then go to /dashboard.
+   * create org + bootstrap session, then go to /flows.
    */
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -495,9 +488,14 @@ export default function OrganizationOnboarding() {
     return <Navigate to="/login" replace />;
   }
 
-  if (shouldGoToDashboard) {
-    console.log("[OrganizationOnboarding] Local redirect flag set; sending to /dashboard");
-    return <Navigate to="/dashboard" replace />;
+  useEffect(() => {
+    if (!shouldGoToFlows) return;
+    console.log("[OrganizationOnboarding] Local redirect flag set; sending to /flows");
+    window.location.assign("/flows");
+  }, [shouldGoToFlows]);
+
+  if (shouldGoToFlows) {
+    return null;
   }
 
   return (
