@@ -47,7 +47,7 @@ jobs:
     outputs:
       db_changes: ${{ steps.compare.outputs.db_changes }}
       repo_revision: ${{ steps.repo_version.outputs.repo_alembic_version }}
-      vm_revision: ${{ steps.vm_version.outputs.vm_alembic_version }}
+      vm_revision: ${{ steps.vm_output.outputs.vm_alembic_version }}
       commit_id: ${{ steps.commit.outputs.commit_id }}
 
     steps:
