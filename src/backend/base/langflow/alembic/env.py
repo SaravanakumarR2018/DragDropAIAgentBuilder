@@ -1,4 +1,5 @@
 # noqa: INP001
+import os
 import asyncio
 from logging.config import fileConfig
 from typing import Any
@@ -14,6 +15,9 @@ from langflow.services.database.service import SQLModel
 # access to the values within the .ini file in use.
 config = context.config
 
+env_database_url = os.environ.get("LANGFLOW_DATABASE_URL")
+if env_database_url:
+    config.set_main_option("sqlalchemy.url", env_database_url)
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:
