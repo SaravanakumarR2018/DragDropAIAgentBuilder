@@ -1,11 +1,12 @@
 # noqa: INP001
-import os
 import asyncio
 from logging.config import fileConfig
 from typing import Any
+import os
 
 from alembic import context
 from sqlalchemy import pool, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.event import listen
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
@@ -18,6 +19,17 @@ config = context.config
 env_database_url = os.environ.get("LANGFLOW_DATABASE_URL")
 if env_database_url:
     config.set_main_option("sqlalchemy.url", env_database_url)
+
+database_url = make_url(config.get_main_option("sqlalchemy.url"))
+
+# Ensure an async driver is used when creating the async engine
+if database_url.drivername.startswith("postgresql") and "+asyncpg" not in database_url.drivername:
+    database_url = database_url.set(drivername="postgresql+asyncpg")
+elif database_url.drivername.startswith("sqlite") and "+aiosqlite" not in database_url.drivername:
+    database_url = database_url.set(drivername="sqlite+aiosqlite")
+
+config.set_main_option("sqlalchemy.url", database_url.render_as_string(hide_password=False))
+
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:
@@ -64,8 +76,8 @@ def run_migrations_offline() -> None:
     }
 
     # Only add prepare_threshold for PostgreSQL
-    if url and "postgresql" in url:
-        configure_kwargs["prepare_threshold"] = None
+    # if url and "postgresql" in url:
+    #     configure_kwargs["prepare_threshold"] = None
 
     context.configure(**configure_kwargs)
 
@@ -96,8 +108,8 @@ def _do_run_migrations(connection):
     }
 
     # Only add prepare_threshold for PostgreSQL
-    if connection.dialect.name == "postgresql":
-        configure_kwargs["prepare_threshold"] = None
+    # if connection.dialect.name == "postgresql":
+    #     configure_kwargs["prepare_threshold"] = None
 
     context.configure(**configure_kwargs)
 
@@ -110,18 +122,18 @@ def _do_run_migrations(connection):
 
 async def _run_async_migrations() -> None:
     # Get database URL to determine dialect
-    url = config.get_main_option("sqlalchemy.url")
-    connect_args: dict[str, Any] = {}
+    # url = config.get_main_option("sqlalchemy.url")
+    # connect_args: dict[str, Any] = {}
 
-    # Only add prepare_threshold for PostgreSQL
-    if url and "postgresql" in url:
-        connect_args["prepare_threshold"] = None
+    # # Only add prepare_threshold for PostgreSQL
+    # if url and "postgresql" in url:
+    #     connect_args["prepare_threshold"] = None
 
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
-        connect_args=connect_args,
+        # connect_args=connect_args,
     )
 
     if connectable.dialect.name == "sqlite":
