@@ -12,7 +12,6 @@ import {
   LANGFLOW_ACCESS_TOKEN,
   LANGFLOW_REFRESH_TOKEN,
 } from "./session";
-import { useMemo } from "react";
 
 function RootRoute() {
   const { isSignedIn } = useAuth();
@@ -38,15 +37,8 @@ function RootRoute() {
 export default function App() {
   console.log(`[App] App mounted with basename ${LANDING_BASENAME}`);
 
-  const routerBasename = useMemo(() => {
-    if (typeof window === "undefined") return LANDING_BASENAME;
-    return window.location.pathname.startsWith(LANDING_BASENAME)
-      ? LANDING_BASENAME
-      : "/";
-  }, []);
-
   return (
-    <BrowserRouter basename={routerBasename}>
+    <BrowserRouter basename={LANDING_BASENAME}>
       <Routes>
         <Route path="/" element={<RootRoute />} />
         <Route path="/login" element={<NewLandingPageLogin />} />
