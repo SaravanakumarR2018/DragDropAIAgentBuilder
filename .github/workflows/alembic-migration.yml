@@ -111,18 +111,16 @@ jobs:
           done
           exit 1
 
+      - name: Check Postgres service status
+        run: |
+          docker ps    
+
       - name: Apply migrations to GitHub PostgreSQL
         working-directory: src/backend/base/langflow
         env:
           LANGFLOW_DATABASE_URL: ${{ env.GA_POSTGRES_DATABASE_URL }}
         run: |
-          alembic -c alembic.ini upgrade head
-      
-      - name: Verify alembic_version table exists
-        run: |
-          psql "${{ env.GA_POSTGRES_DATABASE_URL }}" \
-          -c "\dt" \
-          -c "select * from alembic_version;"    
+          alembic -c alembic.ini upgrade head    
 
       - name: Get repo alembic version
         id: repo_version
