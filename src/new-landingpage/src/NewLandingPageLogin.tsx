@@ -26,14 +26,18 @@ export default function NewLandingPageLogin() {
   useEffect(() => {
     if (isLoaded && isSignedIn) {
       const workspaceReady = hasWorkspaceSession(cookies);
-      const destination = workspaceReady ? "/dashboard" : "/organization";
+      const destination = workspaceReady ? "/flows" : "/organization";
 
       console.log(
         "[NewLandingPageLogin] User signed in, redirecting based on session",
         { workspaceReady, destination },
       );
 
-      navigate(destination, { replace: true });
+      if (workspaceReady) {
+        window.location.assign(destination);
+      } else {
+        navigate(destination, { replace: true });
+      }
     }
   }, [cookies, isLoaded, isSignedIn, navigate]);
 

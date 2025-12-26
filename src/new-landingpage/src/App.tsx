@@ -21,12 +21,17 @@ function RootRoute() {
 
   if (isSignedIn) {
     const workspaceReady = hasWorkspaceSession(cookies);
-    const destination = workspaceReady ? "/dashboard" : "/organization";
+     const destination = workspaceReady ? "/flows" : "/organization";
 
     console.log("[App] Redirecting signed-in user from root", {
       workspaceReady,
       destination,
     });
+
+    if (workspaceReady) {
+      window.location.assign(destination);
+      return null;
+    }
 
     return <Navigate to={destination} replace />;
   }

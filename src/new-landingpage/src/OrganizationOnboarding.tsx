@@ -241,11 +241,28 @@ export default function OrganizationOnboarding() {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [isBootstrapping, setIsBootstrapping] = useState(false);
-  const [shouldGoToDashboard, setShouldGoToDashboard] = useState(false);
+  const [shouldRedirectToFlows, setShouldRedirectToFlows] = useState(false);
 
   const bootstrappedRef = useRef(false);
   const processedOrgRef = useRef<string | null>(null);
   const provisioningOrgRef = useRef<string | null>(null);
+  const redirectTo = useMemo(() => {
+    const next = searchParams.get("next");
+    if (!next) return "/flows";
+    return next.startsWith("/") ? next : "/flows";
+  }, [searchParams]);
+
+  const redirectToWorkspace = useCallback(() => {
+    setShouldRedirectToFlows(true);
+    window.location.assign(redirectTo);
+  }, [redirectTo]);
+
+  const orgRedirectQuery = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set("selected", "true");
+    params.set("next", redirectTo);
+    return params.toString();
+  }, [redirectTo]);
 
   /**
    * Derived user info for display
@@ -367,13 +384,12 @@ export default function OrganizationOnboarding() {
 
       persistSession(orgToken, (tokens as any)?.refresh_token ?? null, activeOrgId);
 
-      setStatus("Redirecting to dashboard...");
+      setStatus("Redirecting to your workspace...");
       console.log(
-        "[OrganizationOnboarding] Redirecting to dashboard with org",
+        "[OrganizationOnboarding] Redirecting to workspace with org",
         activeOrgId,
       );
-      setShouldGoToDashboard(true);
-      navigate("/dashboard", { replace: true });
+      redirectToWorkspace();
     } catch (err: any) {
       console.error("[OrganizationOnboarding] Failed to bootstrap", err);
       const msg =
@@ -391,8 +407,8 @@ export default function OrganizationOnboarding() {
     clearSession,
     getToken,
     isSignedIn,
-    navigate,
     organization?.id,
+    redirectToWorkspace,
     persistSession,
     user,
   ]);
@@ -422,13 +438,12 @@ export default function OrganizationOnboarding() {
     const hasAccessToken = Boolean(cookies[LANGFLOW_ACCESS_TOKEN]);
 
     if (orgSelected && activeOrgId && hasAccessToken) {
-      console.log("[OrganizationOnboarding] Session already present; routing to /dashboard", {
+      console.log("[OrganizationOnboarding] Session already present; routing to workspace", {
         activeOrgId,
       });
-      setShouldGoToDashboard(true);
-      navigate("/dashboard", { replace: true });
+      redirectToWorkspace();
     }
-  }, [cookies, isLoaded, isSignedIn, navigate]);
+  }, [cookies, isLoaded, isSignedIn, redirectToWorkspace]);
 
   /**
    * When Clerk redirects back with ?selected=true,
@@ -495,9 +510,12 @@ export default function OrganizationOnboarding() {
     return <Navigate to="/login" replace />;
   }
 
-  if (shouldGoToDashboard) {
-    console.log("[OrganizationOnboarding] Local redirect flag set; sending to /dashboard");
-    return <Navigate to="/dashboard" replace />;
+  if (shouldRedirectToFlows) {
+    console.log("[OrganizationOnboarding] Local redirect flag set; sending to workspace", {
+      redirectTo,
+    });
+    window.location.assign(redirectTo);
+    return null;
   }
 
   return (
@@ -690,8 +708,8 @@ export default function OrganizationOnboarding() {
         <SignedIn>
           <OrganizationList
             hidePersonal
-            afterCreateOrganizationUrl={`${LANDING_BASENAME}/organization?selected=true`}
-            afterSelectOrganizationUrl={`${LANDING_BASENAME}/organization?selected=true`}
+            afterCreateOrganizationUrl={`${LANDING_BASENAME}/organization?${orgRedirectQuery}`}
+            afterSelectOrganizationUrl={`${LANDING_BASENAME}/organization?${orgRedirectQuery}`}
           />
         </SignedIn>
 
