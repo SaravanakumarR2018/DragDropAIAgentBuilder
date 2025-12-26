@@ -16,8 +16,6 @@ import {
 } from "react";
 import {
   Navigate,
-  useLocation,
-  useNavigate,
   useSearchParams,
 } from "react-router-dom";
 import { useCookies } from "react-cookie";
@@ -228,8 +226,6 @@ export default function OrganizationOnboarding() {
     organizationId: organization?.id,
   });
 
-  const location = useLocation();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [cookies, setCookie, removeCookie] = useCookies([
