@@ -115,26 +115,14 @@ jobs:
         run: |
           docker ps    
 
-      - name: create temporary .env files
-        working-directory: src/backend/base/langflow
-        run: |
-          echo "LANGFLOW_DATABASE_URL=$GA_POSTGRES_DATABASE_URL" > .env    
-
       - name: Apply migrations to GitHub PostgreSQL
         working-directory: src/backend/base/langflow
         run: |
-          set -a
-          source .env
-          set +a
-          alembic -c alembic.ini upgrade head
+          sed -i \
+              "s|^sqlalchemy.url.*|sqlalchemy.url = ${GA_POSTGRES_DATABASE_URL}|" \
+            alembic.ini
+          alembic -c alembic.ini upgrade head    
 
-      - name: Debug .env file
-        working-directory: src/backend/base/langflow
-        run: |
-          echo "===== .env FILE CONTENT ====="
-          cat .env
-          echo "============================="    
-          
       - name: Check tables in DB
         run: |
           psql "postgresql://langflow:langflow@localhost:5432/langflow" \
@@ -143,19 +131,12 @@ jobs:
       - name: Get repo alembic version
         id: repo_version
         run: |
-          set -a
-          source .env
-          set +a
           python .github/script/check_db_changes.py
           --database-url "${{ env.GA_POSTGRES_DATABASE_URL }}"
           --db-user "${{ env.GA_POSTGRES_PGUSER }}"
           --db-password "${{ env.GA_POSTGRES_PGPASSWORD }}"
           --db-name "${{ env.GA_POSTGRES_DB_NAME }}"
-          --output-key repo_alembic_version
-
-      - name: Remove temporary .env files
-        run: |
-          rm -f .env    
+          --output-key repo_alembic_version    
 
       - name: Copy check_db_changes.py to VM
         uses: appleboy/scp-action@v0.1.4
