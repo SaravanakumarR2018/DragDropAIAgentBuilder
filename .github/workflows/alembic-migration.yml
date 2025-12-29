@@ -124,7 +124,7 @@ jobs:
         working-directory: src/backend/base/langflow
         run: |
           set -a
-          source ../../../../.env
+          source .env
           set +a
           alembic -c alembic.ini upgrade head
 
