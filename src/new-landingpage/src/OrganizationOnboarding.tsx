@@ -179,12 +179,22 @@ async function createOrganisation(token: string) {
       token,
     });
   } catch (error: any) {
-    // Some backends return 200 or 400 when org already exists
-    if (
-      error instanceof HttpError &&
-      (error.status === 200 || error.status === 400)
-    ) {
-      return;
+    // Some backends return 200/400/409 when org already exists
+    if (error instanceof HttpError) {
+      const detail =
+        typeof error.data?.detail === "string" ? error.data.detail : "";
+      const isRecoverable =
+        error.status === 200 ||
+        error.status === 400 ||
+        error.status === 409 ||
+        detail.includes("organization already exists");
+
+      if (isRecoverable) {
+        console.debug(
+          "[OrganizationOnboarding] createOrganisation(): org already exists; continuing bootstrap",
+        );
+        return;
+      }
     }
     throw error;
   }
@@ -207,6 +217,35 @@ function setStoredActiveOrgId(orgId: string | null) {
   } catch (error) {
     console.warn("[activeOrgStorage] Unable to persist active org", error);
   }
+}
+
+function markOrgSelection(activeOrgId: string) {
+  if (typeof window === "undefined") return;
+
+  localStorage.setItem(ORG_SELECTED_KEY, "true");
+  sessionStorage.setItem("isOrgSelected", "true");
+  setStoredActiveOrgId(activeOrgId);
+}
+
+function clearOrgSelection() {
+  if (typeof window === "undefined") return;
+
+  localStorage.removeItem(ORG_SELECTED_KEY);
+  sessionStorage.removeItem("isOrgSelected");
+  setStoredActiveOrgId(null);
+}
+
+function hasStoredWorkspaceSession(cookies: Record<string, any>) {
+  if (typeof window === "undefined") return { hasSession: false, activeOrgId: null };
+
+  const orgSelected = localStorage.getItem(ORG_SELECTED_KEY) === "true";
+  const activeOrgId = localStorage.getItem(ACTIVE_ORG_STORAGE_KEY);
+  const hasAccessToken = Boolean(cookies[LANGFLOW_ACCESS_TOKEN]);
+
+  return {
+    hasSession: orgSelected && Boolean(activeOrgId) && hasAccessToken,
+    activeOrgId,
+  };
 }
 
 /**
@@ -306,8 +345,7 @@ export default function OrganizationOnboarding() {
         setCookie(LANGFLOW_REFRESH_TOKEN, refreshToken, cookieOptions);
       }
 
-      localStorage.setItem(ORG_SELECTED_KEY, "true");
-      setStoredActiveOrgId(activeOrgId);
+      markOrgSelection(activeOrgId);
 
       console.log("[OrganizationOnboarding] Session persisted", {
         hasAccessToken: Boolean(accessToken),
@@ -322,8 +360,7 @@ export default function OrganizationOnboarding() {
     removeCookie(LANGFLOW_ACCESS_TOKEN, { path: "/" });
     removeCookie(LANGFLOW_REFRESH_TOKEN, { path: "/" });
     removeCookie(LANGFLOW_AUTO_LOGIN_OPTION, { path: "/" });
-    localStorage.removeItem(ORG_SELECTED_KEY);
-    setStoredActiveOrgId(null);
+    clearOrgSelection();
 
     try {
       await signOut();
@@ -413,6 +450,12 @@ export default function OrganizationOnboarding() {
     if (!isLoaded || !isSignedIn || !organization?.id) return;
     if (!hasExistingOrgSelection || bootstrappedRef.current) return;
 
+    const { hasSession } = hasStoredWorkspaceSession(cookies);
+    if (hasSession) {
+      // Session already usable; let the other effect handle redirect/rehydration
+      return;
+    }
+
     console.log(
       "[OrganizationOnboarding] Existing org selection detected; bootstrapping",
     );
@@ -429,11 +472,14 @@ export default function OrganizationOnboarding() {
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
 
-    const orgSelected = localStorage.getItem(ORG_SELECTED_KEY) === "true";
-    const activeOrgId = localStorage.getItem(ACTIVE_ORG_STORAGE_KEY);
-    const hasAccessToken = Boolean(cookies[LANGFLOW_ACCESS_TOKEN]);
+    const { hasSession, activeOrgId } = hasStoredWorkspaceSession(cookies);
 
-    if (orgSelected && activeOrgId && hasAccessToken) {
+    if (hasSession && activeOrgId) {
+      // Ensure sessionStorage flag is set for this tab so the main app honors the org selection
+      sessionStorage.setItem("isOrgSelected", "true");
+      setStoredActiveOrgId(activeOrgId);
+      bootstrappedRef.current = true;
+
       console.log("[OrganizationOnboarding] Session already present; routing to workspace", {
         activeOrgId,
       });
