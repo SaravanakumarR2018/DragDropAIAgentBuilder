@@ -116,7 +116,7 @@ jobs:
           docker ps    
 
       - name: create temporary .env files
-        workflow-directory: src/backend/base/langflow
+        working-directory: src/backend/base/langflow
         run: |
           echo "LANGFLOW_DATABASE_URL=$GA_POSTGRES_DATABASE_URL" > .env    
 
