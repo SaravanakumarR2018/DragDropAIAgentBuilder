@@ -93,8 +93,24 @@ export default function OrganizationSwitcherPage() {
       try {
         // Step 1: Create backend organization (DB provisioning or linking)
         console.debug("[OrgSwitcherPage] Calling createOrganisation()");
-        await createOrganisation(orgToken);
-        console.debug("[OrgSwitcherPage] createOrganisation() completed");
+
+        try {
+          await createOrganisation(orgToken);
+          console.debug("[OrgSwitcherPage] createOrganisation() completed");
+        } catch (orgErr: any) {
+          const status = orgErr?.response?.status;
+          const isRecoverableOrgError =
+            status === 400 ||
+            status === 409 ||
+            status === 200 ||
+            orgErr?.response?.data?.detail?.includes?.("organization already exists");
+
+          if (isRecoverableOrgError) {
+            console.debug("[OrgSwitcherPage] Organization already exists, continuing bootstrap");
+          } else {
+            throw orgErr;
+          }
+        }
 
         // Step 2: Ensure Langflow user exists via /whoami or /users
         console.debug("[OrgSwitcherPage] Calling ensureLangflowUser()");
