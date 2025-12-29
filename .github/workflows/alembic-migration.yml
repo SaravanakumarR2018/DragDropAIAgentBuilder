@@ -128,6 +128,13 @@ jobs:
           set +a
           alembic -c alembic.ini upgrade head
 
+      - name: Debug .env file
+        working-directory: src/backend/base/langflow
+        run: |
+          echo "===== .env FILE CONTENT ====="
+          cat .env
+          echo "============================="    
+          
       - name: Check tables in DB
         run: |
           psql "postgresql://langflow:langflow@localhost:5432/langflow" \
