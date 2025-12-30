@@ -24,6 +24,7 @@ import logoicon from "./new-assets/visualailogo.png";
 import ProgressBar from "./ProgressBar";
 import {
   ACTIVE_ORG_STORAGE_KEY,
+  hasWorkspaceSession,
   LANGFLOW_ACCESS_TOKEN,
   LANGFLOW_REFRESH_TOKEN,
   ORG_SELECTED_KEY,
@@ -545,19 +546,21 @@ export default function OrganizationOnboarding() {
     return null;
   }
 
-  if (isSignedIn) {
-    console.log(
-      "[OrganizationOnboarding] User already signed in, redirecting to /flows",
-    );
-    window.location.assign("/flows");
-    return null;
-  }
+  const workspaceReady = hasWorkspaceSession(cookies);
 
   if (!isSignedIn) {
     console.log(
       "[OrganizationOnboarding] User not signed in, redirecting to /login",
     );
     return <Navigate to="/login" replace />;
+  }
+
+  if (workspaceReady) {
+    console.log(
+      "[OrganizationOnboarding] Workspace session present; redirecting to /flows",
+    );
+    window.location.assign("/flows");
+    return null;
   }
 
   if (shouldRedirectToFlows) {

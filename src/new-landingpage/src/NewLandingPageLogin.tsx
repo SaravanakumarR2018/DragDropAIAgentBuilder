@@ -1,12 +1,19 @@
 import { SignIn, SignedIn, SignedOut, useAuth } from "@clerk/clerk-react";
 import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { LANDING_BASENAME } from "./landingRoutes";
 import {
   clearStoredOrgSelection,
+  hasWorkspaceSession,
+  LANGFLOW_ACCESS_TOKEN,
+  LANGFLOW_REFRESH_TOKEN,
 } from "./session";
+import { useCookies } from "react-cookie";
 
 export default function NewLandingPageLogin() {
   const { isSignedIn, isLoaded } = useAuth();
+  const navigate = useNavigate();
+  const [cookies] = useCookies([LANGFLOW_ACCESS_TOKEN, LANGFLOW_REFRESH_TOKEN]);
 
   console.log("[NewLandingPageLogin] render", { isLoaded, isSignedIn });
 
@@ -18,10 +25,21 @@ export default function NewLandingPageLogin() {
 
   useEffect(() => {
     if (isLoaded && isSignedIn) {
-      console.log("[NewLandingPageLogin] User signed in, redirecting to /flows");
-      window.location.assign("/flows");
+      const workspaceReady = hasWorkspaceSession(cookies);
+      const destination = workspaceReady ? "/flows" : "/organization";
+
+      console.log("[NewLandingPageLogin] User signed in, redirecting", {
+        workspaceReady,
+        destination,
+      });
+
+      if (workspaceReady) {
+        window.location.assign(destination);
+      } else {
+        navigate("/organization", { replace: true });
+      }
     }
-  }, [isLoaded, isSignedIn]);
+  }, [cookies, isLoaded, isSignedIn, navigate]);
 
   return (
     <div
