@@ -139,6 +139,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--db-name", dest="db_name", help="Database name.")
     parser.add_argument("--db-host", dest="db_host", default="localhost", help="Database host (default: localhost).")
     parser.add_argument("--db-port", dest="db_port", default="5432", help="Database port (default: 5432).")
+    # VM Docker mode
+    parser.add_argument(
+        "--vm-docker",
+        action="store_true",
+        help="Read alembic version from postgres docker container (VM)",
+    )
+    parser.add_argument(
+        "--docker-container",
+        default="postgres",
+        help="Postgres docker container name",
+    )
     parser.add_argument(
         "--output-key",
         dest="output_key",
