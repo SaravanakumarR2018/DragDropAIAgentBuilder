@@ -97,7 +97,6 @@ jobs:
           sudo apt-get install -y postgresql-client
           cd src/backend/base
           pip install uv
-          pip install --upgrade "alembic>=1.10"
           pip install psycopg2-binary asyncpg
           pip install google-generativeai
           pip install .
@@ -121,7 +120,9 @@ jobs:
         env:
           LANGFLOW_DATABASE_URL: ${{ env.GA_POSTGRES_DATABASE_URL }}   
         run : |
-          alembic upgrade head --sqlalchemy-url "$LANGFLOW_DATABASE_URL"  
+          cp alembic.ini /tmp/alembic.runtime.ini
+          sed -i "s#^sqlalchemy.url = .*#sqlalchemy.url = ${LANGFLOW_DATABASE_URL}#" /tmp/alembic.runtime.ini
+          alembic -c /tmp/alembic.runtime.ini upgrade head  
 
       - name: Check tables in DB
         run: |
