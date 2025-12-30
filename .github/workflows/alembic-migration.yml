@@ -161,10 +161,11 @@ jobs:
             apt update
             apt install -y postgresql-client
             python3 /root/workspace/.github/script/check_db_changes.py \
-              --db-user "$VM_POSTGRES_PGUSER" \
-              --db-password "$VM_POSTGRES_PGPASSWORD" \
-              --db-name "$VM_POSTGRES_DB_NAME" \
-              --db-host 127.0.0.1
+              --vm-docker \
+              --db-user $VM_POSTGRES_PGUSER \
+              --db-name $VM_POSTGRES_DB_NAME \
+              --docker-container postgres \
+              --output-key vm_alembic_version
 
       - name: Compare Alembic versions
         id: compare
