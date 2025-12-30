@@ -26,7 +26,7 @@ env:
   GA_POSTGRES_PGUSER: langflow
   GA_POSTGRES_PGPASSWORD: langflow
   GA_POSTGRES_DB_NAME: langflow
-  GA_POSTGRES_DATABASE_URL: postgresql://langflow:langflow@localhost:5432/langflow
+  GA_POSTGRES_DATABASE_URL: postgresql+asyncpg://langflow:langflow@localhost:5432/langflow
 
 jobs:
   check-db-changes:
@@ -104,8 +104,11 @@ jobs:
       - name: Wait for PostgreSQL
         run: |
           for i in {1..10}; do
-            if pg_isready -d "$GA_POSTGRES_DATABASE_URL"; then
-              exit 0
+            if pg_isready \
+              -h localhost \
+              -p 5432 \
+              -U ${GA_POSTGRES_PGUSER}; then
+                exit 0
             fi
             sleep 3
           done
