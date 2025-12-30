@@ -119,6 +119,8 @@ jobs:
         working-directory: src/backend/base/langflow
         env:
           LANGFLOW_DATABASE_URL: ${{ env.GA_POSTGRES_DATABASE_URL }}   
+        run : |
+          alembic upgrade head --sqlalchemy-url "$LANGFLOW_DATABASE_URL"  
 
       - name: Check tables in DB
         run: |
