@@ -26,7 +26,7 @@ env:
   GA_POSTGRES_PGUSER: langflow
   GA_POSTGRES_PGPASSWORD: langflow
   GA_POSTGRES_DB_NAME: langflow
-  GA_POSTGRES_DATABASE_URL: postgresql+asyncpg://langflow:langflow@localhost:5432/langflow
+  GA_POSTGRES_DATABASE_URL: postgresql+psycopg_async://langflow:langflow@localhost:5432/langflow
 
 jobs:
   check-db-changes:
@@ -97,7 +97,8 @@ jobs:
           sudo apt-get install -y postgresql-client
           cd src/backend/base
           pip install uv
-          pip install psycopg2-binary asyncpg
+          pip install "psycopg[binary]"
+          pip install asyncpg
           pip install google-generativeai
           pip install .
 
