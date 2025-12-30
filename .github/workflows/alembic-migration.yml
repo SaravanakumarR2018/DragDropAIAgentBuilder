@@ -137,7 +137,7 @@ jobs:
         id: repo_version
         run: >
           python .github/script/check_db_changes.py
-           --database-url "postgresql://langflow:langflow@localhost:5432/langflow" \
+          --database-url "postgresql://langflow:langflow@localhost:5432/langflow" \
           --db-user "${{ env.GA_POSTGRES_PGUSER }}"
           --db-password "${{ env.GA_POSTGRES_PGPASSWORD }}"
           --db-name "${{ env.GA_POSTGRES_DB_NAME }}"
