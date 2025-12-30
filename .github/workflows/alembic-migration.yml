@@ -220,7 +220,7 @@ jobs:
           cd src/backend/base
           pip install uv
           pip install psycopg2-binary asyncpg
-          pip install google-generativeai
+          pip install google-genai
           pip install .
 
       - name: Generate SQL Migration Files
