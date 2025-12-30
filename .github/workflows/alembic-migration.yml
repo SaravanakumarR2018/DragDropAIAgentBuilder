@@ -137,10 +137,11 @@ jobs:
         id: repo_version
         run: >
           python .github/script/check_db_changes.py
-          --database-url "${{ env.GA_POSTGRES_DATABASE_URL }}"
           --db-user "${{ env.GA_POSTGRES_PGUSER }}"
           --db-password "${{ env.GA_POSTGRES_PGPASSWORD }}"
           --db-name "${{ env.GA_POSTGRES_DB_NAME }}"
+          --db-host "localhost" \
+          --db-port "5432" \
           --output-key repo_alembic_version    
 
       - name: Copy check_db_changes.py to VM
