@@ -136,9 +136,8 @@ jobs:
       - name: Get repo alembic version
         id: repo_version
         run: >
-          python .github/script/check_db_changes.py
-          --database-url "postgresql://langflow:langflow@localhost:5432/langflow" \
-          --output-key repo_alembic_version    
+          python .github/script/check_db_changes.py --database-url "postgresql://langflow:langflow@localhost:5432/langflow" --output-key repo_alembic_version
+    
 
       - name: Copy check_db_changes.py to VM
         uses: appleboy/scp-action@v0.1.4
