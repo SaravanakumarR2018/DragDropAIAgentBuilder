@@ -28,8 +28,8 @@ def main():
         print("Gemini API key is not configured.")
         sys.exit(1)
 
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-2.5-flash")
+    # ✅ NEW SDK usage
+    client = genai.Client(api_key=api_key)
 
     prompt = f"""
 You are a senior database migration reviewer.
@@ -55,7 +55,11 @@ UPGRADE_FORWARD: YES or NO
 Explain each NO clearly and precisely.
 """
 
-    response = model.generate_content(prompt)
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=prompt,
+    )
+
     output = response.text.strip()
     output_upper = output.upper()
 
