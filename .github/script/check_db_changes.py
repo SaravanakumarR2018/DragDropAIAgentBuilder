@@ -86,6 +86,41 @@ def get_revision_from_database_url(
 
     return revision
 
+def get_revision_from_vm_docker(
+    db_user: str,
+    db_name: str,
+    container_name: str,
+) -> str:
+    result = subprocess.run(
+        [
+            "docker",
+            "exec",
+            "-i",
+            container_name,
+            "psql",
+            "-U",
+            db_user,
+            "-d",
+            db_name,
+            "-t",
+            "-A",
+            "-c",
+            "select version_num from alembic_version;",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        logging.error(result.stderr.strip())
+        raise SystemExit(1)
+
+    revision = result.stdout.strip()
+    if not revision:
+        logging.error("No alembic version found in VM DB")
+        raise SystemExit(1)
+
+    return revision
 
 def write_github_output(revision: str, output_key: str) -> None:
     github_output = os.getenv("GITHUB_OUTPUT")
@@ -116,17 +151,22 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
-    database_url = build_database_url(
-        args.database_url,
-        args.db_user,
-        args.db_password,
-        args.db_name,
-        args.db_host,
-        args.db_port,
-    )
-    revision = get_revision_from_database_url(
-        database_url,
-    )
+    if args.vm_docker:
+        revision = get_revision_from_vm_docker(
+            db_user=args.db_user,
+            db_name=args.db_name,
+            container_name=args.docker_container,
+        )
+    else:
+        database_url = build_database_url(
+            args.database_url,
+            args.db_user,
+            args.db_password,
+            args.db_name,
+            args.db_host,
+            args.db_port,
+        )
+        revision = get_revision_from_database_url(database_url)
 
     print(revision)
     write_github_output(revision, args.output_key)
