@@ -1,19 +1,12 @@
 import { SignIn, SignedIn, SignedOut, useAuth } from "@clerk/clerk-react";
 import { useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useCookies } from "react-cookie";
 import { LANDING_BASENAME } from "./landingRoutes";
 import {
   clearStoredOrgSelection,
-  hasWorkspaceSession,
-  LANGFLOW_ACCESS_TOKEN,
-  LANGFLOW_REFRESH_TOKEN,
 } from "./session";
 
 export default function NewLandingPageLogin() {
   const { isSignedIn, isLoaded } = useAuth();
-  const navigate = useNavigate();
-  const [cookies] = useCookies([LANGFLOW_ACCESS_TOKEN, LANGFLOW_REFRESH_TOKEN]);
 
   console.log("[NewLandingPageLogin] render", { isLoaded, isSignedIn });
 
@@ -25,21 +18,10 @@ export default function NewLandingPageLogin() {
 
   useEffect(() => {
     if (isLoaded && isSignedIn) {
-      const workspaceReady = hasWorkspaceSession(cookies);
-      const destination = workspaceReady ? "/flows" : "/organization";
-
-      console.log(
-        "[NewLandingPageLogin] User signed in, redirecting based on session",
-        { workspaceReady, destination },
-      );
-
-      if (workspaceReady) {
-        window.location.assign(destination);
-      } else {
-        navigate(destination, { replace: true });
-      }
+      console.log("[NewLandingPageLogin] User signed in, redirecting to /flows");
+      window.location.assign("/flows");
     }
-  }, [cookies, isLoaded, isSignedIn, navigate]);
+  }, [isLoaded, isSignedIn]);
 
   return (
     <div
@@ -59,7 +41,7 @@ export default function NewLandingPageLogin() {
           />
         </SignedOut>
         <SignedIn>
-          <div style={{ textAlign: "center" }}>Redirecting you to your organization list…</div>
+          <div style={{ textAlign: "center" }}>Redirecting you to your workspace…</div>
         </SignedIn>
       </div>
     </div>

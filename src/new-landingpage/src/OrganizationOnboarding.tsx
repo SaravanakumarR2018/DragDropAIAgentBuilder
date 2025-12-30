@@ -545,6 +545,14 @@ export default function OrganizationOnboarding() {
     return null;
   }
 
+  if (isSignedIn) {
+    console.log(
+      "[OrganizationOnboarding] User already signed in, redirecting to /flows",
+    );
+    window.location.assign("/flows");
+    return null;
+  }
+
   if (!isSignedIn) {
     console.log(
       "[OrganizationOnboarding] User not signed in, redirecting to /login",
