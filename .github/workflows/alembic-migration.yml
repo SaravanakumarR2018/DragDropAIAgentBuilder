@@ -225,7 +225,7 @@ jobs:
           mkdir -p alembic_sql
 
           echo "=== Generating DOWNGRADE SQL (online) ==="
-          alembic downgrade ${REPO_REVISION}:${VM_REVISION} 2>&1 | tee alembic_sql/downgrade.log
+          alembic downgrade ${VM_REVISION} 2>&1 | tee alembic_sql/downgrade.log
           echo "=== Generating UPGRADE SQL (online) ==="
           alembic upgrade ${VM_REVISION}:${REPO_REVISION} 2>&1 | tee alembic_sql/upgrade.log
 
