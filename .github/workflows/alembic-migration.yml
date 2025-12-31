@@ -279,7 +279,7 @@ jobs:
           echo "=== Generating DOWNGRADE SQL (online) ==="
           alembic -c /tmp/alembic.runtime.ini downgrade ${VM_REVISION} 2>&1 | tee alembic_sql/downgrade.log
           echo "=== Generating UPGRADE SQL (online) ==="
-          alembic -c /tmp/alembic.runtime.ini upgrade ${VM_REVISION}:${REPO_REVISION} 2>&1 | tee alembic_sql/upgrade.log
+          alembic -c /tmp/alembic.runtime.ini upgrade ${REPO_REVISION} 2>&1 | tee alembic_sql/upgrade.log
 
           echo "=== Extracting SQL statements ==="
           grep -E "ALTER TABLE|CREATE TABLE|DROP TABLE|ADD COLUMN|DROP COLUMN" \
