@@ -6,6 +6,12 @@ import useAuthStore from "@/stores/authStore";
 import { useLogout } from "@/clerk/auth";
 import { useNavigate } from "react-router-dom";
 import logoicon from "../../assets/visualailogo.png"
+import { Cookies } from "react-cookie";
+import { getAuthCookie } from "@/utils/utils";
+import {
+  LANGFLOW_ACCESS_TOKEN,
+  LANGFLOW_AUTO_LOGIN_OPTION,
+} from "@/constants/constants";
 
 
 function CheckIcon(props: SVGProps<SVGSVGElement>) {
@@ -48,8 +54,12 @@ function AnimatedArrowIcon(props: SVGProps<SVGSVGElement>) {
 export default function Landing(): JSX.Element {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const setIsAuthenticated = useAuthStore((state) => state.setIsAuthenticated);
+  const setAccessToken = useAuthStore((state) => state.setAccessToken);
+  const setAutoLogin = useAuthStore((state) => state.setAutoLogin);
   const { mutate: logout } = useLogout();
   const navigate = useNavigate();
+  const cookies = new Cookies();
 
   const handleLogout = () => {
     logout();
@@ -57,6 +67,22 @@ export default function Landing(): JSX.Element {
 
   const handleDashboardClick = () => {
     navigate("/flows");
+  };
+
+  const handleLoginClick = () => {
+    // Honor existing session from another tab without needing a page reload
+    const token = getAuthCookie(cookies, LANGFLOW_ACCESS_TOKEN);
+    const autoLoginCookie = getAuthCookie(cookies, LANGFLOW_AUTO_LOGIN_OPTION);
+
+    if (token) {
+      setIsAuthenticated(true);
+      setAccessToken(token);
+      setAutoLogin(autoLoginCookie === "auto");
+      navigate("/flows");
+      return;
+    }
+
+    navigate("/login");
   };
   return (
     <div className="h-screen overflow-y-auto bg-[#0f1217] text-white">
@@ -145,12 +171,13 @@ export default function Landing(): JSX.Element {
                   Book a Demo
                 </a>
                 {/* Log in (shown when unauthenticated) */}
-                <a
-                  href="/login"
+                <button
                   className="whitespace-nowrap rounded-xl bg-white px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:opacity-90"
+                  onClick={handleLoginClick}
+                  type="button"
                 >
                   Log in
-                </a>
+                </button>
               </>
             )}
           </div>

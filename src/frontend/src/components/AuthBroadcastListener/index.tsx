@@ -23,12 +23,21 @@ import { authBroadcast } from "@/utils/auth-broadcast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect } from "react";
 import { useLocation } from "react-router-dom";
+import { Cookies } from "react-cookie";
+import {
+  LANGFLOW_ACCESS_TOKEN,
+  LANGFLOW_AUTO_LOGIN_OPTION,
+} from "@/constants/constants";
+import { getAuthCookie } from "@/utils/utils";
 
 export function AuthBroadcastListener() {
   const queryClient = useQueryClient();
   const navigate = useCustomNavigate();
   const location = useLocation();
   const logout = useAuthStore((state) => state.logout);
+  const setIsAuthenticated = useAuthStore((state) => state.setIsAuthenticated);
+  const setAccessToken = useAuthStore((state) => state.setAccessToken);
+  const setAutoLogin = useAuthStore((state) => state.setAutoLogin);
   const { signOut } = IS_CLERK_AUTH ? useClerk() : { signOut: async () => {} };
 
   /**
@@ -126,9 +135,37 @@ export function AuthBroadcastListener() {
         handleCrossTabLogout();
       });
 
+      const unsubscribeLogin = authBroadcast.onLogin(async () => {
+        // Another tab logged in — refresh local auth state and redirect if needed
+        const cookies = new Cookies();
+        const accessToken = getAuthCookie(cookies, LANGFLOW_ACCESS_TOKEN);
+
+        if (accessToken) {
+          setIsAuthenticated(true);
+          setAccessToken(accessToken);
+          // Derive autoLogin from cookie set during login (defaults to manual)
+          const autoLoginCookie = getAuthCookie(
+            cookies,
+            LANGFLOW_AUTO_LOGIN_OPTION,
+          );
+          setAutoLogin(autoLoginCookie === "auto");
+
+          const currentPath = location.pathname;
+          const isLoginPage = currentPath.includes("login");
+          const isOrgPage = currentPath.includes("organization");
+
+          if (isLoginPage || isOrgPage) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const redirectPath = urlParams.get("redirect");
+            navigate(redirectPath || "/flows", { replace: true });
+          }
+        }
+      });
+
       // Cleanup on unmount
       return () => {
         unsubscribe();
+        unsubscribeLogin();
       };
     } catch (error) {
       console.error("[AuthBroadcast] Failed to register listener:", error);

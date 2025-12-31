@@ -9,6 +9,7 @@ import {
 import { useGetUserData } from "@/controllers/API/queries/auth";
 import { useGetGlobalVariablesMutation } from "@/controllers/API/queries/variables/use-get-mutation-global-variables";
 import useAuthStore from "@/stores/authStore";
+import { authBroadcast } from "@/utils/auth-broadcast";
 import { setLocalStorage } from "@/utils/local-storage-util";
 import { getAuthCookie, setAuthCookie } from "@/utils/utils";
 import { useStoreStore } from "../stores/storeStore";
@@ -92,6 +93,8 @@ export function AuthProvider({ children }): React.ReactElement {
     }
     setAccessToken(newAccessToken);
     setIsAuthenticated(true);
+    // Notify other tabs that a manual login has completed
+    authBroadcast.broadcastLogin();
     getUser();
     getGlobalVariables();
   }
