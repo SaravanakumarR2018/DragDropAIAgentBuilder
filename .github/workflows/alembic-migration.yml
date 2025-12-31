@@ -113,7 +113,7 @@ jobs:
             fi
             sleep 3
           done
-          exit 1    
+          exit 1
 
       - name: Apply migrations to GitHub PostgreSQL
         working-directory: src/backend/base/langflow
