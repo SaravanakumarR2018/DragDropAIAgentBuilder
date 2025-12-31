@@ -288,6 +288,12 @@ jobs:
           grep -E "ALTER TABLE|CREATE TABLE|DROP TABLE|ADD COLUMN|DROP COLUMN" \
             alembic_sql/upgrade.log > alembic_sql/upgrade.sql || true
 
+      - name: Upload SQL files for testing the files
+        uses: actions/upload-artifact@v4
+        with:
+          name: alembic-sql
+          path: src/backend/base/langflow/alembic_sql/      
+
       - name: Validate SQL with Gemini
         id: validate_sql
         env:
