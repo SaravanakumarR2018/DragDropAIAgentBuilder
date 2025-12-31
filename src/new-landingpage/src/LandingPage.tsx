@@ -2,7 +2,6 @@ import { AnimatePresence, motion, type SVGMotionProps } from "framer-motion";
 import { useState, type SVGProps } from "react";
 import { useCookies } from "react-cookie";
 import { useAuth } from "@clerk/clerk-react";
-import { Link } from "react-router-dom";
 import VisualWorkflow from "./new-assets/VisualWorkflow.webp";
 import demoWalkthrough from "./new-assets/demo-walkthrough.webp";
 import logoicon from "./new-assets/visualailogo.png";
@@ -55,7 +54,7 @@ function AnimatedArrowIcon(props: SVGMotionProps<SVGSVGElement>) {
 export default function LandingPage(): JSX.Element {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { isSignedIn, signOut } = useAuth();
-  const [, , removeCookie] = useCookies([
+  const [cookies, , removeCookie] = useCookies([
     LANGFLOW_ACCESS_TOKEN,
     LANGFLOW_REFRESH_TOKEN,
   ]);
@@ -69,6 +68,17 @@ export default function LandingPage(): JSX.Element {
 
   const handleDashboardClick = () => {
     window.location.assign("/flows");
+  };
+
+  const handleLoginClick = () => {
+    const token = cookies[LANGFLOW_ACCESS_TOKEN];
+
+    if (token) {
+      window.location.assign("/flows");
+      return;
+    }
+
+    window.location.assign("/login");
   };
 
   /* -------------------- UI (copied structure from second file) -------------------- */
@@ -155,12 +165,13 @@ export default function LandingPage(): JSX.Element {
                   Book a Demo
                 </a>
 
-                <Link
-                  to="/login"
+                <button
+                  onClick={handleLoginClick}
                   className="whitespace-nowrap rounded-xl bg-white px-4 py-2 text-sm font-semibold text-neutral-900 transition hover:opacity-90"
+                  type="button"
                 >
                   Log in
-                </Link>
+                </button>
               </>
             )}
           </div>
