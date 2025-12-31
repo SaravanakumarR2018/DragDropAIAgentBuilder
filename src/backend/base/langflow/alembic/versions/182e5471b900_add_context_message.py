@@ -7,7 +7,7 @@ Create Date: 2025-10-08 11:30:12.912190
 """
 from typing import Sequence, Union
 
-from alembic import op
+from alembic import context, op
 import sqlalchemy as sa
 
 
@@ -19,6 +19,9 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    if context.is_offline_mode():
+        op.add_column('message', sa.Column('context_id', sa.String(), nullable=True))
+        return
     # Check if context_id column already exists
     bind = op.get_bind()
     inspector = sa.inspect(bind)
@@ -30,6 +33,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    if context.is_offline_mode():
+        op.drop_column('message', 'context_id')
+        return
     # Check if context_id column exists before dropping
     bind = op.get_bind()
     inspector = sa.inspect(bind)
