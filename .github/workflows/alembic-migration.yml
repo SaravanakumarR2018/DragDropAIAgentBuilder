@@ -113,11 +113,7 @@ jobs:
             fi
             sleep 3
           done
-          exit 1
-
-      - name: Check Postgres service status
-        run: |
-          docker ps    
+          exit 1    
 
       - name: Apply migrations to GitHub PostgreSQL
         working-directory: src/backend/base/langflow
@@ -126,12 +122,7 @@ jobs:
         run : |
           cp alembic.ini /tmp/alembic.runtime.ini
           sed -i "s#^sqlalchemy.url = .*#sqlalchemy.url = ${LANGFLOW_DATABASE_URL}#" /tmp/alembic.runtime.ini
-          alembic -c /tmp/alembic.runtime.ini upgrade head  
-
-      - name: Check tables in DB
-        run: |
-          psql "postgresql://langflow:langflow@localhost:5432/langflow" \
-          -c "\dt"
+          alembic -c /tmp/alembic.runtime.ini upgrade head
 
       - name: Get repo alembic version
         id: repo_version
