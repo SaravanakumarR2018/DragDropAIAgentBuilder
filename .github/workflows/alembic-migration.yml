@@ -210,7 +210,8 @@ jobs:
         run: |
           cd src/backend/base
           pip install uv
-          pip install psycopg2-binary asyncpg
+          pip install "psycopg[binary]"
+          pip install asyncpg
           pip install google-genai
           pip install .
 
