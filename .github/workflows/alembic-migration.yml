@@ -224,10 +224,13 @@ jobs:
 
           mkdir -p alembic_sql
 
+          cp alembic.ini /tmp/alembic.runtime.ini
+          sed -i "s#^sqlalchemy.url = .*#sqlalchemy.url = ${LANGFLOW_DATABASE_URL}#" /tmp/alembic.runtime.ini
+
           echo "=== Generating DOWNGRADE SQL (online) ==="
-          alembic downgrade ${VM_REVISION} 2>&1 | tee alembic_sql/downgrade.log
+          alembic -c /tmp/alembic.runtime.ini downgrade ${VM_REVISION} 2>&1 | tee alembic_sql/downgrade.log
           echo "=== Generating UPGRADE SQL (online) ==="
-          alembic upgrade ${VM_REVISION}:${REPO_REVISION} 2>&1 | tee alembic_sql/upgrade.log
+          alembic -c /tmp/alembic.runtime.ini upgrade ${VM_REVISION}:${REPO_REVISION} 2>&1 | tee alembic_sql/upgrade.log
 
           echo "=== Extracting SQL statements ==="
           grep -E "ALTER TABLE|CREATE TABLE|DROP TABLE|ADD COLUMN|DROP COLUMN" \
