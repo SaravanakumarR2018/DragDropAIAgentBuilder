@@ -3,7 +3,6 @@ import sys
 from google import genai
 
 
-
 def main():
     if len(sys.argv) != 2:
         print(
