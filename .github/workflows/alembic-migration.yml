@@ -184,25 +184,10 @@ jobs:
     needs: check-db-changes
     if: needs.check-db-changes.outputs.db_changes == 'true'
 
-    services:
-      postgres:
-        image: ${{ vars.POSTGRESQL_DOCKER_VERSION }}
-        env:
-          POSTGRES_USER: ${{ env.GA_POSTGRES_PGUSER }}
-          POSTGRES_PASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}
-          POSTGRES_DB: ${{ env.GA_POSTGRES_DB_NAME }}
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U langflow"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     env:
       VM_REVISION: ${{ needs.check-db-changes.outputs.vm_revision }}
       REPO_REVISION: ${{ needs.check-db-changes.outputs.repo_revision }}
-      GA_POSTGRES_DATABASE_URL: postgresql+psycopg_async://langflow:langflow@localhost:5432/langflow
+      GA_POSTGRES_DATABASE_URL: postgresql://langflow:langflow@localhost:5432/langflow
 
     steps:
       - name: Print Alembic versions (VM vs Repo)
@@ -226,83 +211,22 @@ jobs:
         run: |
           cd src/backend/base
           pip install uv
-          pip install "psycopg[binary]"
-          pip install asyncpg
+          pip install psycopg2-binary asyncpg
           pip install google-genai
           pip install .
 
-      - name: Wait for PostgreSQL
-        run: |
-          for i in {1..10}; do
-            if pg_isready \
-              -h localhost \
-              -p 5432 \
-              -U ${GA_POSTGRES_PGUSER}; then
-                exit 0
-            fi
-            sleep 3
-          done
-          exit 1    
-
-      - name: Apply migrations to GitHub PostgreSQL database
-        working-directory: src/backend/base/langflow
-        env:
-          LANGFLOW_DATABASE_URL: ${{ env.GA_POSTGRES_DATABASE_URL }}   
-        run : |
-          cp alembic.ini /tmp/alembic.runtime.ini
-          sed -i "s#^sqlalchemy.url = .*#sqlalchemy.url = ${LANGFLOW_DATABASE_URL}#" /tmp/alembic.runtime.ini
-          alembic -c /tmp/alembic.runtime.ini upgrade head        
-
-      - name: Verify DB is at repo revision
-        run: |
-            CURRENT=$(psql "postgresql://langflow:langflow@localhost:5432/langflow" \
-              -t -A -c "select version_num from alembic_version;")
-            echo "Current DB revision: $CURRENT"
-            if [ "$CURRENT" != "${REPO_REVISION}" ]; then
-                echo "DB is not at repo revision, aborting downgrade SQL generation"
-                exit 1
-            fi     
-
-      - name: Generate SQL Migration Files (DEBUG)
+      - name: Generate SQL Migration Files
         env:
           LANGFLOW_DATABASE_URL: ${{ env.GA_POSTGRES_DATABASE_URL }}
-          SQLALCHEMY_ECHO: "true"
         working-directory: src/backend/base/langflow
         run: |
-          set -euo pipefail
-
           mkdir -p alembic_sql
 
-          cp alembic.ini /tmp/alembic.runtime.ini
-          sed -i "s#^sqlalchemy.url = .*#sqlalchemy.url = ${LANGFLOW_DATABASE_URL}#" /tmp/alembic.runtime.ini
+          alembic -c alembic.ini downgrade ${REPO_REVISION}:${VM_REVISION} --sql \
+            > alembic_sql/downgrade.sql
 
-          echo "=== Generating DOWNGRADE SQL (online) ==="
-          alembic -c /tmp/alembic.runtime.ini downgrade ${VM_REVISION} \
-              2>&1 | tee alembic_sql/downgrade.log
-
-          echo "=== Generating UPGRADE SQL (online) ==="
-          alembic -c /tmp/alembic.runtime.ini upgrade ${REPO_REVISION} \
-              2>&1 | tee alembic_sql/upgrade.log
-
-          echo "=== DEBUG: Showing raw logs ==="
-          echo "--- DOWNGRADE LOG ---"
-          sed -n '1,200p' alembic_sql/downgrade.log
-          echo "--- UPGRADE LOG ---"
-          sed -n '1,200p' alembic_sql/upgrade.log
-
-          echo "=== DEBUG: Copying logs as SQL ==="
-          cp alembic_sql/downgrade.log alembic_sql/downgrade.sql
-          cp alembic_sql/upgrade.log alembic_sql/upgrade.sql
-
-          echo "=== DEBUG: Copying logs as SQL ==="
-          cp alembic_sql/downgrade.log alembic_sql/downgrade.sql
-          cp alembic_sql/upgrade.log alembic_sql/upgrade.sql
-
-      - name: Upload SQL files for testing the files
-        uses: actions/upload-artifact@v4
-        with:
-          name: alembic-sql
-          path: src/backend/base/langflow/alembic_sql/      
+          alembic -c alembic.ini upgrade ${VM_REVISION}:${REPO_REVISION} --sql \
+            > alembic_sql/upgrade.sql
 
       - name: Validate SQL with Gemini
         id: validate_sql
