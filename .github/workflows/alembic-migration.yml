@@ -183,6 +183,22 @@ jobs:
     runs-on: ubuntu-latest
     needs: check-db-changes
     if: needs.check-db-changes.outputs.db_changes == 'true'
+    
+    services:
+      postgres:
+        image: ${{ vars.POSTGRESQL_DOCKER_VERSION }}
+        env:
+          POSTGRES_USER: ${{ env.GA_POSTGRES_PGUSER }}
+          POSTGRES_PASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}
+          POSTGRES_DB: ${{ env.GA_POSTGRES_DB_NAME }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U langflow"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
       VM_REVISION: ${{ needs.check-db-changes.outputs.vm_revision }}
       REPO_REVISION: ${{ needs.check-db-changes.outputs.repo_revision }}
@@ -214,6 +230,29 @@ jobs:
           pip install asyncpg
           pip install google-genai
           pip install .
+
+      - name: Wait for PostgreSQL
+        run: |
+          for i in {1..10}; do
+            if pg_isready \
+              -h localhost \
+              -p 5432 \
+              -U ${GA_POSTGRES_PGUSER}; then
+                exit 0
+            fi
+            sleep 3
+          done
+          exit 1    
+
+      - name: Verify DB is at repo revision
+        run: |
+            CURRENT=$(psql "postgresql://langflow:langflow@localhost:5432/langflow" \
+              -t -A -c "select version_num from alembic_version;")
+            echo "Current DB revision: $CURRENT"
+            if [ "$CURRENT" != "${REPO_REVISION}" ]; then
+                echo "DB is not at repo revision, aborting downgrade SQL generation"
+                exit 1
+            fi     
 
       - name: Generate SQL Migration Files
         env:
