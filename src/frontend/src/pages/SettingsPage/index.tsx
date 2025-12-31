@@ -1,5 +1,5 @@
 import { Outlet, type To } from "react-router-dom";
-import type { ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import SideBarButtonsComponent, { type SidebarNavItem } from "@/components/core/sidebarComponent";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { CustomStoreSidebar } from "@/customization/components/custom-store-sidebar";
@@ -14,6 +14,8 @@ import ForwardedIconComponent from "../../components/common/genericIconComponent
 import PageLayout from "../../components/common/pageLayout";
 import { useClerk, useOrganization } from "@clerk/clerk-react";
 import { IS_CLERK_AUTH } from "@/clerk/auth";
+import { OrganizationMembersDialog } from "@/components/clerk/OrganizationMembersDialog";
+import { clerkAppearance } from "@/clerk/appearance";
 
 type SettingsPageBaseProps = {
   headerActions?: ReactNode;
@@ -105,20 +107,21 @@ const SettingsPageBase = ({
 };
 
 const SettingsPageWithClerk = () => {
-  const { openUserProfile, openOrganizationProfile } = useClerk();
+  const { openUserProfile } = useClerk();
   const { organization, isLoaded: isOrganizationLoaded } = useOrganization();
+  const [membersOpen, setMembersOpen] = useState(false);
 
   const canManageMembers = Boolean(
-    isOrganizationLoaded && organization?.id && openOrganizationProfile,
+    isOrganizationLoaded && organization?.id,
   );
 
   const handleManageAccount = () => {
-    openUserProfile?.();
+    openUserProfile?.({ appearance: clerkAppearance });
   };
 
   const handleManageMembers = () => {
     if (canManageMembers) {
-      openOrganizationProfile?.();
+      setMembersOpen(true);
     }
   };
 
@@ -157,7 +160,12 @@ const SettingsPageWithClerk = () => {
   ];
 
   // Pass Clerk items so they show at the bottom
-  return <SettingsPageBase additionalNavItems={clerkNavItems} />;
+  return (
+    <>
+      <SettingsPageBase additionalNavItems={clerkNavItems} />
+      <OrganizationMembersDialog open={membersOpen} onOpenChange={setMembersOpen} />
+    </>
+  );
 };
 
 const SettingsPageWithoutClerk = () => <SettingsPageBase />;
