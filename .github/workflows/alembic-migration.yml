@@ -186,7 +186,7 @@ jobs:
     env:
       VM_REVISION: ${{ needs.check-db-changes.outputs.vm_revision }}
       REPO_REVISION: ${{ needs.check-db-changes.outputs.repo_revision }}
-      GA_POSTGRES_DATABASE_URL: postgresql://langflow:langflow@localhost:5432/langflow
+      GA_POSTGRES_DATABASE_URL: postgresql+psycopg_async://langflow:langflow@localhost:5432/langflow
 
     steps:
       - name: Print Alembic versions (VM vs Repo)
