@@ -263,7 +263,7 @@ jobs:
                 exit 1
             fi     
 
-      - name: Generate SQL Migration Files
+      - name: Generate SQL Migration Files (DEBUG)
         env:
           LANGFLOW_DATABASE_URL: ${{ env.GA_POSTGRES_DATABASE_URL }}
           SQLALCHEMY_ECHO: "true"
@@ -277,16 +277,26 @@ jobs:
           sed -i "s#^sqlalchemy.url = .*#sqlalchemy.url = ${LANGFLOW_DATABASE_URL}#" /tmp/alembic.runtime.ini
 
           echo "=== Generating DOWNGRADE SQL (online) ==="
-          alembic -c /tmp/alembic.runtime.ini downgrade ${VM_REVISION} 2>&1 | tee alembic_sql/downgrade.log
+          alembic -c /tmp/alembic.runtime.ini downgrade ${VM_REVISION} \
+              2>&1 | tee alembic_sql/downgrade.log
+
           echo "=== Generating UPGRADE SQL (online) ==="
-          alembic -c /tmp/alembic.runtime.ini upgrade ${REPO_REVISION} 2>&1 | tee alembic_sql/upgrade.log
+          alembic -c /tmp/alembic.runtime.ini upgrade ${REPO_REVISION} \
+              2>&1 | tee alembic_sql/upgrade.log
 
-          echo "=== Extracting SQL statements ==="
-          grep -E "ALTER TABLE|CREATE TABLE|DROP TABLE|ADD COLUMN|DROP COLUMN" \
-            alembic_sql/downgrade.log > alembic_sql/downgrade.sql || true
+          echo "=== DEBUG: Showing raw logs ==="
+          echo "--- DOWNGRADE LOG ---"
+          sed -n '1,200p' alembic_sql/downgrade.log
+          echo "--- UPGRADE LOG ---"
+          sed -n '1,200p' alembic_sql/upgrade.log
 
-          grep -E "ALTER TABLE|CREATE TABLE|DROP TABLE|ADD COLUMN|DROP COLUMN" \
-            alembic_sql/upgrade.log > alembic_sql/upgrade.sql || true
+          echo "=== DEBUG: Copying logs as SQL ==="
+          cp alembic_sql/downgrade.log alembic_sql/downgrade.sql
+          cp alembic_sql/upgrade.log alembic_sql/upgrade.sql
+
+          echo "=== DEBUG: Copying logs as SQL ==="
+          cp alembic_sql/downgrade.log alembic_sql/downgrade.sql
+          cp alembic_sql/upgrade.log alembic_sql/upgrade.sql
 
       - name: Upload SQL files for testing the files
         uses: actions/upload-artifact@v4
