@@ -151,6 +151,7 @@ jobs:
           script: |
             apt update
             apt install -y postgresql-client
+            export GITHUB_OUTPUT=/tmp/gout
             python3 /root/workspace/.github/script/check_db_changes.py \
               --vm-docker \
               --db-user $VM_POSTGRES_PGUSER \
