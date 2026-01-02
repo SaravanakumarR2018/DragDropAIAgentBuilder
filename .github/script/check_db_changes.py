@@ -2,14 +2,32 @@ import argparse
 import logging
 import os
 import re
+import shutil
 import subprocess
 from pathlib import Path
-from typing import Optional
 from urllib.parse import quote_plus
 
+logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 REVISION_PATTERN = re.compile(r"([0-9a-f]{12,40})", re.IGNORECASE)
+
+# Exception messages (required for TRY003 / EM101)
+ERR_ALEMBIC_NOT_FOUND = "alembic binary not found in PATH"
+ERR_PSQL_NOT_FOUND = "psql binary not found in PATH"
+ERR_DOCKER_NOT_FOUND = "docker binary not found in PATH"
+
+# Resolve executables explicitly
+ALEMBIC_BIN = shutil.which("alembic")
+PSQL_BIN = shutil.which("psql")
+DOCKER_BIN = shutil.which("docker")
+
+if not ALEMBIC_BIN:
+    raise RuntimeError(ERR_ALEMBIC_NOT_FOUND)
+if not PSQL_BIN:
+    raise RuntimeError(ERR_PSQL_NOT_FOUND)
+if not DOCKER_BIN:
+    raise RuntimeError(ERR_DOCKER_NOT_FOUND)
 
 
 def parse_revision(output: str) -> str:
@@ -21,38 +39,49 @@ def parse_revision(output: str) -> str:
 
 
 def get_revision_from_alembic(workdir: Path, alembic_ini: str) -> str:
-    result = subprocess.run(
-        ["alembic", "-c", alembic_ini, "heads"],
+    result = subprocess.run(  # noqa: S603 - inputs are trusted CI configuration
+        [ALEMBIC_BIN, "-c", alembic_ini, "heads"],
         cwd=workdir,
         capture_output=True,
         text=True,
+        check=False,
     )
+
     if result.returncode != 0:
-        logging.error("alembic heads failed: %s", result.stderr.strip())
+        logger.error("alembic heads failed: %s", result.stderr.strip())
         raise SystemExit(1)
 
     revision = parse_revision(result.stdout)
     if not revision:
-        logging.error("No alembic head revision found")
+        logger.error("No alembic head revision found")
         raise SystemExit(1)
 
     return revision
 
 
 def build_database_url(
-    database_url: Optional[str],
-    db_user: Optional[str],
-    db_password: Optional[str],
-    db_name: Optional[str],
+    database_url: str | None,
+    db_user: str | None,
+    db_password: str | None,
+    db_name: str | None,
     db_host: str,
     db_port: str,
 ) -> str:
     if database_url:
         return database_url
 
-    missing = [field for field, value in {"db_user": db_user, "db_password": db_password, "db_name": db_name}.items() if not value]
+    required = {
+        "db_user": db_user,
+        "db_password": db_password,
+        "db_name": db_name,
+    }
+    missing = [key for key, value in required.items() if not value]
+
     if missing:
-        logging.error("Missing required database parameters: %s", ", ".join(missing))
+        logger.error(
+            "Missing required database parameters: %s",
+            ", ".join(missing),
+        )
         raise SystemExit(1)
 
     return (
@@ -61,12 +90,10 @@ def build_database_url(
     )
 
 
-def get_revision_from_database_url(
-    database_url: str,
-) -> str:
-    result = subprocess.run(
+def get_revision_from_database_url(database_url: str) -> str:
+    result = subprocess.run(  # noqa: S603 - database_url comes from CI inputs
         [
-            "psql",
+            PSQL_BIN,
             database_url,
             "-A",
             "-t",
@@ -75,29 +102,33 @@ def get_revision_from_database_url(
         ],
         capture_output=True,
         text=True,
+        check=False,
     )
+
     if result.returncode != 0:
-        logging.error(result.stderr.strip())
+        logger.error(result.stderr.strip())
         raise SystemExit(1)
 
     revision = result.stdout.strip()
     if not revision:
+        logger.error("No alembic version found in database")
         raise SystemExit(1)
 
     return revision
+
 
 def get_revision_from_vm_docker(
     db_user: str,
     db_name: str,
     container_name: str,
 ) -> str:
-    result = subprocess.run(
+    result = subprocess.run(  # noqa: S603 - docker/psql args are trusted VM config
         [
-            "docker",
+            DOCKER_BIN,
             "exec",
             "-i",
             container_name,
-            "psql",
+            PSQL_BIN,
             "-U",
             db_user,
             "-d",
@@ -109,53 +140,43 @@ def get_revision_from_vm_docker(
         ],
         capture_output=True,
         text=True,
+        check=False,
     )
 
     if result.returncode != 0:
-        logging.error(result.stderr.strip())
+        logger.error(result.stderr.strip())
         raise SystemExit(1)
 
     revision = result.stdout.strip()
     if not revision:
-        logging.error("No alembic version found in VM DB")
+        logger.error("No alembic version found in VM DB")
         raise SystemExit(1)
 
     return revision
+
 
 def write_github_output(revision: str, output_key: str) -> None:
     github_output = os.getenv("GITHUB_OUTPUT")
     if not github_output:
         return
 
-    with Path(github_output).open("a") as f:
-        f.write(f"{output_key}={revision}\n")
+    with Path(github_output).open("a") as file:
+        file.write(f"{output_key}={revision}\n")
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Retrieve Alembic revision from PostgreSQL.")
-    parser.add_argument("--database-url", dest="database_url", help="Full PostgreSQL database URL.")
-    parser.add_argument("--db-user", dest="db_user", help="Database username.")
-    parser.add_argument("--db-password", dest="db_password", help="Database password.")
-    parser.add_argument("--db-name", dest="db_name", help="Database name.")
-    parser.add_argument("--db-host", dest="db_host", default="localhost", help="Database host (default: localhost).")
-    parser.add_argument("--db-port", dest="db_port", default="5432", help="Database port (default: 5432).")
-    # VM Docker mode
-    parser.add_argument(
-        "--vm-docker",
-        action="store_true",
-        help="Read alembic version from postgres docker container (VM)",
+    parser = argparse.ArgumentParser(
+        description="Retrieve Alembic revision from PostgreSQL."
     )
-    parser.add_argument(
-        "--docker-container",
-        default="postgres",
-        help="Postgres docker container name",
-    )
-    parser.add_argument(
-        "--output-key",
-        dest="output_key",
-        default="alembic_version",
-        help="Key to use when writing to GITHUB_OUTPUT.",
-    )
+    parser.add_argument("--database-url")
+    parser.add_argument("--db-user")
+    parser.add_argument("--db-password")
+    parser.add_argument("--db-name")
+    parser.add_argument("--db-host", default="localhost")
+    parser.add_argument("--db-port", default="5432")
+    parser.add_argument("--vm-docker", action="store_true")
+    parser.add_argument("--docker-container", default="postgres")
+    parser.add_argument("--output-key", default="alembic_version")
     return parser.parse_args()
 
 
@@ -179,7 +200,6 @@ def main() -> None:
         )
         revision = get_revision_from_database_url(database_url)
 
-    print(revision)
     write_github_output(revision, args.output_key)
 
 
