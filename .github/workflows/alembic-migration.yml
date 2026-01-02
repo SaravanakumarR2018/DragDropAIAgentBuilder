@@ -149,8 +149,6 @@ jobs:
           capture_stdout: "true"
           envs: VM_POSTGRES_PGUSER,VM_POSTGRES_PGPASSWORD,VM_POSTGRES_DB_NAME
           script: |
-            apt update
-            apt install -y postgresql-client
             export GITHUB_OUTPUT=/tmp/gout
             python3 /root/workspace/.github/script/check_db_changes.py \
               --vm-docker \
