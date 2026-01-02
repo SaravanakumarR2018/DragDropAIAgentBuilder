@@ -22,14 +22,6 @@ ALEMBIC_BIN = shutil.which("alembic")
 PSQL_BIN = shutil.which("psql")
 DOCKER_BIN = shutil.which("docker")
 
-if not ALEMBIC_BIN:
-    raise RuntimeError(ERR_ALEMBIC_NOT_FOUND)
-if not PSQL_BIN:
-    raise RuntimeError(ERR_PSQL_NOT_FOUND)
-if not DOCKER_BIN:
-    raise RuntimeError(ERR_DOCKER_NOT_FOUND)
-
-
 def parse_revision(output: str) -> str:
     for line in reversed(output.splitlines()):
         match = REVISION_PATTERN.search(line)
@@ -39,6 +31,8 @@ def parse_revision(output: str) -> str:
 
 
 def get_revision_from_alembic(workdir: Path, alembic_ini: str) -> str:
+    if not ALEMBIC_BIN:
+        raise RuntimeError(ERR_ALEMBIC_NOT_FOUND)
     result = subprocess.run(  # noqa: S603 - inputs are trusted CI configuration
         [ALEMBIC_BIN, "-c", alembic_ini, "heads"],
         cwd=workdir,
@@ -91,6 +85,8 @@ def build_database_url(
 
 
 def get_revision_from_database_url(database_url: str) -> str:
+    if not PSQL_BIN:
+        raise RuntimeError(ERR_PSQL_NOT_FOUND)
     result = subprocess.run(  # noqa: S603 - database_url comes from CI inputs
         [
             PSQL_BIN,
@@ -122,6 +118,10 @@ def get_revision_from_vm_docker(
     db_name: str,
     container_name: str,
 ) -> str:
+    if not DOCKER_BIN:
+        raise RuntimeError(ERR_DOCKER_NOT_FOUND)
+    if not PSQL_BIN:
+        raise RuntimeError(ERR_PSQL_NOT_FOUND)
     result = subprocess.run(  # noqa: S603 - docker/psql args are trusted VM config
         [
             DOCKER_BIN,
