@@ -157,6 +157,7 @@ jobs:
               --db-name $VM_POSTGRES_DB_NAME \
               --docker-container postgres \
               --output-key vm_alembic_version
+            cat /tmp/gout  
 
       - name: Compare Alembic versions
         id: compare
