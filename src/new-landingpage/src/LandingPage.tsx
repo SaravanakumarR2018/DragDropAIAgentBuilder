@@ -12,6 +12,36 @@ import {
   LANGFLOW_REFRESH_TOKEN,
 } from "./session";
 
+const API_BASE = (import.meta.env.VITE_LANGFLOW_API_BASE ?? "/api/v1/")
+  .replace(/\/?$/, "/");
+const AUTH_CHANNEL_NAME = "langflow_auth_channel";
+
+type AuthBroadcastMessage = {
+  type: "LOGOUT";
+  timestamp: number;
+  source?: string;
+};
+
+function broadcastLogoutEvent() {
+  if (typeof window === "undefined" || typeof BroadcastChannel === "undefined") {
+    return;
+  }
+
+  try {
+    const channel = new BroadcastChannel(AUTH_CHANNEL_NAME);
+    const message: AuthBroadcastMessage = {
+      type: "LOGOUT",
+      timestamp: Date.now(),
+      source: window.location.pathname,
+    };
+
+    channel.postMessage(message);
+    channel.close();
+  } catch (error) {
+    console.warn("[LandingPage] Failed to broadcast logout event", error);
+  }
+}
+
 /* -------------------- Icons -------------------- */
 
 function CheckIcon(props: SVGProps<SVGSVGElement>) {
@@ -61,7 +91,20 @@ export default function LandingPage(): JSX.Element {
   ]);
 
   const handleLogout = async () => {
-    await signOut();
+    try {
+      await signOut();
+    } catch (error) {
+      console.warn("[LandingPage] Clerk signOut failed", error);
+    }
+
+    try {
+      await fetch(`${API_BASE}logout`, { method: "POST" });
+    } catch (error) {
+      console.warn("[LandingPage] Backend logout request failed", error);
+    }
+
+    broadcastLogoutEvent();
+
     removeCookie(LANGFLOW_ACCESS_TOKEN, { path: "/" });
     removeCookie(LANGFLOW_REFRESH_TOKEN, { path: "/" });
     clearStoredOrgSelection();
