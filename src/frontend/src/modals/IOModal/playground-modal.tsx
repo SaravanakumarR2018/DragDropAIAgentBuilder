@@ -426,7 +426,7 @@ export default function IOModal({
                     <Button
                       onClick={LangflowButtonClick}
                       variant="primary"
-                      className="hidden w-full !rounded-xl shadow-lg"
+                      className="!hidden w-full !rounded-xl shadow-lg"
                     >
                       <LangflowLogoColor />
                       <div className="text-sm">Built with Langflow</div>
@@ -444,7 +444,7 @@ export default function IOModal({
                 >
                   <Button
                     variant="primary"
-                    className="hidden h-12 w-12 !rounded-xl !p-4 shadow-lg"
+                    className="!hidden h-12 w-12 !rounded-xl !p-4 shadow-lg"
                     onClick={LangflowButtonClick}
                   >
                     <LangflowLogoColor className="h-[18px] w-[18px] scale-150" />
