@@ -225,7 +225,6 @@ jobs:
     env:
       VM_REVISION: ${{ needs.check-db-changes.outputs.vm_revision }}
       REPO_REVISION: ${{ needs.check-db-changes.outputs.repo_revision }}
-      # GA_POSTGRES_DATABASE_URL: postgresql://langflow:langflow@localhost:5432/langflow
 
     steps:
       - name: Print Alembic versions (VM vs Repo)
@@ -254,8 +253,6 @@ jobs:
           pip install .
 
       - name: Generate SQL Migration Files
-        # env:
-        #   LANGFLOW_DATABASE_URL: ${{ env.GA_POSTGRES_DATABASE_URL }}
         working-directory: src/backend/base/langflow
         run: |
           mkdir -p alembic_sql
