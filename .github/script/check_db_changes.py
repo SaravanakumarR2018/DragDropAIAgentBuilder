@@ -160,7 +160,7 @@ def write_github_output(revision: str, output_key: str) -> None:
     if not github_output:
         return
 
-    with Path(github_output).open("a") as file:
+    with Path(github_output).open("w") as file:
         file.write(f"{output_key}={revision}\n")
 
 
