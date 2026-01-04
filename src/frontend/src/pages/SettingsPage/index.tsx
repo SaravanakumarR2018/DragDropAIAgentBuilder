@@ -107,6 +107,7 @@ const SettingsPageBase = ({
 const SettingsPageWithClerk = () => {
   const { openUserProfile, openOrganizationProfile } = useClerk();
   const { organization, isLoaded: isOrganizationLoaded } = useOrganization();
+  const isAdmin = useAuthStore((state) => state.isAdmin);
 
   const canManageMembers = Boolean(
     isOrganizationLoaded && organization?.id && openOrganizationProfile,
@@ -144,16 +145,20 @@ const SettingsPageWithClerk = () => {
       onClick: handleManageMembers,
       disabled: !canManageMembers,
     },
-    {
-      title: "Admin",
-      href: "/admin",
-      icon: (
-        <ForwardedIconComponent
-          name="Shield"
-          className="w-4 flex-shrink-0 justify-start stroke-[1.5]"
-        />
-      ),
-    },
+    ...(isAdmin
+      ? [
+          {
+            title: "Admin",
+            href: "/admin",
+            icon: (
+              <ForwardedIconComponent
+                name="Shield"
+                className="w-4 flex-shrink-0 justify-start stroke-[1.5]"
+              />
+            ),
+          } satisfies SidebarNavItem,
+        ]
+      : []),
     {
       title: "Debugging",
       href: "/settings/debugging",
