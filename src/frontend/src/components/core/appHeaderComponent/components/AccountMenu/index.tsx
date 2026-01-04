@@ -111,6 +111,18 @@ export const AccountMenu = () => {
                     Admin Page
                   </span>
                 </HeaderMenuItemButton>
+                <HeaderMenuItemButton
+                  onClick={() => {
+                    navigate("/admin/trial-access");
+                  }}
+                >
+                  <span
+                    data-testid="menu_trial_access_button"
+                    id="menu_trial_access_button"
+                  >
+                    Trial Access
+                  </span>
+                </HeaderMenuItemButton>
               </div>
             )}
             <HeaderMenuItemLink
