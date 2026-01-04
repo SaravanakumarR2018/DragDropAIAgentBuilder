@@ -1,4 +1,5 @@
 import json
+import math
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Annotated
 from uuid import UUID, uuid4
@@ -154,10 +155,10 @@ class MessageTable(MessageBase, table=True):  # type: ignore[call-arg]
         if isinstance(value, list):
             return [cls.validate_properties_or_content_blocks(item) for item in value]
         if hasattr(value, "model_dump"):
-            return value.model_dump()
+            value = value.model_dump()
         if isinstance(value, str):
-            return json.loads(value)
-        return value
+            value = json.loads(value)
+        return cls._sanitize_json_value(value)
 
     @field_serializer("properties", "content_blocks")
     @classmethod
@@ -165,9 +166,19 @@ class MessageTable(MessageBase, table=True):  # type: ignore[call-arg]
         if isinstance(value, list):
             return [cls.serialize_properties_or_content_blocks(item) for item in value]
         if hasattr(value, "model_dump"):
-            return value.model_dump()
+            value = value.model_dump()
         if isinstance(value, str):
-            return json.loads(value)
+            value = json.loads(value)
+        return cls._sanitize_json_value(value)
+
+    @staticmethod
+    def _sanitize_json_value(value):
+        if isinstance(value, dict):
+            return {key: MessageTable._sanitize_json_value(val) for key, val in value.items()}
+        if isinstance(value, list):
+            return [MessageTable._sanitize_json_value(item) for item in value]
+        if isinstance(value, float) and not math.isfinite(value):
+            return None
         return value
 
 
