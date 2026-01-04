@@ -20,6 +20,7 @@ import useAuthStore from "@/stores/authStore";
 export function AppInitPage() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const { pathname } = useLocation();
+  const isClerkAuth = IS_CLERK_AUTH;
 
   const refreshStars = useDarkStore((state) => state.refreshStars);
   const refreshDiscordCount = useDarkStore((state) => state.refreshDiscordCount);
@@ -35,27 +36,28 @@ export function AppInitPage() {
 
   // Skip the initialization queries when unauthenticated visitors load the
   // unauthenticated marketing landing page rendered at the root route.
-  const skipAppInit = !isAuthenticated && pathname === "/";  
+  const skipAppInit = !isAuthenticated && pathname === "/";
+  const waitForClerkAuth = isClerkAuth && !isAuthenticated;
 
-  const shouldSkipAutoLogin = IS_CLERK_AUTH;
+  const shouldSkipAutoLogin = isClerkAuth;
 
   const { isFetched: isAutoLoginFetched, refetch: refetchAutoLogin } = useGetAutoLogin({
-    enabled: !shouldSkipAutoLogin && isLoaded && !shouldSkip && !skipAppInit,
+    enabled: !shouldSkipAutoLogin && isLoaded && !shouldSkip && !skipAppInit && !waitForClerkAuth,
   });
 
   const isFetched = shouldSkipAutoLogin ? true : isAutoLoginFetched;
 
   const { isFetched: isConfigFetched } = useGetConfig({
-    enabled: isFetched && !shouldSkip && !skipAppInit,
+    enabled: isFetched && !shouldSkip && !skipAppInit && !waitForClerkAuth,
   });
 
-  useGetVersionQuery({ enabled: isFetched && !shouldSkip && !skipAppInit });
-  useGetGlobalVariables({ enabled: isFetched && !shouldSkip && !skipAppInit });
-  useGetTagsQuery({ enabled: isFetched && !shouldSkip && !skipAppInit });
-  useGetFoldersQuery({ enabled: isFetched && !shouldSkip && !skipAppInit });
+  useGetVersionQuery({ enabled: isFetched && !shouldSkip && !skipAppInit && !waitForClerkAuth });
+  useGetGlobalVariables({ enabled: isFetched && !shouldSkip && !skipAppInit && !waitForClerkAuth });
+  useGetTagsQuery({ enabled: isFetched && !shouldSkip && !skipAppInit && !waitForClerkAuth });
+  useGetFoldersQuery({ enabled: isFetched && !shouldSkip && !skipAppInit && !waitForClerkAuth });
 
   const { isFetched: isExamplesFetched, refetch: refetchExamples } = useGetBasicExamplesQuery({
-    enabled: !shouldSkip && !skipAppInit,
+    enabled: !shouldSkip && !skipAppInit && !waitForClerkAuth,
   });
 
   useEffect(() => {
@@ -67,14 +69,20 @@ export function AppInitPage() {
       refreshDiscordCount();
     }
 
-    if (isConfigFetched && !shouldSkip) {
-      refetchAutoLogin();
+    if (isConfigFetched && !shouldSkip && !waitForClerkAuth) {
+      if (!shouldSkipAutoLogin) {
+        refetchAutoLogin();
+      }
       refetchExamples();
     }
-  }, [isFetched, isConfigFetched, shouldSkip, skipAppInit]);
+  }, [isFetched, isConfigFetched, shouldSkip, skipAppInit, waitForClerkAuth]);
 
   if (skipAppInit) {
     return <Outlet />;
+  }
+
+  if (waitForClerkAuth) {
+    return <CustomLoadingPage />;
   }
 
   return (

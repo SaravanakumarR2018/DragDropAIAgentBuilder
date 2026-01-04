@@ -360,7 +360,9 @@ export default function UserManagementModal({
             </Button>
 
             <Form.Submit asChild>
-              <Button className="mt-8">{confirmationText}</Button>
+              <Button className="mt-8" type="submit">
+                {confirmationText}
+              </Button>
             </Form.Submit>
           </div>
         </Form.Root>
