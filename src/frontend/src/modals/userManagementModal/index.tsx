@@ -310,30 +310,36 @@ export default function UserManagementModal({
             </div>
 
             <div className="grid gap-2">
-              <Form.Label className="data-[invalid]:label-invalid">
-                Trial end date
-              </Form.Label>
-              <Form.Control asChild>
-                <input
-                  type="date"
-                  value={trialDate}
-                  className="primary-input"
-                  onChange={(event) => setTrialDate(event.target.value)}
-                />
-              </Form.Control>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  checked={skipTrial}
-                  id="skip_trial_access"
-                  className="relative top-0.5"
-                  onCheckedChange={(value) => {
-                    setSkipTrial(Boolean(value));
-                  }}
-                />
+              <Form.Field name="trial_end_date">
                 <Form.Label className="data-[invalid]:label-invalid">
-                  Skip trial for this user
+                  Trial end date
                 </Form.Label>
-              </div>
+                <Form.Control asChild>
+                  <input
+                    type="date"
+                    value={trialDate}
+                    className="primary-input"
+                    onChange={(event) => setTrialDate(event.target.value)}
+                  />
+                </Form.Control>
+              </Form.Field>
+              <Form.Field name="skip_trial_access">
+                <div className="flex items-center gap-2">
+                  <Form.Control asChild>
+                    <Checkbox
+                      checked={skipTrial}
+                      id="skip_trial_access"
+                      className="relative top-0.5"
+                      onCheckedChange={(value) => {
+                        setSkipTrial(Boolean(value));
+                      }}
+                    />
+                  </Form.Control>
+                  <Form.Label className="data-[invalid]:label-invalid">
+                    Skip trial for this user
+                  </Form.Label>
+                </div>
+              </Form.Field>
               {data?.optins?.trial_access_until ? (
                 <p className="text-xs text-muted-foreground">
                   Stored value: {data.optins.trial_access_until}

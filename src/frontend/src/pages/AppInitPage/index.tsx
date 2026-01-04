@@ -37,9 +37,13 @@ export function AppInitPage() {
   // unauthenticated marketing landing page rendered at the root route.
   const skipAppInit = !isAuthenticated && pathname === "/";  
 
-  const { isFetched, refetch } = useGetAutoLogin({
-    enabled: isLoaded && !shouldSkip && !skipAppInit,
+  const shouldSkipAutoLogin = IS_CLERK_AUTH;
+
+  const { isFetched: isAutoLoginFetched, refetch: refetchAutoLogin } = useGetAutoLogin({
+    enabled: !shouldSkipAutoLogin && isLoaded && !shouldSkip && !skipAppInit,
   });
+
+  const isFetched = shouldSkipAutoLogin ? true : isAutoLoginFetched;
 
   const { isFetched: isConfigFetched } = useGetConfig({
     enabled: isFetched && !shouldSkip && !skipAppInit,
@@ -64,7 +68,7 @@ export function AppInitPage() {
     }
 
     if (isConfigFetched && !shouldSkip) {
-      refetch();
+      refetchAutoLogin();
       refetchExamples();
     }
   }, [isFetched, isConfigFetched, shouldSkip, skipAppInit]);
