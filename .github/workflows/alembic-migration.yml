@@ -73,9 +73,10 @@ jobs:
             echo "commit_id=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
           fi
 
-      - name: Build GA PostgreSQL DATABASE_URL
+      - name: Build GA PostgreSQL DATABASE_URLs
         run: |
-          echo "GA_POSTGRES_DATABASE_URL=postgresql+psycopg_async://${GA_POSTGRES_PGUSER}:${GA_POSTGRES_PGPASSWORD}@${GA_POSTGRES_HOST}:${GA_POSTGRES_PORT}/${GA_POSTGRES_DB_NAME}" >> $GITHUB_ENV    
+          echo "GA_POSTGRES_DATABASE_URL_ASYNC=postgresql+psycopg_async://${GA_POSTGRES_PGUSER}:${GA_POSTGRES_PGPASSWORD}@${GA_POSTGRES_HOST}:${GA_POSTGRES_PORT}/${GA_POSTGRES_DB_NAME}" >> $GITHUB_ENV
+          echo "GA_POSTGRES_DATABASE_URL_SYNC=postgresql://${GA_POSTGRES_PGUSER}:${GA_POSTGRES_PGPASSWORD}@${GA_POSTGRES_HOST}:${GA_POSTGRES_PORT}/${GA_POSTGRES_DB_NAME}" >> $GITHUB_ENV    
 
       - name: Resolve website domain dynamically
         env:
@@ -153,7 +154,7 @@ jobs:
       - name: Apply migrations to GitHub PostgreSQL
         working-directory: src/backend/base/langflow
         env:
-          LANGFLOW_DATABASE_URL: ${{ env.GA_POSTGRES_DATABASE_URL }}   
+          LANGFLOW_DATABASE_URL: ${{ env.GA_POSTGRES_DATABASE_URL_ASYNC }}   
         run : |
           cp alembic.ini /tmp/alembic.runtime.ini
           sed -i "s#^sqlalchemy.url = .*#sqlalchemy.url = ${LANGFLOW_DATABASE_URL}#" /tmp/alembic.runtime.ini
@@ -163,7 +164,7 @@ jobs:
         id: repo_version
         run: |
           python .github/script/check_db_changes.py \
-            --database-url "${GA_POSTGRES_DATABASE_URL}" \
+            --database-url "${GA_POSTGRES_DATABASE_URL_SYNC}" \
             --output-key repo_alembic_version
     
 
