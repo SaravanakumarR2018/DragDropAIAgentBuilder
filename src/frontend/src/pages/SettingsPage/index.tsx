@@ -145,6 +145,16 @@ const SettingsPageWithClerk = () => {
       disabled: !canManageMembers,
     },
     {
+      title: "Admin",
+      href: "/admin",
+      icon: (
+        <ForwardedIconComponent
+          name="Shield"
+          className="w-4 flex-shrink-0 justify-start stroke-[1.5]"
+        />
+      ),
+    },
+    {
       title: "Debugging",
       href: "/settings/debugging",
       icon: (

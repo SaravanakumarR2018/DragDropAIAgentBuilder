@@ -86,9 +86,6 @@ const LoginAdminPage = lazy(() =>
 );
 
 const AdminPage = lazy(() => import("./pages/AdminPage"));
-const AdminTrialAccessPage = lazy(
-  () => import("./pages/AdminTrialAccessPage"),
-);
 const DeleteAccountPage = lazy(() => import("./pages/DeleteAccountPage"));
 const PlaygroundPage = lazy(() => import("./pages/Playground"));
 
@@ -330,16 +327,6 @@ const router = createBrowserRouter(
                   <Suspense fallback={<LoadingPage />}>
                     <ProtectedAdminRoute>
                       <AdminPage />
-                    </ProtectedAdminRoute>
-                  </Suspense>
-                }
-              />
-              <Route
-                path="admin/trial-access"
-                element={
-                  <Suspense fallback={<LoadingPage />}>
-                    <ProtectedAdminRoute>
-                      <AdminTrialAccessPage />
                     </ProtectedAdminRoute>
                   </Suspense>
                 }

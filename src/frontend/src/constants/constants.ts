@@ -628,6 +628,10 @@ export const CONTROL_NEW_USER = {
   password: "",
   is_active: false,
   is_superuser: false,
+  optins: {
+    trial_access_until: "",
+    skip_trial_access: false,
+  },
 };
 
 export const tabsCode = [];

@@ -435,6 +435,11 @@ export type UserInputType = {
   id?: string;
   create_at?: string;
   updated_at?: string;
+  optins?: {
+    trial_access_until?: string;
+    skip_trial_access?: boolean;
+    trial_access_days?: number;
+  };
 };
 
 export type ApiKeyType = {
