@@ -399,6 +399,23 @@ jobs:
             root@${VM_HOST}:/home/full_cluster.sql \
             $GITHUB_WORKSPACE/full_cluster.sql
 
+      - name: Prepare dump for restore
+        run: |
+          # Remove CREATE ROLE for langflow (role already exists in GA Postgres)
+          sed -i '/^CREATE ROLE langflow;/d' full_cluster.sql
+
+          # Drop existing langflow/org_* databases to avoid CREATE DATABASE errors
+          DBS=$(psql -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }} -At \
+            -c "SELECT datname FROM pg_database WHERE datname='langflow' OR datname LIKE 'org_%';")
+
+          for db in $DBS; do
+            echo "Dropping existing database $db"
+            psql -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }} -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$db';"
+            psql -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }} -c "DROP DATABASE IF EXISTS \"$db\";"
+          done
+        env:
+          PGPASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}      
+
       - name: Restore FULL cluster into GA PostgreSQL
         run: |
           psql -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }} -f full_cluster.sql
