@@ -399,6 +399,18 @@ jobs:
         env:
           PGPASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}
 
+      - name: List all databases after restore
+        run: |
+          echo "====== DATABASE LIST ======"
+          psql \
+            -h ${GA_POSTGRES_HOST} \
+            -p ${GA_POSTGRES_PORT} \
+            -U postgres \
+            -c "\l"
+          echo "==========================="
+        env:
+          PGPASSWORD: postgres    
+
       - name: Apply upgrade.sql ONLY to langflow and org DBs
         if: ${{ hashFiles('upgrade.sql') != '' }}
         run: |
