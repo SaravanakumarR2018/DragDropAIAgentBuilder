@@ -377,10 +377,12 @@ jobs:
           username: root
           password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
           script: |
-            docker exec -t postgres pg_dumpall \
+            docker exec postgres pg_dumpall \
               -U ${{ env.GA_POSTGRES_PGUSER }} \
               --no-owner --no-acl \
-              > /tmp/full_cluster.sql
+              > /root/full_cluster.sql
+
+            ls -lh /root/full_cluster.sql
 
       - name: Copy cluster dump from VM
         uses: appleboy/scp-action@v0.1.4
@@ -388,7 +390,7 @@ jobs:
           host: ${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
           username: root
           password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
-          source: "/tmp/full_cluster.sql"
+          source: "/root/full_cluster.sql"
           target: "./"
 
       - name: Restore FULL cluster into GA PostgreSQL
