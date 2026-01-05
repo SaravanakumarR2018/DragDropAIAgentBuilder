@@ -338,18 +338,42 @@ jobs:
           done
           exit 1
 
-      - name: Resolve VM host
+      - name: Resolve website domain dynamically
+        env:
+          ENVIRONMENT: ${{ github.event.inputs.environment }}
         run: |
-          if [ "${{ github.event.inputs.environment }}" = "staging" ]; then
-            echo "VM_HOST=staging.${{ vars.LANGFLOW_WEBSITE_DOMAIN }}" >> $GITHUB_ENV
+          set -euo pipefail
+          ENV_FILE=".env-file"
+
+          if [ ! -f "$ENV_FILE" ]; then
+            echo "❌ $ENV_FILE not found"
+            exit 1
+          fi
+
+          BASE_DOMAIN=$(grep '^LANGFLOW_WEBSITE_DOMAIN=' "$ENV_FILE" | tail -n1 | cut -d'=' -f2-)
+
+          if [ -z "$BASE_DOMAIN" ]; then
+            echo "❌ LANGFLOW_WEBSITE_DOMAIN missing in $ENV_FILE"
+            exit 1
+          fi
+
+          STAGING_HOST="staging.${BASE_DOMAIN}"
+          PROD_HOST="${BASE_DOMAIN}"
+
+          if [ "$ENVIRONMENT" = "staging" ]; then
+            WEBSITE_DOMAIN="$STAGING_HOST"
           else
-            echo "VM_HOST=${{ vars.LANGFLOW_WEBSITE_DOMAIN }}" >> $GITHUB_ENV
-          fi    
+            WEBSITE_DOMAIN="$PROD_HOST"
+          fi
+
+          echo "WEBSITE_DOMAIN=$WEBSITE_DOMAIN" >> $GITHUB_ENV
+          echo "STAGING_HOST=$STAGING_HOST" >> $GITHUB_ENV
+          echo "PROD_HOST=$PROD_HOST" >> $GITHUB_ENV    
 
       - name: Dump FULL PostgreSQL cluster on VM
         uses: appleboy/ssh-action@v1.2.2
         with:
-          host: ${{ env.VM_HOST }}
+          host: ${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
           username: root
           password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
           script: |
