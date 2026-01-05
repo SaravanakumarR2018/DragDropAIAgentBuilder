@@ -422,7 +422,7 @@ jobs:
 
       - name: Restore FULL cluster into GA PostgreSQL
         run: |
-          psql -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }} -f full_cluster.sql
+          psql -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }} -d postgres -f full_cluster.sql
         env:
           PGPASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}
 
