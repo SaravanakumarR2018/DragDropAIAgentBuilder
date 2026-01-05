@@ -392,7 +392,6 @@ jobs:
           username: root
           password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
           source: "/home/full_cluster.sql"
-          target: "./"
           target: "${{ github.workspace }}"
 
       - name: Restore FULL cluster into GA PostgreSQL
