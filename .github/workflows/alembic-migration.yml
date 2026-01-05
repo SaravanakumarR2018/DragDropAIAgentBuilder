@@ -294,3 +294,82 @@ jobs:
         with:
           name: alembic-sql-${{ github.run_id }}
           path: src/backend/base/langflow/alembic_sql/
+
+  vm-db-restore-and-upgrade:
+    runs-on: ubuntu-latest
+    needs: check-db-changes
+    if: needs.check-db-changes.outputs.db_changes == 'true'
+
+    services:
+      postgres:
+        image: ${{ vars.POSTGRESQL_DOCKER_VERSION }}
+        env:
+          POSTGRES_USER: ${{ env.GA_POSTGRES_PGUSER }}
+          POSTGRES_PASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}
+          POSTGRES_DB: ${{ env.GA_POSTGRES_DB_NAME }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U langflow"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Wait for PostgreSQL
+        run: |
+          for i in {1..10}; do
+            if pg_isready -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }}; then
+              exit 0
+            fi
+            sleep 3
+          done
+          exit 1
+
+      - name: Dump FULL PostgreSQL cluster on VM
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
+          username: root
+          password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
+          script: |
+            docker exec -t postgres pg_dumpall \
+              -U ${{ env.GA_POSTGRES_PGUSER }} \
+              --no-owner --no-acl \
+              > /tmp/full_cluster.sql
+
+      - name: Copy cluster dump from VM
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
+          username: root
+          password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
+          source: "/tmp/full_cluster.sql"
+          target: "./"
+
+      - name: Restore FULL cluster into GA PostgreSQL
+        run: |
+          psql -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }} -f full_cluster.sql
+        env:
+          PGPASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}
+
+      - name: Apply upgrade.sql ONLY to langflow and org DBs
+        if: ${{ hashFiles('upgrade.sql') != '' }}
+        run: |
+          DBS=$(psql -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }} -At \
+            -c "SELECT datname FROM pg_database WHERE datname='langflow' OR datname LIKE 'org_%';")
+
+          for db in $DBS; do
+            echo "Applying upgrade.sql to $db"
+            psql -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }} -d "$db" -f upgrade.sql
+          done
+        env:
+          PGPASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}
