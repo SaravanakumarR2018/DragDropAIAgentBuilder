@@ -386,13 +386,13 @@ jobs:
             ls -lh full_cluster.sql
 
       - name: Copy cluster dump from VM
-        uses: appleboy/scp-action@v0.1.4
-        with:
-          host: ${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
-          username: root
-          password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
-          source: "/home/full_cluster.sql"
-          target: "${{ github.workspace }}"
+        env:
+          VM_PASSWORD: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
+          VM_HOST: ${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
+        run: |
+          sshpass -p "$VM_PASSWORD" scp -o StrictHostKeyChecking=no \
+            root@${VM_HOST}:/home/full_cluster.sql \
+            $GITHUB_WORKSPACE/full_cluster.sql
 
       - name: Restore FULL cluster into GA PostgreSQL
         run: |
