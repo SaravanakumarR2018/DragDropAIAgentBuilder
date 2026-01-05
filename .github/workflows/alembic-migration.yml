@@ -341,9 +341,9 @@ jobs:
       - name: Resolve VM host
         run: |
           if [ "${{ github.event.inputs.environment }}" = "staging" ]; then
-            echo "VM_HOST=${{ env.STAGING_HOST }}" >> $GITHUB_ENV
+            echo "VM_HOST=staging.${{ vars.LANGFLOW_WEBSITE_DOMAIN }}" >> $GITHUB_ENV
           else
-            echo "VM_HOST=${{ env.PROD_HOST }}" >> $GITHUB_ENV
+            echo "VM_HOST=${{ vars.LANGFLOW_WEBSITE_DOMAIN }}" >> $GITHUB_ENV
           fi    
 
       - name: Dump FULL PostgreSQL cluster on VM
