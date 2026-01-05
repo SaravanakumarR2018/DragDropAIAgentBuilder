@@ -403,13 +403,13 @@ jobs:
         run: |
           echo "====== DATABASE LIST ======"
           psql \
-            -h ${GA_POSTGRES_HOST} \
-            -p ${GA_POSTGRES_PORT} \
-            -U postgres \
+            -h ${{ env.GA_POSTGRES_HOST }} \
+            -p ${{ env.GA_POSTGRES_PORT }} \
+            -U ${{ env.GA_POSTGRES_PGUSER }} \
             -c "\l"
           echo "==========================="
         env:
-          PGPASSWORD: postgres
+          PGPASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}
 
       - name: Apply upgrade.sql ONLY to langflow and org DBs
         if: ${{ hashFiles('upgrade.sql') != '' }}
