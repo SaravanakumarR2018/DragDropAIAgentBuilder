@@ -420,12 +420,14 @@ jobs:
       - name: Apply upgrade.sql ONLY to langflow and org DBs
         if: ${{ hashFiles('alembic_sql/upgrade.sql') != '' }}
         run: |
+          UPGRADE_SQL_PATH="alembic_sql/upgrade.sql"
+          ls -l "$UPGRADE_SQL_PATH"
           DBS=$(psql -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }} -At \
             -c "SELECT datname FROM pg_database WHERE datname='langflow' OR datname LIKE 'org_%';")
 
           for db in $DBS; do
             echo "Applying upgrade.sql to $db"
-            psql -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }} -d "$db" alembic_sql/upgrade.sql
+            psql -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }} -d "$db" --file="$UPGRADE_SQL_PATH"
           done
         env:
           PGPASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}
