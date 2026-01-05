@@ -452,3 +452,30 @@ jobs:
           done
         env:
           PGPASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}
+      
+      - name: Inspect org database schema (GA Postgres)
+        run: |
+          set -e
+
+          ORG_DB="org_34A0LhKcRD7D8xyu8h9fJxPQ81A"
+
+          echo "====== CONNECTING TO ORG DATABASE (GA) ======"
+          echo "Database: $ORG_DB"
+
+          echo "---------- TABLE LIST ----------"
+          psql \
+            -h ${{ env.GA_POSTGRES_HOST }} \
+            -p ${{ env.GA_POSTGRES_PORT }} \
+            -U ${{ env.GA_POSTGRES_PGUSER }} \
+            -d "$ORG_DB" \
+            -c "\dt"
+          echo "---------- MESSAGE TABLE STRUCTURE ----------"
+          psql \
+            -h ${{ env.GA_POSTGRES_HOST }} \
+            -p ${{ env.GA_POSTGRES_PORT }} \
+            -U ${{ env.GA_POSTGRES_PGUSER }} \
+            -d "$ORG_DB" \
+            -c "\d message"
+          echo "============================================"
+        env:
+          PGPASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}    
