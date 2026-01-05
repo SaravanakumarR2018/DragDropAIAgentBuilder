@@ -310,7 +310,6 @@ jobs:
         env:
           POSTGRES_USER: ${{ env.GA_POSTGRES_PGUSER }}
           POSTGRES_PASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}
-          POSTGRES_DB: ${{ env.GA_POSTGRES_DB_NAME }}
         ports:
           - 5432:5432
         options: >-
