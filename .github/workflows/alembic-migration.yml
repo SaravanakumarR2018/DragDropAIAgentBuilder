@@ -401,17 +401,21 @@ jobs:
 
       - name: Prepare dump for restore
         run: |
+          set -euo pipefail
+
           # Remove CREATE ROLE for langflow (role already exists in GA Postgres)
           sed -i '/^CREATE ROLE langflow;/d' full_cluster.sql
 
           # Drop existing langflow/org_* databases to avoid CREATE DATABASE errors
-          DBS=$(psql -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }} -At \
+          ADMIN_CONN="psql -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }} -d postgres"
+
+          DBS=$($ADMIN_CONN -At \
             -c "SELECT datname FROM pg_database WHERE datname='langflow' OR datname LIKE 'org_%';")
 
           for db in $DBS; do
             echo "Dropping existing database $db"
-            psql -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }} -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$db';"
-            psql -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }} -c "DROP DATABASE IF EXISTS \"$db\";"
+            $ADMIN_CONN -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='$db' AND pid <> pg_backend_pid();"
+            $ADMIN_CONN -c "DROP DATABASE IF EXISTS \"$db\";"
           done
         env:
           PGPASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}      
