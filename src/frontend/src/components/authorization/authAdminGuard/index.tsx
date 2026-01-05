@@ -9,6 +9,7 @@ export const ProtectedAdminRoute = ({ children }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const isAdmin = useAuthStore((state) => state.isAdmin);
   const hasRequestedUser = useRef(false);
+  const isSuperUser = userData?.is_superuser ?? isAdmin;
 
   useEffect(() => {
     if (isAuthenticated && !userData && !hasRequestedUser.current) {
@@ -25,7 +26,7 @@ export const ProtectedAdminRoute = ({ children }) => {
     return <LoadingPage />;
   }
 
-  if (!isAdmin) {
+  if (!isSuperUser) {
     return <CustomNavigate to="/flows" replace />;
   } else {
     return children;
