@@ -479,7 +479,7 @@ jobs:
             for db in $DBS; do
               echo "Migrating database: $db"
               docker exec postgres psql -U langflow -d "$db" \
-                -f /root/db-migrations/upgrade.sql
+                -f /root/db-migrations/alembic_sql/upgrade.sql
             done
 
             echo "Migration completed on VM"
