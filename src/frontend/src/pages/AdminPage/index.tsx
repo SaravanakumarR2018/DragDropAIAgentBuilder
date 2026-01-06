@@ -232,6 +232,7 @@ export default function AdminPage() {
             user: {
               is_active: user.is_active,
               is_superuser: user.is_superuser,
+              optins: user.optins,
             },
           },
           {
