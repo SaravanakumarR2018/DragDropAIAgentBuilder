@@ -525,6 +525,38 @@ jobs:
           name: alembic-sql-${{ github.run_id }}
           path: alembic_sql 
 
+      - name: Resolve website domain dynamically
+        env:
+          ENVIRONMENT: ${{ github.event.inputs.environment }}
+        run: |
+          set -euo pipefail
+          ENV_FILE=".env-file"
+
+          if [ ! -f "$ENV_FILE" ]; then
+            echo "❌ $ENV_FILE not found"
+            exit 1
+          fi
+
+          BASE_DOMAIN=$(grep '^LANGFLOW_WEBSITE_DOMAIN=' "$ENV_FILE" | tail -n1 | cut -d'=' -f2-)
+
+          if [ -z "$BASE_DOMAIN" ]; then
+            echo "❌ LANGFLOW_WEBSITE_DOMAIN missing in $ENV_FILE"
+            exit 1
+          fi
+
+          STAGING_HOST="staging.${BASE_DOMAIN}"
+          PROD_HOST="${BASE_DOMAIN}"
+
+          if [ "$ENVIRONMENT" = "staging" ]; then
+            WEBSITE_DOMAIN="$STAGING_HOST"
+          else
+            WEBSITE_DOMAIN="$PROD_HOST"
+          fi
+
+          echo "WEBSITE_DOMAIN=$WEBSITE_DOMAIN" >> $GITHUB_ENV
+          echo "STAGING_HOST=$STAGING_HOST" >> $GITHUB_ENV
+          echo "PROD_HOST=$PROD_HOST" >> $GITHUB_ENV        
+
       - name: Copy upgrade.sql to VM
         uses: appleboy/scp-action@v0.1.4
         with:
@@ -534,12 +566,15 @@ jobs:
           source: "alembic_sql/upgrade.sql"
           target: "/root/db-migrations/"
 
-      - name: Apply upgrade.sql on VM databases
+      - name: Apply upgrade.sql on Staging VM databases
+        if: ${{ github.event.inputs.environment == 'staging' }}
         uses: appleboy/ssh-action@v1.2.2
+        env:
+          APP_DB_NAME: ${{ secrets.POSTGRES_DB }}
         with:
-          host: ${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
+          host: ${{ env.STAGING_HOST }}
           username: root
-          password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
+          password: ${{ secrets.VM_PASSWORD }}
           script: |
             set -e
 
@@ -550,13 +585,43 @@ jobs:
              exit 1
             fi
 
-            DBS=$(docker exec postgres psql -U langflow -At \
-              -c "SELECT datname FROM pg_database WHERE datname='langflow' OR datname LIKE 'org_%';")
+            DBS=$(docker exec postgres psql -U ${{ secrets.POSTGRES_USER }} -At \
+              -c "SELECT datname FROM pg_database WHERE datname='${APP_DB_NAME}' OR datname LIKE 'org_%';")
 
             for db in $DBS; do
               echo "Migrating database: $db"
-              docker exec -i postgres psql -U langflow -d "$db" \
+              docker exec -i postgres psql -U ${{ secrets.POSTGRES_USER }} -d "$db" \
                 < "$SQL_FILE"
             done
 
-            echo "Migration completed on VM"
+            echo "Migration completed on Staging VM"
+
+      - name: Apply upgrade.sql on Prod VM databases
+        if: ${{ github.event.inputs.environment == 'prod' }}
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          APP_DB_NAME: ${{ secrets.PROD_POSTGRES_DB }}
+        with:
+          host: ${{ env.PROD_HOST }}
+          username: root
+          password: ${{ secrets.PROD_VM_PASSWORD }}
+          script: |
+            set -e
+
+            SQL_FILE="/root/db-migrations/alembic_sql/upgrade.sql"
+
+            if [ ! -f "$SQL_FILE" ]; then
+              echo "ERROR: $SQL_FILE not found on VM host"
+             exit 1
+            fi
+
+            DBS=$(docker exec postgres psql -U ${{ secrets.PROD_POSTGRES_USER }} -At \
+              -c "SELECT datname FROM pg_database WHERE datname='${APP_DB_NAME}' OR datname LIKE 'org_%';")
+
+            for db in $DBS; do
+              echo "Migrating database: $db"
+              docker exec -i postgres psql -U ${{ secrets.PROD_POSTGRES_USER }} -d "$db" \
+                < "$SQL_FILE"
+            done
+
+            echo "Migration completed on Prod VM"      
