@@ -8,6 +8,7 @@ import {
   useUpdateUser,
 } from "@/controllers/API/queries/auth";
 import CustomLoader from "@/customization/components/custom-loader";
+import { useCustomNavigate } from "@/customization/hooks/use-custom-navigate";
 import IconComponent from "../../components/common/genericIconComponent";
 import ShadTooltip from "../../components/common/shadTooltipComponent";
 import { Button } from "../../components/ui/button";
@@ -52,6 +53,7 @@ export default function AdminPage() {
   const setErrorData = useAlertStore((state) => state.setErrorData);
   const { userData } = useContext(AuthContext);
   const [totalRowsCount, setTotalRowsCount] = useState(0);
+  const navigate = useCustomNavigate();
 
   const { mutate: mutateDeleteUser } = useDeleteUsers();
   const { mutate: mutateUpdateUser } = useUpdateUser();
@@ -69,6 +71,12 @@ export default function AdminPage() {
 
   const { mutate: mutateGetUsers, isPending, isIdle } = useGetUsers({});
 
+  function handleUsersError(error) {
+    if (error?.response?.status === 403) {
+      navigate("/flows");
+    }
+  }
+
   function getUsers() {
     mutateGetUsers(
       {
@@ -81,7 +89,9 @@ export default function AdminPage() {
           userList.current = users["users"];
           setFilterUserList(users["users"]);
         },
-        onError: () => {},
+        onError: (error) => {
+          handleUsersError(error);
+        },
       },
     );
   }
@@ -100,6 +110,9 @@ export default function AdminPage() {
           setTotalRowsCount(users["total_count"]);
           userList.current = users["users"];
           setFilterUserList(users["users"]);
+        },
+        onError: (error) => {
+          handleUsersError(error);
         },
       },
     );

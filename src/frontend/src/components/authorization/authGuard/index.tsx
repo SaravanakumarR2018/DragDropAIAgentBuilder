@@ -30,6 +30,7 @@ export const ProtectedRoute = ({ children }) => {
   const currentPath = location.pathname;
   const isLoginPage = currentPath.includes("login");
   const isOrgPage = currentPath.includes("organization");
+  const isAdminPage = currentPath.includes("/admin");
   const isRootPage = currentPath === "/";
   const isFlowsPage = currentPath.includes("/flows");
 
@@ -52,6 +53,7 @@ export const ProtectedRoute = ({ children }) => {
     isSignedIn &&
     !isOrgSelected &&
     !isOrgPage &&
+    !isAdminPage &&
     !isLoginPage;
 
   // ✅ 3️⃣ DO NOT redirect "/" to "/flows" - authenticated users should stay on landing page
