@@ -458,6 +458,9 @@ jobs:
           PGPASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}
           APP_DB_NAME: ${{ secrets.POSTGRES_DB }}
         run: |
+          set -e
+          rm -f /tmp/upgrade_error.txt /tmp/upgrade_success.txt
+
           UPGRADE_SQL_PATH="alembic_sql/upgrade.sql"
           ls -l "$UPGRADE_SQL_PATH"
           DBS=$(psql -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }} -At \
@@ -465,8 +468,10 @@ jobs:
 
           for db in $DBS; do
             echo "Applying upgrade.sql to $db"
+            trap 'echo "Upgrade failed on database: '"$db"'" > /tmp/upgrade_error.txt' ERR
             psql -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }} -d "$db" --file="$UPGRADE_SQL_PATH"
           done
+          echo "SUCCESS" > /tmp/upgrade_success.txt
 
       - name: If env is prod - Apply upgrade.sql to app DB and org DBs
         if: ${{ github.event.inputs.environment == 'prod' && hashFiles('alembic_sql/upgrade.sql') != '' }}
@@ -474,6 +479,9 @@ jobs:
           PGPASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}
           APP_DB_NAME: ${{ secrets.PROD_POSTGRES_DB }}
         run: |
+          set -e
+          rm -f /tmp/upgrade_error.txt /tmp/upgrade_success.txt
+
           UPGRADE_SQL_PATH="alembic_sql/upgrade.sql"
           ls -l "$UPGRADE_SQL_PATH"
           DBS=$(psql -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }} -At \
@@ -481,19 +489,28 @@ jobs:
 
           for db in $DBS; do
             echo "Applying upgrade.sql to $db"
+            trap 'echo "Upgrade failed on database: '"$db"'" > /tmp/upgrade_error.txt' ERR
             psql -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }} -d "$db" --file="$UPGRADE_SQL_PATH"
           done    
+          echo "SUCCESS" > /tmp/upgrade_success.txt
 
       - name: Set upgrade result
         id: upgrade_result
         if: always()
         run: |
-          if [ "${{ job.status }}" = "success" ]; then
-            echo "upgrade_status=success" >> $GITHUB_OUTPUT
-          else
+          if [ -f /tmp/upgrade_error.txt ]; then
             echo "upgrade_status=failure" >> $GITHUB_OUTPUT
-            echo "upgrade_error=Restore or upgrade failed. Check logs." >> $GITHUB_OUTPUT
-          fi    
+            echo "upgrade_error=$(cat /tmp/upgrade_error.txt)" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          if [ ! -f /tmp/upgrade_success.txt ]; then
+            echo "upgrade_status=failure" >> $GITHUB_OUTPUT
+            echo "upgrade_error=Upgrade status unknown (success marker missing)" >> $GITHUB_OUTPUT
+            exit 1
+          fi  
+
+          echo "upgrade_status=success" >> $GITHUB_OUTPUT   
 
   manual-approval:
     runs-on: ubuntu-latest
@@ -575,11 +592,12 @@ jobs:
           password: ${{ secrets.VM_PASSWORD }}
           script: |
             set -e
+            rm -f /tmp/migration_error.txt /tmp/migration_success.txt
 
             SQL_FILE="/root/db-migrations/alembic_sql/upgrade.sql"
 
             if [ ! -f "$SQL_FILE" ]; then
-              echo "ERROR: $SQL_FILE not found on VM host"
+              echo "upgrade.sql missing on VM" > /tmp/migration_error.txt
              exit 1
             fi
 
@@ -588,9 +606,11 @@ jobs:
 
             for db in $DBS; do
               echo "Migrating database: $db"
+              trap 'echo "Migration failed on database: '"$db"'" > /tmp/migration_error.txt' ERR
               docker exec -i postgres psql -U ${{ secrets.POSTGRES_USER }} -d "$db" \
                 < "$SQL_FILE"
             done
+            echo "SUCCESS" > /tmp/migration_success.txt
 
             echo "Migration completed on Staging VM"
 
@@ -603,11 +623,12 @@ jobs:
           password: ${{ secrets.PROD_VM_PASSWORD }}
           script: |
             set -e
+            rm -f /tmp/migration_error.txt /tmp/migration_success.txt
 
             SQL_FILE="/root/db-migrations/alembic_sql/upgrade.sql"
 
             if [ ! -f "$SQL_FILE" ]; then
-              echo "ERROR: $SQL_FILE not found on VM host"
+              echo "upgrade.sql missing on VM" > /tmp/migration_error.txt
              exit 1
             fi
 
@@ -616,8 +637,41 @@ jobs:
 
             for db in $DBS; do
               echo "Migrating database: $db"
+              trap 'echo "Migration failed on database: '"$db"'" > /tmp/migration_error.txt' ERR
               docker exec -i postgres psql -U ${{ secrets.PROD_POSTGRES_USER }} -d "$db" \
                 < "$SQL_FILE"
             done
+            echo "SUCCESS" > /tmp/migration_success.txt
 
             echo "Migration completed on Prod VM"      
+
+      - name: Collect migration result
+        if: always()
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
+          username: root
+          password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
+          script: |
+            if [ -f /tmp/migration_error.txt ]; then
+              echo "❌ MIGRATION FAILED"
+              cat /tmp/migration_error.txt
+              exit 1
+            fi
+
+            if [ ! -f /tmp/migration_success.txt ]; then
+              echo "❌ MIGRATION STATUS UNKNOWN (success marker missing)"
+              exit 1
+            fi
+
+            echo "✅ MIGRATION SUCCESS CONFIRMED"    
+
+      - name: Migration summary
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "✅ Migration Status: SUCCESS"
+          else
+            echo "❌ Migration Status: FAILURE"
+            echo "Reason: SQL execution failed, DB-level error, or upgrade.sql missing"
+          fi
