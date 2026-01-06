@@ -623,11 +623,18 @@ export const CONTROL_LOGIN_STATE = {
   password: "",
 };
 
+export const DEFAULT_TRIAL_ACCESS_UNTIL =
+  "2026-01-13T04:12:06.580705+00:00";
+
 export const CONTROL_NEW_USER = {
   username: "",
   password: "",
   is_active: false,
   is_superuser: false,
+  optins: {
+    skip_trial_access: false,
+    trial_access_until: DEFAULT_TRIAL_ACCESS_UNTIL,
+  },
 };
 
 export const tabsCode = [];
