@@ -569,8 +569,6 @@ jobs:
       - name: Apply upgrade.sql on Staging VM databases
         if: ${{ github.event.inputs.environment == 'staging' }}
         uses: appleboy/ssh-action@v1.2.2
-        env:
-          APP_DB_NAME: ${{ secrets.POSTGRES_DB }}
         with:
           host: ${{ env.STAGING_HOST }}
           username: root
@@ -586,7 +584,7 @@ jobs:
             fi
 
             DBS=$(docker exec postgres psql -U ${{ secrets.POSTGRES_USER }} -At \
-              -c "SELECT datname FROM pg_database WHERE datname='${APP_DB_NAME}' OR datname LIKE 'org_%';")
+              -c "SELECT datname FROM pg_database WHERE datname='${{ secrets.POSTGRES_DB }}' OR datname LIKE 'org_%';")
 
             for db in $DBS; do
               echo "Migrating database: $db"
@@ -599,8 +597,6 @@ jobs:
       - name: Apply upgrade.sql on Prod VM databases
         if: ${{ github.event.inputs.environment == 'prod' }}
         uses: appleboy/ssh-action@v1.2.2
-        env:
-          APP_DB_NAME: ${{ secrets.PROD_POSTGRES_DB }}
         with:
           host: ${{ env.PROD_HOST }}
           username: root
@@ -616,7 +612,7 @@ jobs:
             fi
 
             DBS=$(docker exec postgres psql -U ${{ secrets.PROD_POSTGRES_USER }} -At \
-              -c "SELECT datname FROM pg_database WHERE datname='${APP_DB_NAME}' OR datname LIKE 'org_%';")
+              -c "SELECT datname FROM pg_database WHERE datname='${{ secrets.PROD_POSTGRES_DB }}' OR datname LIKE 'org_%';")
 
             for db in $DBS; do
               echo "Migrating database: $db"
