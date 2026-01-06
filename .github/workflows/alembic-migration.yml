@@ -422,34 +422,6 @@ jobs:
             root@${VM_HOST}:/home/full_cluster.sql \
             $GITHUB_WORKSPACE/full_cluster.sql      
 
-      # - name: Prepare dump for restore (clean all non-system DBs)
-      #   run: |
-      #     set -euo pipefail
-
-      #     # Remove CREATE ROLE for langflow (role already exists in GA Postgres)
-      #     sed -i '/^CREATE ROLE langflow;/d' full_cluster.sql
-
-      #     ADMIN_CONN="psql -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }} -d postgres"
-
-      #     DBS=$($ADMIN_CONN -At -c "
-      #       SELECT datname
-      #       FROM pg_database
-      #       WHERE datname NOT IN ('postgres', 'template0', 'template1');
-      #     ")
-
-      #     for db in $DBS; do
-      #       echo "Dropping database: $db"
-      #       $ADMIN_CONN -c "
-      #         SELECT pg_terminate_backend(pid)
-      #         FROM pg_stat_activity
-      #         WHERE datname = '$db'
-      #           AND pid <> pg_backend_pid();
-      #       "
-      #       $ADMIN_CONN -c "DROP DATABASE IF EXISTS \"$db\";"
-      #     done
-      #   env:
-      #     PGPASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}     
-
       - name: List all databases after restore
         run: |
           echo "====== DATABASE LIST ======"
@@ -527,10 +499,14 @@ jobs:
     runs-on: ubuntu-latest
     needs: apply-migrations-in-GA-Postgres
     if: needs.apply-migrations-in-GA-Postgres.outputs.upgrade_status == 'success'
-    environment:
-      name: db-approval
+
     steps:
-      - run: echo "Waiting for manual approval to continue."
+      - name: Await manual approval
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ secrets.GITHUB_TOKEN }}
+          approvers: ${{ github.actor }}
+          minimum-approvals: 1
 
   apply-migrations-in-VM-Postgres:
     runs-on: ubuntu-latest
