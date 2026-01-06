@@ -423,8 +423,6 @@ jobs:
             $GITHUB_WORKSPACE/full_cluster.sql      
 
       - name: Prepare dump for restore (clean all non-system DBs)
-        env:
-          PGPASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}      
         run: |
           set -euo pipefail
 
@@ -449,6 +447,8 @@ jobs:
             "
             $ADMIN_CONN -c "DROP DATABASE IF EXISTS \"$db\";"
           done
+        env:
+          PGPASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}     
 
       - name: List all databases after restore
         run: |
