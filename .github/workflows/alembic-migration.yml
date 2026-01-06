@@ -534,6 +534,7 @@ jobs:
           host: ${{ env.TARGET_HOST }}
           username: root
           password: ${{ env.TARGET_VM_PASSWORD }}
+          envs: TARGET_PG_USER,TARGET_APP_DB,ENV_LABEL
           script: |
             set -e
             rm -f /tmp/migration_error.txt /tmp/migration_success.txt
