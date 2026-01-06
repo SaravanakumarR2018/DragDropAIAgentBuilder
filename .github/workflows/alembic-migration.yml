@@ -422,33 +422,33 @@ jobs:
             root@${VM_HOST}:/home/full_cluster.sql \
             $GITHUB_WORKSPACE/full_cluster.sql      
 
-      - name: Prepare dump for restore (clean all non-system DBs)
-        run: |
-          set -euo pipefail
+      # - name: Prepare dump for restore (clean all non-system DBs)
+      #   run: |
+      #     set -euo pipefail
 
-          # Remove CREATE ROLE for langflow (role already exists in GA Postgres)
-          sed -i '/^CREATE ROLE langflow;/d' full_cluster.sql
+      #     # Remove CREATE ROLE for langflow (role already exists in GA Postgres)
+      #     sed -i '/^CREATE ROLE langflow;/d' full_cluster.sql
 
-          ADMIN_CONN="psql -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }} -d postgres"
+      #     ADMIN_CONN="psql -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }} -d postgres"
 
-          DBS=$($ADMIN_CONN -At -c "
-            SELECT datname
-            FROM pg_database
-            WHERE datname NOT IN ('postgres', 'template0', 'template1');
-          ")
+      #     DBS=$($ADMIN_CONN -At -c "
+      #       SELECT datname
+      #       FROM pg_database
+      #       WHERE datname NOT IN ('postgres', 'template0', 'template1');
+      #     ")
 
-          for db in $DBS; do
-            echo "Dropping database: $db"
-            $ADMIN_CONN -c "
-              SELECT pg_terminate_backend(pid)
-              FROM pg_stat_activity
-              WHERE datname = '$db'
-                AND pid <> pg_backend_pid();
-            "
-            $ADMIN_CONN -c "DROP DATABASE IF EXISTS \"$db\";"
-          done
-        env:
-          PGPASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}     
+      #     for db in $DBS; do
+      #       echo "Dropping database: $db"
+      #       $ADMIN_CONN -c "
+      #         SELECT pg_terminate_backend(pid)
+      #         FROM pg_stat_activity
+      #         WHERE datname = '$db'
+      #           AND pid <> pg_backend_pid();
+      #       "
+      #       $ADMIN_CONN -c "DROP DATABASE IF EXISTS \"$db\";"
+      #     done
+      #   env:
+      #     PGPASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}     
 
       - name: List all databases after restore
         run: |
@@ -467,6 +467,18 @@ jobs:
           psql -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }} -d postgres -f full_cluster.sql
         env:
           PGPASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}
+
+      - name: List all databases after restore
+        run: |
+          echo "====== DATABASE LIST ======"
+          psql \
+            -h ${{ env.GA_POSTGRES_HOST }} \
+            -p ${{ env.GA_POSTGRES_PORT }} \
+            -U ${{ env.GA_POSTGRES_PGUSER }} \
+            -c "\l"
+          echo "==========================="
+        env:
+          PGPASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}       
 
       - name: If env is staging - Apply upgrade.sql to app DB and org DBs
         if: ${{ github.event.inputs.environment == 'staging' && hashFiles('alembic_sql/upgrade.sql') != '' }}
