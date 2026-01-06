@@ -3,6 +3,7 @@ import { IS_CLERK_AUTH, useLogout } from "@/clerk/auth";
 import { LogOut, Users, Settings, User } from "lucide-react";
 import { AccountMenu } from "@/components/core/appHeaderComponent/components/AccountMenu";
 import { cn } from "@/utils/utils";
+import useAuthStore from "@/stores/authStore";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -17,6 +18,7 @@ export function ClerkAccountMenu() {
   const { openUserProfile, openOrganizationProfile } = useClerk();
   const { user } = useUser();
   const [menuOpen, setMenuOpen] = useState(false);
+  const isAdmin = useAuthStore((state) => state.isAdmin);
 
   const handleLogout = () => {
     mutationLogout();
@@ -72,6 +74,14 @@ export function ClerkAccountMenu() {
 
         {/* Menu Items */}
         <div className="pt-2 text-sm">
+          {isAdmin ? (
+            <div className="mx-4 mb-2 flex items-center justify-between rounded-md border border-border/40 bg-muted px-3 py-2 text-xs font-medium text-foreground">
+              <span>You are an Admin</span>
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-primary">
+                Admin
+              </span>
+            </div>
+          ) : null}
           {/* Manage Account */}
           <DropdownMenuItem
             onClick={handleOpenUserProfile}
@@ -88,6 +98,19 @@ export function ClerkAccountMenu() {
           >
             <Users className="h-4 w-4" />
             Members
+          </DropdownMenuItem>
+
+          {/* Admin */}
+          <DropdownMenuItem
+            asChild
+            className="flex items-center gap-3 px-5 py-3 rounded-lg hover:bg-muted/30 transition"
+          >
+            <a href="/admin" className="flex items-center gap-3">
+              <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold uppercase text-primary">
+                A
+              </span>
+              Admin
+            </a>
           </DropdownMenuItem>
 
           {/* Settings */}

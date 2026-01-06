@@ -60,6 +60,14 @@ export const AccountMenu = () => {
       <HeaderMenuItems position="right" classNameSize="w-[272px]">
         <div className="divide-y divide-foreground/10">
           <div>
+            {isAdmin && !autoLogin && (
+              <div className="flex items-center justify-between rounded-md border border-border/40 bg-muted px-4 py-2 text-xs font-medium text-foreground">
+                <span>You are an Admin</span>
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-primary">
+                  Admin
+                </span>
+              </div>
+            )}
             <div className="h-[44px] items-center px-4 pt-3">
               <div className="flex items-center justify-between">
                 <span

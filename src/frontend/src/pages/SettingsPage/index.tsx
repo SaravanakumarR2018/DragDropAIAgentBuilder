@@ -107,6 +107,7 @@ const SettingsPageBase = ({
 const SettingsPageWithClerk = () => {
   const { openUserProfile, openOrganizationProfile } = useClerk();
   const { organization, isLoaded: isOrganizationLoaded } = useOrganization();
+  const isAdmin = useAuthStore((state) => state.isAdmin);
 
   const canManageMembers = Boolean(
     isOrganizationLoaded && organization?.id && openOrganizationProfile,
@@ -144,6 +145,20 @@ const SettingsPageWithClerk = () => {
       onClick: handleManageMembers,
       disabled: !canManageMembers,
     },
+    ...(isAdmin
+      ? [
+          {
+            title: "Admin",
+            href: "/admin",
+            icon: (
+              <ForwardedIconComponent
+                name="Shield"
+                className="w-4 flex-shrink-0 justify-start stroke-[1.5]"
+              />
+            ),
+          } satisfies SidebarNavItem,
+        ]
+      : []),
     {
       title: "Debugging",
       href: "/settings/debugging",
@@ -161,6 +176,26 @@ const SettingsPageWithClerk = () => {
 };
 
 const SettingsPageWithoutClerk = () => <SettingsPageBase />;
+const SettingsPageWithoutClerk = () => {
+  const isAdmin = useAuthStore((state) => state.isAdmin);
+
+  const additionalNavItems: SidebarNavItem[] = isAdmin
+    ? [
+        {
+          title: "Admin",
+          href: "/admin",
+          icon: (
+            <ForwardedIconComponent
+              name="Shield"
+              className="w-4 flex-shrink-0 justify-start stroke-[1.5]"
+            />
+          ),
+        },
+      ]
+    : [];
+
+  return <SettingsPageBase additionalNavItems={additionalNavItems} />;
+};
 
 export default function SettingsPage(): JSX.Element {
   if (IS_CLERK_AUTH) {

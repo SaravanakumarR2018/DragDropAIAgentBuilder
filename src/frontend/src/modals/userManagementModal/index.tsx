@@ -33,6 +33,14 @@ export default function UserManagementModal({
   const [confirmPassword, setConfirmPassword] = useState(data?.password ?? "");
   const [isActive, setIsActive] = useState(data?.is_active ?? false);
   const [isSuperUser, setIsSuperUser] = useState(data?.is_superuser ?? false);
+  const [trialDate, setTrialDate] = useState<string>(
+    data?.optins?.trial_access_until
+      ? data.optins.trial_access_until.split("T")[0]
+      : "",
+  );
+  const [skipTrial, setSkipTrial] = useState<boolean>(
+    Boolean(data?.optins?.skip_trial_access),
+  );
   const [inputState, setInputState] = useState<UserInputType>(CONTROL_NEW_USER);
   const { userData } = useContext(AuthContext);
 
@@ -50,6 +58,12 @@ export default function UserManagementModal({
         setUserName(data.username);
         setIsActive(data.is_active);
         setIsSuperUser(data.is_superuser);
+        setTrialDate(
+          data.optins?.trial_access_until
+            ? data.optins.trial_access_until.split("T")[0]
+            : "",
+        );
+        setSkipTrial(Boolean(data.optins?.skip_trial_access));
 
         handleInput({ target: { name: "username", value: username } });
         handleInput({ target: { name: "is_active", value: isActive } });
@@ -64,6 +78,8 @@ export default function UserManagementModal({
     setConfirmPassword("");
     setIsActive(false);
     setIsSuperUser(false);
+    setTrialDate("");
+    setSkipTrial(false);
   }
 
   return (
@@ -85,7 +101,21 @@ export default function UserManagementModal({
               return;
             }
             resetForm();
-            onConfirm(1, inputState);
+            const trialAccess = trialDate
+              ? new Date(trialDate).toISOString()
+              : undefined;
+            onConfirm(1, {
+              ...inputState,
+              username,
+              password,
+              is_active: isActive,
+              is_superuser: isSuperUser,
+              optins: {
+                ...(data?.optins ?? {}),
+                ...(trialAccess ? { trial_access_until: trialAccess } : {}),
+                skip_trial_access: skipTrial,
+              },
+            });
             setOpen(false);
             event.preventDefault();
           }}
@@ -278,6 +308,44 @@ export default function UserManagementModal({
                 </Form.Field>
               )}
             </div>
+
+            <div className="grid gap-2">
+              <Form.Field name="trial_end_date">
+                <Form.Label className="data-[invalid]:label-invalid">
+                  Trial end date
+                </Form.Label>
+                <Form.Control asChild>
+                  <input
+                    type="date"
+                    value={trialDate}
+                    className="primary-input"
+                    onChange={(event) => setTrialDate(event.target.value)}
+                  />
+                </Form.Control>
+              </Form.Field>
+              <Form.Field name="skip_trial_access">
+                <div className="flex items-center gap-2">
+                  <Form.Control asChild>
+                    <Checkbox
+                      checked={skipTrial}
+                      id="skip_trial_access"
+                      className="relative top-0.5"
+                      onCheckedChange={(value) => {
+                        setSkipTrial(Boolean(value));
+                      }}
+                    />
+                  </Form.Control>
+                  <Form.Label className="data-[invalid]:label-invalid">
+                    Skip trial for this user
+                  </Form.Label>
+                </div>
+              </Form.Field>
+              {data?.optins?.trial_access_until ? (
+                <p className="text-xs text-muted-foreground">
+                  Stored value: {data.optins.trial_access_until}
+                </p>
+              ) : null}
+            </div>
           </div>
 
           <div className="float-right">
@@ -292,7 +360,9 @@ export default function UserManagementModal({
             </Button>
 
             <Form.Submit asChild>
-              <Button className="mt-8">{confirmationText}</Button>
+              <Button className="mt-8" type="submit">
+                {confirmationText}
+              </Button>
             </Form.Submit>
           </div>
         </Form.Root>
