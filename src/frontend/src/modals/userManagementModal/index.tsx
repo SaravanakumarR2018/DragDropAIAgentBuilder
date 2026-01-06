@@ -338,11 +338,11 @@ export default function UserManagementModal({
               )}
             </div>
             <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-2">
-                <Form.Label className="data-[invalid]:label-invalid">
+              <div className="flex flex-col gap-3">
+                <span className="text-sm font-medium text-foreground">
                   Trial Access
-                </Form.Label>
-                <div className="flex gap-4">
+                </span>
+                <div className="flex gap-6">
                   <Form.Field name="skip_trial_access">
                     <div className="flex items-center gap-2">
                       <Checkbox
