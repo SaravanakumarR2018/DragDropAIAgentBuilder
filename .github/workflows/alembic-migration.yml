@@ -413,6 +413,15 @@ jobs:
 
             ls -lh full_cluster.sql
 
+      - name: Copy cluster dump from VM
+        env:
+          VM_PASSWORD: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
+          VM_HOST: ${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
+        run: |
+          sshpass -p "$VM_PASSWORD" scp -o StrictHostKeyChecking=no \
+            root@${VM_HOST}:/home/full_cluster.sql \
+            $GITHUB_WORKSPACE/full_cluster.sql      
+
       - name: Prepare dump for restore (clean all non-system DBs)
         env:
           PGPASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}      
