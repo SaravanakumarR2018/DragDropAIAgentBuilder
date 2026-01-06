@@ -388,14 +388,14 @@ jobs:
           host: ${{ env.STAGING_HOST }}
           username: root
           password: ${{ secrets.VM_PASSWORD }}
-        script: |
-          cd /home
-          docker exec postgres pg_dumpall \
-            -U ${{ secrets.POSTGRES_USER }} \
-            --no-owner --no-acl \
-            > full_cluster.sql
+          script: |
+            cd /home
+            docker exec postgres pg_dumpall \
+              -U ${{ secrets.POSTGRES_USER }} \
+              --no-owner --no-acl \
+              > full_cluster.sql
 
-          ls -lh full_cluster.sql
+            ls -lh full_cluster.sql
 
       - name: If env is prod - Dump FULL PostgreSQL cluster on Prod VM
         if: ${{ github.event.inputs.environment == 'prod' }}
