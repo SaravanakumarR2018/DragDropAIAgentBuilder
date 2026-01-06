@@ -492,8 +492,8 @@ jobs:
 
   manual-approval:
     runs-on: ubuntu-latest
-    needs: vm-db-restore-and-upgrade
-    if: needs.vm-db-restore-and-upgrade.outputs.upgrade_status == 'success'
+    needs: apply-migrations-in-GA-Postgres
+    if: needs.apply-migrations-in-GA-Postgres.outputs.upgrade_status == 'success'
     environment:
       name: db-approval
     steps:
