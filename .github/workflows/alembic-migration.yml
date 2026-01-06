@@ -422,33 +422,9 @@ jobs:
             root@${VM_HOST}:/home/full_cluster.sql \
             $GITHUB_WORKSPACE/full_cluster.sql      
 
-      - name: List all databases after restore
-        run: |
-          echo "====== DATABASE LIST ======"
-          psql \
-            -h ${{ env.GA_POSTGRES_HOST }} \
-            -p ${{ env.GA_POSTGRES_PORT }} \
-            -U ${{ env.GA_POSTGRES_PGUSER }} \
-            -c "\l"
-          echo "==========================="
-        env:
-          PGPASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}    
-
       - name: Restore FULL cluster into GA PostgreSQL
         run: |
           psql -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }} -d postgres -f full_cluster.sql
-        env:
-          PGPASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}
-
-      - name: List all databases after restore
-        run: |
-          echo "====== DATABASE LIST ======"
-          psql \
-            -h ${{ env.GA_POSTGRES_HOST }} \
-            -p ${{ env.GA_POSTGRES_PORT }} \
-            -U ${{ env.GA_POSTGRES_PGUSER }} \
-            -c "\l"
-          echo "==========================="
         env:
           PGPASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}       
 
