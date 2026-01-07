@@ -23,6 +23,7 @@ export const URLs = {
   VARIABLES: `variables`,
   VALIDATE: `validate`,
   CONFIG: `config`,
+  BILLING: `billing`,
   STARTER_PROJECTS: `starter-projects`,
   SIDEBAR_CATEGORIES: `sidebar_categories`,
   ALL: `all`,
