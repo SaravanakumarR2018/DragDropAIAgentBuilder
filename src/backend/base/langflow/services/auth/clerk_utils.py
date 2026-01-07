@@ -139,12 +139,12 @@ async def _apply_dummy_user_optins(
 
     skip_trial_access = dummy_optins.get("skip_trial_access", False)
     trial_access_days = dummy_optins.get("trial_access_days", 7)
-    trial_access_until = datetime.now(timezone.utc) + timedelta(days=trial_access_days)
+    trial_access_until = (datetime.now(timezone.utc) + timedelta(days=trial_access_days)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     new_user.optins = {
         **(new_user.optins or {}),
         "skip_trial_access": skip_trial_access,
-        "trial_access_until": trial_access_until.isoformat(),
+        "trial_access_until": trial_access_until,
     }
 
 

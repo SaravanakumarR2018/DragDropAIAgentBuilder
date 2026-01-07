@@ -4,7 +4,10 @@ import { useContext, useEffect, useState } from "react";
 import IconComponent from "@/components/common/genericIconComponent";
 import { Button } from "../../components/ui/button";
 import { Checkbox } from "../../components/ui/checkbox";
-import { CONTROL_NEW_USER } from "../../constants/constants";
+import {
+  CONTROL_NEW_USER,
+  DEFAULT_TRIAL_ACCESS_UNTIL,
+} from "../../constants/constants";
 import { AuthContext } from "../../contexts/authContext";
 import type {
   inputHandlerEventType,
@@ -12,6 +15,26 @@ import type {
   UserManagementType,
 } from "../../types/components";
 import BaseModal from "../baseModal";
+
+function isoToLocalDatetime(iso?: string | null) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  const mm = pad(d.getMonth() + 1);
+  const dd = pad(d.getDate());
+  const hh = pad(d.getHours());
+  const min = pad(d.getMinutes());
+  return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+}
+
+function localDatetimeToISO(localValue: string) {
+  if (!localValue) return "";
+  const d = new Date(localValue);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString();
+}
 
 export default function UserManagementModal({
   title,
@@ -33,6 +56,15 @@ export default function UserManagementModal({
   const [confirmPassword, setConfirmPassword] = useState(data?.password ?? "");
   const [isActive, setIsActive] = useState(data?.is_active ?? false);
   const [isSuperUser, setIsSuperUser] = useState(data?.is_superuser ?? false);
+  const [skipTrialAccess, setSkipTrialAccess] = useState(
+    data?.optins?.skip_trial_access ?? false,
+  );
+  const [trialAccessUntil, setTrialAccessUntil] = useState(
+    data?.optins?.trial_access_until ?? DEFAULT_TRIAL_ACCESS_UNTIL,
+  );
+  const [trialAccessDays, setTrialAccessDays] = useState<string>(
+    data?.optins?.trial_access_days?.toString() ?? "",
+  );
   const [inputState, setInputState] = useState<UserInputType>(CONTROL_NEW_USER);
   const { userData } = useContext(AuthContext);
 
@@ -47,16 +79,40 @@ export default function UserManagementModal({
       if (!data) {
         resetForm();
       } else {
+        const trialAccessSettings = {
+          skip_trial_access: data.optins?.skip_trial_access ?? false,
+          trial_access_until:
+            data.optins?.trial_access_until ?? DEFAULT_TRIAL_ACCESS_UNTIL,
+          trial_access_days: data.optins?.trial_access_days ?? "",
+        };
+
         setUserName(data.username);
         setIsActive(data.is_active);
         setIsSuperUser(data.is_superuser);
+        setSkipTrialAccess(trialAccessSettings.skip_trial_access);
+        setTrialAccessUntil(trialAccessSettings.trial_access_until);
+        setTrialAccessDays(
+          trialAccessSettings.trial_access_days !== undefined
+            ? String(trialAccessSettings.trial_access_days)
+            : "",
+        );
+        setPassword("");
+        setConfirmPassword("");
 
-        handleInput({ target: { name: "username", value: username } });
-        handleInput({ target: { name: "is_active", value: isActive } });
-        handleInput({ target: { name: "is_superuser", value: isSuperUser } });
+        setInputState((prev) => ({
+          ...prev,
+          username: data.username,
+          password: "",
+          is_active: data.is_active,
+          is_superuser: data.is_superuser,
+          optins: {
+            ...(data.optins ?? {}),
+            ...trialAccessSettings,
+          },
+        }));
       }
     }
-  }, [open]);
+  }, [open, data]);
 
   function resetForm() {
     setPassword("");
@@ -64,6 +120,24 @@ export default function UserManagementModal({
     setConfirmPassword("");
     setIsActive(false);
     setIsSuperUser(false);
+    setSkipTrialAccess(false);
+    setTrialAccessUntil(DEFAULT_TRIAL_ACCESS_UNTIL);
+    setTrialAccessDays("");
+    setInputState(CONTROL_NEW_USER);
+  }
+
+  function handleOptinsUpdate(newOptins: {
+    skip_trial_access?: boolean;
+    trial_access_until?: string;
+    trial_access_days?: number | string;
+  }) {
+    setInputState((prev) => ({
+      ...prev,
+      optins: {
+        ...(prev.optins ?? {}),
+        ...newOptins,
+      },
+    }));
   }
 
   return (
@@ -84,8 +158,22 @@ export default function UserManagementModal({
               event.preventDefault();
               return;
             }
+            const userPayload: UserInputType = {
+              ...inputState,
+              username,
+              password,
+              is_active: isActive,
+              is_superuser: isSuperUser,
+              optins: {
+                ...(inputState.optins ?? {}),
+                skip_trial_access: skipTrialAccess,
+                trial_access_until: trialAccessUntil,
+                trial_access_days:
+                  trialAccessDays === "" ? undefined : Number(trialAccessDays),
+              },
+            };
             resetForm();
-            onConfirm(1, inputState);
+            onConfirm(1, userPayload);
             setOpen(false);
             event.preventDefault();
           }}
@@ -247,8 +335,11 @@ export default function UserManagementModal({
                       id="is_active"
                       className="relative top-0.5"
                       onCheckedChange={(value) => {
-                        handleInput({ target: { name: "is_active", value } });
-                        setIsActive(value);
+                        const checked = value === true;
+                        handleInput({
+                          target: { name: "is_active", value: checked },
+                        });
+                        setIsActive(checked);
                       }}
                     />
                   </Form.Control>
@@ -267,16 +358,89 @@ export default function UserManagementModal({
                         id="is_superuser"
                         className="relative top-0.5"
                         onCheckedChange={(value) => {
+                          const checked = value === true;
                           handleInput({
-                            target: { name: "is_superuser", value },
+                            target: { name: "is_superuser", value: checked },
                           });
-                          setIsSuperUser(value);
+                          setIsSuperUser(checked);
                         }}
                       />
                     </Form.Control>
                   </div>
                 </Form.Field>
               )}
+            </div>
+            <div className="flex flex-col gap-2">
+              <div>
+                <span className="text-sm font-medium text-foreground">
+                  Trial Access
+                </span>
+              </div>
+
+              <div className="flex flex-row gap-6 items-end">
+                <Form.Field name="skip_trial_access">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={skipTrialAccess}
+                      id="skip_trial_access"
+                      className="relative top-0.5"
+                      onCheckedChange={(value) => {
+                        const checked = value === true;
+                        setSkipTrialAccess(checked);
+                        handleOptinsUpdate({ skip_trial_access: checked });
+                      }}
+                    />
+                    <Form.Label
+                      className="data-[invalid]:label-invalid"
+                      htmlFor="skip_trial_access"
+                    >
+                      Skip Trial Access
+                    </Form.Label>
+                  </div>
+                </Form.Field>
+
+                <Form.Field name="trial_access_until">
+                  <div className="flex flex-col">
+                    <Form.Label className="data-[invalid]:label-invalid">
+                      Trial Access Until
+                    </Form.Label>
+                    <Form.Control asChild>
+                      <input
+                        type="datetime-local"
+                        className="primary-input w-56"
+                        value={isoToLocalDatetime(trialAccessUntil)}
+                        onChange={({ target: { value } }) => {
+                          const iso = localDatetimeToISO(value);
+                          setTrialAccessUntil(iso);
+                          handleOptinsUpdate({ trial_access_until: iso });
+                        }}
+                      />
+                    </Form.Control>
+                  </div>
+                </Form.Field>
+
+                <Form.Field name="trial_access_days">
+                  <div className="flex flex-col">
+                    <Form.Label className="data-[invalid]:label-invalid">
+                      Trial Access Days
+                    </Form.Label>
+                    <Form.Control asChild>
+                      <input
+                        type="number"
+                        min={0}
+                        className="primary-input w-32"
+                        value={trialAccessDays}
+                        onChange={({ target: { value } }) => {
+                          // store as string locally; only convert when submitting
+                          setTrialAccessDays(value);
+                          const numeric = value === "" ? undefined : Number(value);
+                          handleOptinsUpdate({ trial_access_days: numeric });
+                        }}
+                      />
+                    </Form.Control>
+                  </div>
+                </Form.Field>
+              </div>
             </div>
           </div>
 

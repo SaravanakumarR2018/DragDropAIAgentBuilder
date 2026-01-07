@@ -166,6 +166,9 @@ export type changeUser = {
     discord_clicked?: boolean;
     dialog_dismissed?: boolean;
     mcp_dialog_dismissed?: boolean;
+    skip_trial_access?: boolean;
+    trial_access_until?: string;
+    trial_access_days?: number;
   };
 };
 
@@ -187,6 +190,9 @@ export type Users = {
     discord_clicked?: boolean;
     dialog_dismissed?: boolean;
     mcp_dialog_dismissed?: boolean;
+    skip_trial_access?: boolean;
+    trial_access_until?: string;
+    trial_access_days?: number;
   };
 };
 
