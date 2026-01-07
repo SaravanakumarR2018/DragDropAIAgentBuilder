@@ -875,6 +875,11 @@ ensure_ebs_volume
 # 1) Stop active (frees CPU/RAM/port)
 stop_active_container
 prepare_langflow_env
+if [[ -n "${CONTAINER_ENV_FILE}" ]]; then
+  if [[ -f "deploy/apply-stripe-env.sh" && -f "deploy/ebs-common-staging-prod.yml" ]]; then
+    deploy/apply-stripe-env.sh "deploy/ebs-common-staging-prod.yml" "${CONTAINER_ENV_FILE}" "${ENVIRONMENT}"
+  fi
+fi
 ensure_postgres
 
 # 2) Start target and health-check while site is temporarily down
