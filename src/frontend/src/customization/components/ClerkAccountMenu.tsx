@@ -12,6 +12,7 @@ import {
 import { useContext, useState } from "react";
 import ThemeButtons from "@/components/core/appHeaderComponent/components/ThemeButtons";
 import { AuthContext } from "@/contexts/authContext";
+import { useCustomNavigate } from "@/customization/hooks/use-custom-navigate";
 
 export function ClerkAccountMenu() {
   const { mutate: mutationLogout } = useLogout();
@@ -19,6 +20,7 @@ export function ClerkAccountMenu() {
   const { user } = useUser();
   const { userData } = useContext(AuthContext);
   const [menuOpen, setMenuOpen] = useState(false);
+  const navigate = useCustomNavigate();
 
   const handleLogout = () => {
     mutationLogout();
@@ -102,26 +104,22 @@ export function ClerkAccountMenu() {
 
           {/* Admin Page */}
           {userData?.is_superuser && (
-            <DropdownMenuItem asChild>
-              <a
-                href="/admin"
-                className="flex items-center gap-3 px-5 py-3 rounded-lg hover:bg-muted/30 transition"
-              >
-                <Shield className="h-4 w-4" />
-                Admin Page
-              </a>
+            <DropdownMenuItem
+              onClick={() => navigate("/admin")}
+              className="flex items-center gap-3 px-5 py-3 rounded-lg hover:bg-muted/30 transition"
+            >
+              <Shield className="h-4 w-4" />
+              Admin Page
             </DropdownMenuItem>
           )}
 
           {/* Settings */}
-          <DropdownMenuItem asChild>
-            <a
-              href="/settings"
-              className="flex items-center gap-3 px-5 py-3 rounded-lg hover:bg-muted/30 transition"
-            >
-              <Settings className="h-4 w-4" />
-              Settings
-            </a>
+          <DropdownMenuItem
+            onClick={() => navigate("/settings")}
+            className="flex items-center gap-3 px-5 py-3 rounded-lg hover:bg-muted/30 transition"
+          >
+            <Settings className="h-4 w-4" />
+            Settings
           </DropdownMenuItem>
 
           {/* Theme */}
