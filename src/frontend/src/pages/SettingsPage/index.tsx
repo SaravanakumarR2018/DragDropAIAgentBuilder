@@ -1,4 +1,5 @@
 import { Outlet, type To } from "react-router-dom";
+import { useContext } from "react";
 import type { ReactNode } from "react";
 import SideBarButtonsComponent, { type SidebarNavItem } from "@/components/core/sidebarComponent";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -14,6 +15,7 @@ import ForwardedIconComponent from "../../components/common/genericIconComponent
 import PageLayout from "../../components/common/pageLayout";
 import { useClerk, useOrganization } from "@clerk/clerk-react";
 import { IS_CLERK_AUTH } from "@/clerk/auth";
+import { AuthContext } from "@/contexts/authContext";
 
 type SettingsPageBaseProps = {
   headerActions?: ReactNode;
@@ -112,6 +114,9 @@ const SettingsPageWithClerk = () => {
     isOrganizationLoaded && organization?.id && openOrganizationProfile,
   );
 
+  const { userData } = useContext(AuthContext);
+  const isSuperUser = Boolean(userData?.is_superuser);
+
   const handleManageAccount = () => {
     openUserProfile?.();
   };
@@ -144,17 +149,32 @@ const SettingsPageWithClerk = () => {
       onClick: handleManageMembers,
       disabled: !canManageMembers,
     },
-    {
-      title: "Debugging",
-      href: "/settings/debugging",
+  ];
+
+  if (isSuperUser) {
+    clerkNavItems.push({
+      title: "Admin Page",
+      href: "/admin",
       icon: (
         <ForwardedIconComponent
-          name="Bug"
+          name="Shield"
           className="w-4 flex-shrink-0 justify-start stroke-[1.5]"
         />
       ),
-    },
-  ];
+    });
+  }
+
+  // Debugging goes after Members / Admin (if present)
+  clerkNavItems.push({
+    title: "Debugging",
+    href: "/settings/debugging",
+    icon: (
+      <ForwardedIconComponent
+        name="Bug"
+        className="w-4 flex-shrink-0 justify-start stroke-[1.5]"
+      />
+    ),
+  });
 
   // Pass Clerk items so they show at the bottom
   return <SettingsPageBase additionalNavItems={clerkNavItems} />;

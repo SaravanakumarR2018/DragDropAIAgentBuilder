@@ -159,13 +159,14 @@ export function ClerkAuthAdapter() {
   const { getToken, isSignedIn } = useAuth();
   const { user } = useUser();
   const clerk = useClerk();
-  const { login } = useContext(AuthContext);
+  const { getUser, login, userData } = useContext(AuthContext);
   const cookie = new Cookies();
   const navigate = useNavigate();
   const location = useLocation();
   const { organization, isLoaded: isOrgLoaded } = useOrganization();
   const prevTokenRef = useRef<string | null>(null);
   const autoJoinAttemptedRef = useRef(false);
+  const hasRequestedUserRef = useRef(false);
 
   const isOrgSelected = useIsOrgSelected();
   const currentPath = location.pathname;
@@ -347,6 +348,22 @@ export function ClerkAuthAdapter() {
     navigate,
   ]);
 
+  useEffect(() => {
+    if (!IS_CLERK_AUTH) {
+      return;
+    }
+
+    if (!isSignedIn || !isOrgSelected) {
+      return;
+    }
+
+    if (userData || hasRequestedUserRef.current) {
+      return;
+    }
+
+    hasRequestedUserRef.current = true;
+    getUser();
+  }, [getUser, isOrgSelected, isSignedIn, userData]);
 
   // ✅ Clerk token listener: backend sync ONLY after org is selected
   useEffect(() => {
