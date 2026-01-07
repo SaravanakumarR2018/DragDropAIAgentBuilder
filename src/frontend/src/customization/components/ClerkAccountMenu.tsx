@@ -1,6 +1,6 @@
 import { UserButton, useClerk, useUser } from "@clerk/clerk-react";
 import { IS_CLERK_AUTH, useLogout } from "@/clerk/auth";
-import { LogOut, Users, Settings, User } from "lucide-react";
+import { LogOut, Users, Settings, User, Shield } from "lucide-react";
 import { AccountMenu } from "@/components/core/appHeaderComponent/components/AccountMenu";
 import { cn } from "@/utils/utils";
 import {
@@ -9,13 +9,15 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import { useState } from "react";
+import { useContext, useState } from "react";
 import ThemeButtons from "@/components/core/appHeaderComponent/components/ThemeButtons";
+import { AuthContext } from "@/contexts/authContext";
 
 export function ClerkAccountMenu() {
   const { mutate: mutationLogout } = useLogout();
   const { openUserProfile, openOrganizationProfile } = useClerk();
   const { user } = useUser();
+  const { userData } = useContext(AuthContext);
   const [menuOpen, setMenuOpen] = useState(false);
 
   const handleLogout = () => {
@@ -54,20 +56,28 @@ export function ClerkAccountMenu() {
         )}
       >
         {/* User Info */}
-        <div className="flex items-center gap-3 px-5 py-3 rounded-xl hover:bg-muted/20 transition">
-          <img
-            src={user?.imageUrl}
-            alt="avatar"
-            className="h-8 w-8 rounded-full border border-border/30"
-          />
-          <div className="flex flex-col">
-            <span className="text-[15px] font-semibold text-foreground">
-              {user?.fullName || user?.username || "User"}
-            </span>
-            <span className="text-xs text-muted-foreground truncate max-w-[200px]">
-              {user?.primaryEmailAddress?.emailAddress}
-            </span>
+        <div className="flex flex-col gap-3 px-5 py-3 rounded-xl hover:bg-muted/20 transition">
+          <div className="flex items-center gap-3">
+            <img
+              src={user?.imageUrl}
+              alt="avatar"
+              className="h-8 w-8 rounded-full border border-border/30"
+            />
+            <div className="flex flex-col flex-1">
+              <span className="text-[15px] font-semibold text-foreground">
+                {user?.fullName || user?.username || "User"}
+              </span>
+              <span className="text-xs text-muted-foreground truncate max-w-[200px]">
+                {user?.primaryEmailAddress?.emailAddress}
+              </span>
+            </div>
           </div>
+          {userData?.is_superuser && (
+            <div className="flex items-center gap-2 text-amber-600">
+              <Shield className="h-4 w-4" />
+              <span className="text-xs font-semibold">You are an admin</span>
+            </div>
+          )}
         </div>
 
         {/* Menu Items */}
@@ -89,6 +99,19 @@ export function ClerkAccountMenu() {
             <Users className="h-4 w-4" />
             Members
           </DropdownMenuItem>
+
+          {/* Admin Page */}
+          {userData?.is_superuser && (
+            <DropdownMenuItem asChild>
+              <a
+                href="/admin"
+                className="flex items-center gap-3 px-5 py-3 rounded-lg hover:bg-muted/30 transition"
+              >
+                <Shield className="h-4 w-4" />
+                Admin Page
+              </a>
+            </DropdownMenuItem>
+          )}
 
           {/* Settings */}
           <DropdownMenuItem asChild>
