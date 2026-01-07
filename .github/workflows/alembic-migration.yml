@@ -21,9 +21,9 @@ on:
         default: ""
 
 env:
-  GA_POSTGRES_PGUSER: langflow
-  GA_POSTGRES_PGPASSWORD: langflow
-  GA_POSTGRES_DB_NAME: langflow
+  GA_POSTGRES_PGUSER: galangflow
+  GA_POSTGRES_PGPASSWORD: galangflow
+  GA_POSTGRES_DB_NAME: galangflow
   GA_POSTGRES_HOST: localhost
   GA_POSTGRES_PORT: 5432
 
@@ -41,7 +41,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U langflow"
+          --health-cmd "pg_isready -U $POSTGRES_USER"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -294,3 +294,298 @@ jobs:
         with:
           name: alembic-sql-${{ github.run_id }}
           path: src/backend/base/langflow/alembic_sql/
+
+  apply-migrations-in-GA-Postgres:
+    runs-on: ubuntu-latest
+    needs:
+      - migration-flow
+    if: needs.migration-flow.result == 'success'
+
+    outputs:
+      upgrade_status: ${{ steps.upgrade_result.outputs.upgrade_status }}
+      upgrade_error: ${{ steps.upgrade_result.outputs.upgrade_error }}  
+
+    services:
+      postgres:
+        image: ${{ vars.POSTGRESQL_DOCKER_VERSION }}
+        env:
+          POSTGRES_USER: ${{ env.GA_POSTGRES_PGUSER }}
+          POSTGRES_PASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U $POSTGRES_USER"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout resolved commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.check-db-changes.outputs.commit_id }}
+
+      - name: Download SQL artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: alembic-sql-${{ github.run_id }}
+          path: alembic_sql  
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Wait for PostgreSQL
+        run: |
+          for i in {1..10}; do
+            if pg_isready -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }}; then
+              exit 0
+            fi
+            sleep 3
+          done
+          exit 1
+
+      - name: Resolve website domain dynamically
+        env:
+          ENVIRONMENT: ${{ github.event.inputs.environment }}
+        run: |
+          set -euo pipefail
+          ENV_FILE=".env-file"
+
+          if [ ! -f "$ENV_FILE" ]; then
+            echo "❌ $ENV_FILE not found"
+            exit 1
+          fi
+
+          BASE_DOMAIN=$(grep '^LANGFLOW_WEBSITE_DOMAIN=' "$ENV_FILE" | tail -n1 | cut -d'=' -f2-)
+
+          if [ -z "$BASE_DOMAIN" ]; then
+            echo "❌ LANGFLOW_WEBSITE_DOMAIN missing in $ENV_FILE"
+            exit 1
+          fi
+
+          STAGING_HOST="staging.${BASE_DOMAIN}"
+          PROD_HOST="${BASE_DOMAIN}"
+
+          if [ "$ENVIRONMENT" = "staging" ]; then
+            WEBSITE_DOMAIN="$STAGING_HOST"
+          else
+            WEBSITE_DOMAIN="$PROD_HOST"
+          fi
+
+          echo "WEBSITE_DOMAIN=$WEBSITE_DOMAIN" >> $GITHUB_ENV
+          echo "STAGING_HOST=$STAGING_HOST" >> $GITHUB_ENV
+          echo "PROD_HOST=$PROD_HOST" >> $GITHUB_ENV    
+
+      - name: Dump FULL PostgreSQL cluster on target VM
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          TARGET_HOST: ${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
+          TARGET_PASSWORD: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
+          TARGET_PG_USER: ${{ github.event.inputs.environment == 'staging' && secrets.POSTGRES_USER || secrets.PROD_POSTGRES_USER }}
+        with:
+          host: ${{ env.TARGET_HOST }}
+          username: root
+          password: ${{ env.TARGET_PASSWORD }}
+          script: |
+            cd /home
+            docker exec postgres pg_dumpall \
+              -U ${{ env.TARGET_PG_USER }} \
+              --no-owner --no-acl \
+              > full_cluster.sql
+
+            ls -lh full_cluster.sql
+
+      - name: Copy cluster dump from VM
+        env:
+          VM_PASSWORD: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
+          VM_HOST: ${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
+        run: |
+          sshpass -p "$VM_PASSWORD" scp -o StrictHostKeyChecking=no \
+            root@${VM_HOST}:/home/full_cluster.sql \
+            $GITHUB_WORKSPACE/full_cluster.sql      
+
+      - name: Restore FULL cluster into GA PostgreSQL
+        run: |
+          psql -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }} -d postgres -f full_cluster.sql
+        env:
+          PGPASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}       
+
+      - name: Apply upgrade.sql to app DB and org DBs
+        if: ${{ hashFiles('alembic_sql/upgrade.sql') != '' }}
+        env:
+          PGPASSWORD: ${{ env.GA_POSTGRES_PGPASSWORD }}
+          APP_DB_NAME: ${{ github.event.inputs.environment == 'staging' && secrets.POSTGRES_DB || secrets.PROD_POSTGRES_DB }}
+        run: |
+          set -e
+          rm -f /tmp/upgrade_error.txt /tmp/upgrade_success.txt
+
+          UPGRADE_SQL_PATH="alembic_sql/upgrade.sql"
+          ls -l "$UPGRADE_SQL_PATH"
+          DBS=$(psql -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }} -At \
+            -c "SELECT datname FROM pg_database WHERE datname='${APP_DB_NAME}' OR datname LIKE 'org_%';")
+
+          for db in $DBS; do
+            echo "Applying upgrade.sql to $db"
+            trap 'echo "Upgrade failed on database: '"$db"'" > /tmp/upgrade_error.txt' ERR
+            psql -h ${{ env.GA_POSTGRES_HOST }} -p ${{ env.GA_POSTGRES_PORT }} -U ${{ env.GA_POSTGRES_PGUSER }} -d "$db" --file="$UPGRADE_SQL_PATH"
+          done
+          echo "SUCCESS" > /tmp/upgrade_success.txt
+
+      - name: Set upgrade result
+        id: upgrade_result
+        if: always()
+        run: |
+          if [ -f /tmp/upgrade_error.txt ]; then
+            echo "upgrade_status=failure" >> $GITHUB_OUTPUT
+            echo "upgrade_error=$(cat /tmp/upgrade_error.txt)" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          if [ ! -f /tmp/upgrade_success.txt ]; then
+            echo "upgrade_status=failure" >> $GITHUB_OUTPUT
+            echo "upgrade_error=Upgrade status unknown (success marker missing)" >> $GITHUB_OUTPUT
+            exit 1
+          fi  
+
+          echo "upgrade_status=success" >> $GITHUB_OUTPUT   
+
+  manual-approval:
+    runs-on: ubuntu-latest
+    needs: apply-migrations-in-GA-Postgres
+    if: needs.apply-migrations-in-GA-Postgres.outputs.upgrade_status == 'success'
+
+    steps:
+      - name: Await manual approval
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ secrets.GITHUB_TOKEN }}
+          approvers: ${{ github.actor }}
+          minimum-approvals: 1
+
+  apply-migrations-in-VM-Postgres:
+    runs-on: ubuntu-latest
+    needs: manual-approval
+    if: needs.manual-approval.result == 'success'
+
+    steps:
+      - name: Checkout resolved commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.check-db-changes.outputs.commit_id }}
+      
+      - name: Download SQL artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: alembic-sql-${{ github.run_id }}
+          path: alembic_sql 
+
+      - name: Resolve website domain dynamically
+        env:
+          ENVIRONMENT: ${{ github.event.inputs.environment }}
+        run: |
+          set -euo pipefail
+          ENV_FILE=".env-file"
+
+          if [ ! -f "$ENV_FILE" ]; then
+            echo "❌ $ENV_FILE not found"
+            exit 1
+          fi
+
+          BASE_DOMAIN=$(grep '^LANGFLOW_WEBSITE_DOMAIN=' "$ENV_FILE" | tail -n1 | cut -d'=' -f2-)
+
+          if [ -z "$BASE_DOMAIN" ]; then
+            echo "❌ LANGFLOW_WEBSITE_DOMAIN missing in $ENV_FILE"
+            exit 1
+          fi
+
+          STAGING_HOST="staging.${BASE_DOMAIN}"
+          PROD_HOST="${BASE_DOMAIN}"
+
+          if [ "$ENVIRONMENT" = "staging" ]; then
+            WEBSITE_DOMAIN="$STAGING_HOST"
+          else
+            WEBSITE_DOMAIN="$PROD_HOST"
+          fi
+
+          echo "WEBSITE_DOMAIN=$WEBSITE_DOMAIN" >> $GITHUB_ENV
+          echo "STAGING_HOST=$STAGING_HOST" >> $GITHUB_ENV
+          echo "PROD_HOST=$PROD_HOST" >> $GITHUB_ENV        
+
+      - name: Copy upgrade.sql to VM
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
+          username: root
+          password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
+          source: "alembic_sql/upgrade.sql"
+          target: "/root/db-migrations/"
+
+      - name: Apply upgrade.sql on VM databases
+        uses: appleboy/ssh-action@v1.2.2
+        env:
+          TARGET_HOST: ${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
+          TARGET_VM_PASSWORD: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
+          TARGET_PG_USER: ${{ github.event.inputs.environment == 'staging' && secrets.POSTGRES_USER || secrets.PROD_POSTGRES_USER }}
+          TARGET_APP_DB: ${{ github.event.inputs.environment == 'staging' && secrets.POSTGRES_DB || secrets.PROD_POSTGRES_DB }}
+          ENV_LABEL: ${{ github.event.inputs.environment }}
+        with:
+          host: ${{ env.TARGET_HOST }}
+          username: root
+          password: ${{ env.TARGET_VM_PASSWORD }}
+          envs: TARGET_PG_USER,TARGET_APP_DB,ENV_LABEL
+          script: |
+            set -e
+            rm -f /tmp/migration_error.txt /tmp/migration_success.txt
+
+            SQL_FILE="/root/db-migrations/alembic_sql/upgrade.sql"
+
+            if [ ! -f "$SQL_FILE" ]; then
+              echo "upgrade.sql missing on VM" > /tmp/migration_error.txt
+             exit 1
+            fi
+
+            DBS=$(docker exec postgres psql -U "$TARGET_PG_USER" -At \
+              -c "SELECT datname FROM pg_database WHERE datname='${TARGET_APP_DB}' OR datname LIKE 'org_%';")
+
+            for db in $DBS; do
+              echo "Migrating database: $db"
+              trap 'echo "Migration failed on database: '"$db"'" > /tmp/migration_error.txt' ERR
+              docker exec -i postgres psql -U "$TARGET_PG_USER" -d "$db" \
+                < "$SQL_FILE"
+            done
+            echo "SUCCESS" > /tmp/migration_success.txt
+
+            echo "Migration completed on ${ENV_LABEL} VM"
+
+      - name: Collect migration result
+        if: always()
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ github.event.inputs.environment == 'staging' && env.STAGING_HOST || env.PROD_HOST }}
+          username: root
+          password: ${{ github.event.inputs.environment == 'staging' && secrets.VM_PASSWORD || secrets.PROD_VM_PASSWORD }}
+          script: |
+            if [ -f /tmp/migration_error.txt ]; then
+              echo "❌ MIGRATION FAILED"
+              cat /tmp/migration_error.txt
+              exit 1
+            fi
+
+            if [ ! -f /tmp/migration_success.txt ]; then
+              echo "❌ MIGRATION STATUS UNKNOWN (success marker missing)"
+              exit 1
+            fi
+
+            echo "✅ MIGRATION SUCCESS CONFIRMED"    
+
+      - name: Migration summary
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "✅ Migration Status: SUCCESS"
+          else
+            echo "❌ Migration Status: FAILURE"
+            echo "Reason: SQL execution failed, DB-level error, or upgrade.sql missing"
+          fi
