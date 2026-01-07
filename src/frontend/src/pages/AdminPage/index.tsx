@@ -327,15 +327,15 @@ export default function AdminPage() {
                     }
                   >
                     <TableRow>
-                      <TableHead className="h-10">Id</TableHead>
+                      <TableHead className="h-10 hidden lg:table-cell">Id</TableHead>
                       <TableHead className="h-10">Username</TableHead>
                       <TableHead className="h-10">Active</TableHead>
                       <TableHead className="h-10">Superuser</TableHead>
-                      <TableHead className="h-10">Created At</TableHead>
-                      <TableHead className="h-10">Updated At</TableHead>
-                      <TableHead className="h-10">Skip Trial Access</TableHead>
-                      <TableHead className="h-10">Trial Access Until</TableHead>
-                      <TableHead className="h-10">Trial Access Days</TableHead>
+                      <TableHead className="h-10 hidden lg:table-cell">Created At</TableHead>
+                      <TableHead className="h-10 hidden lg:table-cell">Updated At</TableHead>
+                      <TableHead className="h-10 hidden lg:table-cell">Skip Trial Access</TableHead>
+                      <TableHead className="h-10 hidden lg:table-cell">Trial Access Until</TableHead>
+                      <TableHead className="h-10 hidden lg:table-cell">Trial Access Days</TableHead>
                       <TableHead className="h-10 w-[100px] text-right"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -343,7 +343,7 @@ export default function AdminPage() {
                     <TableBody>
                       {filterUserList.map((user: UserInputType, index) => (
                         <TableRow key={index}>
-                          <TableCell className="truncate py-2 font-medium">
+                          <TableCell className="truncate py-2 font-medium hidden lg:table-cell">
                             <ShadTooltip content={user.id}>
                               <span className="cursor-default">{user.id}</span>
                             </ShadTooltip>
@@ -419,27 +419,27 @@ export default function AdminPage() {
                               </ConfirmationModal.Trigger>
                             </ConfirmationModal>
                           </TableCell>
-                          <TableCell className="truncate py-2">
+                          <TableCell className="truncate py-2 hidden lg:table-cell">
                             {
                               new Date(user.create_at!)
                                 .toISOString()
                                 .split("T")[0]
                             }
                           </TableCell>
-                          <TableCell className="truncate py-2">
+                          <TableCell className="truncate py-2 hidden lg:table-cell">
                             {
                               new Date(user.updated_at!)
                                 .toISOString()
                                 .split("T")[0]
                             }
                           </TableCell>
-                          <TableCell className="truncate py-2">
+                          <TableCell className="truncate py-2 hidden lg:table-cell">
                             {user.optins?.skip_trial_access ? "Yes" : "No"}
                           </TableCell>
-                          <TableCell className="truncate py-2">
+                          <TableCell className="truncate py-2 hidden lg:table-cell">
                             {user.optins?.trial_access_until || "—"}
                           </TableCell>
-                          <TableCell className="truncate py-2">
+                          <TableCell className="truncate py-2 hidden lg:table-cell">
                             {user.optins?.trial_access_days || "—"}
                           </TableCell>
                           <TableCell className="flex w-[100px] py-2 text-right">
