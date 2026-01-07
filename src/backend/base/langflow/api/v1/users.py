@@ -22,6 +22,7 @@ from langflow.services.deps import get_settings_service
 
 router = APIRouter(tags=["Users"], prefix="/users")
 
+SENSITIVE_OPTIN_KEYS = {"skip_trial_access", "trial_access_until", "trial_access_days"}
 
 @router.post("/", response_model=UserRead, status_code=201)
 async def add_user(
@@ -90,6 +91,12 @@ async def patch_user(
 
     if not user.is_superuser and user.id != user_id:
         raise HTTPException(status_code=403, detail="Permission denied")
+    
+    if user_update.optins and not user.is_superuser:
+        sensitive_updates = set(user_update.optins.keys()) & SENSITIVE_OPTIN_KEYS
+        if sensitive_updates:
+            raise HTTPException(status_code=403, detail="Permission denied")
+
     if update_password:
         if not user.is_superuser:
             raise HTTPException(status_code=400, detail="You can't change your password here")
