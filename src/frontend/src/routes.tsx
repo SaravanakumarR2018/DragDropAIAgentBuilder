@@ -8,6 +8,7 @@ import {
 import { ProtectedAdminRoute } from "./components/authorization/authAdminGuard";
 import { ProtectedRoute } from "./components/authorization/authGuard";
 import { ProtectedLoginRoute } from "./components/authorization/authLoginGuard";
+import TrialAccessGate from "./components/billing/TrialAccessGate";
 import ContextWrapper from "./contexts";
 import { CustomNavigate } from "./customization/components/custom-navigate";
 import { BASENAME } from "./customization/config-constants";
@@ -67,6 +68,7 @@ const MCPServersPage = lazy(
 const KnowledgePage = lazy(
   () => import("./pages/MainPage/pages/knowledgePage"),
 );
+const BillingPage = lazy(() => import("./pages/BillingPage"));
 const ViewPage = lazy(() => import("./pages/ViewPage"));
 const OrganizationPage = lazy(() => import("./clerk/OrganizationPage"));
 const LoginPage = lazy(() =>
@@ -189,7 +191,17 @@ const router = createBrowserRouter(
                   path="flows/"
                   element={
                     <Suspense fallback={<LoadingPage />}>
-                      <HomePage key="flows" type="flows" />
+                      <TrialAccessGate>
+                        <HomePage key="flows" type="flows" />
+                      </TrialAccessGate>
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="pricing"
+                  element={
+                    <Suspense fallback={<LoadingPage />}>
+                      <BillingPage />
                     </Suspense>
                   }
                 />
@@ -214,7 +226,9 @@ const router = createBrowserRouter(
                   path="all/"
                   element={
                     <Suspense fallback={<LoadingPage />}>
-                      <HomePage key="flows" type="flows" />
+                      <TrialAccessGate>
+                        <HomePage key="flows" type="flows" />
+                      </TrialAccessGate>
                     </Suspense>
                   }
                 >
@@ -222,7 +236,9 @@ const router = createBrowserRouter(
                     path="folder/:folderId"
                     element={
                       <Suspense fallback={<LoadingPage />}>
-                        <HomePage key="flows" type="flows" />
+                        <TrialAccessGate>
+                          <HomePage key="flows" type="flows" />
+                        </TrialAccessGate>
                       </Suspense>
                     }
                   />
