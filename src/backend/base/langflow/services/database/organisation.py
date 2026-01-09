@@ -297,6 +297,7 @@ class OrganizationService:
             is_superuser=False,
             optins={
                 **UserOptin().model_dump(),
+                "has_access": False,
                 "skip_trial_access": False,
                 "trial_access_days": 7,
             },

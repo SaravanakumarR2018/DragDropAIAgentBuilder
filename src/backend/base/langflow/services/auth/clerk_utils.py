@@ -12,6 +12,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.status import HTTP_401_UNAUTHORIZED
 
 from langflow.logging.logger import logger
+from langflow.services.billing.access_control import set_has_access_optin
 from langflow.services.database.constants import DUMMY_USER_NAMESPACE_TEMPLATE
 from langflow.services.database.models.user import User
 from langflow.services.database.models.user.crud import get_user_by_id
@@ -141,11 +142,13 @@ async def _apply_dummy_user_optins(
     trial_access_days = dummy_optins.get("trial_access_days", 7)
     trial_access_until = (datetime.now(timezone.utc) + timedelta(days=trial_access_days)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    new_user.optins = {
-        **(new_user.optins or {}),
-        "skip_trial_access": skip_trial_access,
-        "trial_access_until": trial_access_until,
-    }
+    new_user.optins = set_has_access_optin(
+        {
+            **(new_user.optins or {}),
+            "skip_trial_access": skip_trial_access,
+            "trial_access_until": trial_access_until,
+        }
+    )
 
 
 async def process_new_user_with_clerk(new_user: User, session: AsyncSession | None = None):

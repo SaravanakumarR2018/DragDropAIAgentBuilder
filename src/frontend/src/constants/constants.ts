@@ -632,6 +632,7 @@ export const CONTROL_NEW_USER = {
   is_active: false,
   is_superuser: false,
   optins: {
+    has_access: true,
     skip_trial_access: false,
     trial_access_until: DEFAULT_TRIAL_ACCESS_UNTIL,
     trial_access_days: 7,

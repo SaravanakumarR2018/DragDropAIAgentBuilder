@@ -439,6 +439,7 @@ export type UserInputType = {
     trial_access_days?: number;
     skip_trial_access?: boolean;
     trial_access_until?: string;
+    has_access?: boolean;
     github_starred?: boolean;
     discord_clicked?: boolean;
     dialog_dismissed?: boolean;

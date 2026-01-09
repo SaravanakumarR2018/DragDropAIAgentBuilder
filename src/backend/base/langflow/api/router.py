@@ -18,6 +18,7 @@ from langflow.api.v1 import (
     organisation_router,
     projects_router,
     starter_projects_router,
+    stripe_webhook_router,
     store_router,
     users_router,
     validate_router,
@@ -51,6 +52,7 @@ router_v1.include_router(folders_router)
 router_v1.include_router(projects_router)
 router_v1.include_router(organisation_router)
 router_v1.include_router(starter_projects_router)
+router_v1.include_router(stripe_webhook_router)
 router_v1.include_router(knowledge_bases_router)
 router_v1.include_router(mcp_router)
 router_v1.include_router(voice_mode_router)

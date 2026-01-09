@@ -3,6 +3,7 @@ import { AuthContext } from "@/contexts/authContext";
 import { CustomLoadingPage } from "@/customization/components/custom-loading-page";
 import BillingPage from "@/pages/BillingPage";
 import useAuthStore from "@/stores/authStore";
+import { resolveHasAccess } from "@/utils/billing/hasAccess";
 
 const TrialAccessGate = ({
   children,
@@ -21,25 +22,10 @@ const TrialAccessGate = ({
     getUser();
   }, [getUser, isAuthenticated, requestStarted, userData]);
 
-  const hasTrialAccess = useMemo(() => {
-    if (!userData?.optins) {
-      return false;
-    }
-
-    const { skip_trial_access: skipTrial, trial_access_until: trialUntil } =
-      userData.optins;
-    if (skipTrial) {
-      return true;
-    }
-    if (!trialUntil) {
-      return false;
-    }
-    const trialDate = new Date(trialUntil);
-    if (Number.isNaN(trialDate.getTime())) {
-      return false;
-    }
-    return trialDate.getTime() > Date.now();
-  }, [userData?.optins]);
+  const hasTrialAccess = useMemo(
+    () => resolveHasAccess(userData?.optins),
+    [userData?.optins],
+  );
 
   if (!isAuthenticated) {
     return <>{children}</>;

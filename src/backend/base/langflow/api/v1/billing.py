@@ -71,6 +71,8 @@ async def create_stripe_checkout_session(
         "success_url": str(payload.success_url),
         "cancel_url": str(payload.cancel_url),
         "client_reference_id": str(current_user.id),
+        "subscription_data[metadata][user_id]": str(current_user.id),
+        "subscription_data[trial_period_days]": "7",
         "line_items[0][price_data][currency]": "usd",
         "line_items[0][price_data][unit_amount]": str(plan["amount"]),
         "line_items[0][price_data][product_data][name]": f"{plan['name']} Plan",

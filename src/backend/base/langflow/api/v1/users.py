@@ -16,13 +16,24 @@ from langflow.services.auth.utils import (
     get_password_hash,
     verify_password,
 )
+from langflow.services.billing.access_control import ensure_user_has_access
 from langflow.services.database.models.user.crud import get_user_by_id, update_user
 from langflow.services.database.models.user.model import User, UserCreate, UserRead, UserUpdate
 from langflow.services.deps import get_settings_service
 
 router = APIRouter(tags=["Users"], prefix="/users")
 
-SENSITIVE_OPTIN_KEYS = {"skip_trial_access", "trial_access_until", "trial_access_days"}
+SENSITIVE_OPTIN_KEYS = {
+    "has_access",
+    "skip_trial_access",
+    "stripe_cancel_at_period_end",
+    "stripe_current_period_end",
+    "stripe_customer_id",
+    "stripe_subscription_id",
+    "stripe_subscription_status",
+    "trial_access_until",
+    "trial_access_days",
+}
 
 @router.post("/", response_model=UserRead, status_code=201)
 async def add_user(
@@ -51,9 +62,10 @@ async def add_user(
 @router.get("/whoami", response_model=UserRead)
 async def read_current_user(
     current_user: CurrentActiveUser,
+    session: DbSession,
 ) -> User:
     """Retrieve the current user's data."""
-    return current_user
+    return await ensure_user_has_access(session, current_user)
 
 
 @router.get("/", dependencies=[Depends(get_current_active_superuser)])
