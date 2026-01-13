@@ -528,10 +528,13 @@ export default function Landing(): JSX.Element {
             <div className="text-sm font-semibold">Legal & Company</div>
             <ul className="mt-3 space-y-2 text-sm text-white/70">
               <li>
-                <a href="#privacy">Privacy Policy</a>
+                <a href="/privacy-policy">Privacy Policy</a>
               </li>
               <li>
-                <a href="#terms">Terms of Service</a>
+                <a href="/terms-of-service">Terms of Service</a>
+              </li>
+              <li>
+                <a href="/refund-policy">Refund Policy</a>
               </li>
               <li>
                 <a href="#careers">Careers</a>
