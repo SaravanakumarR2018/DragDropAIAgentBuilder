@@ -406,54 +406,90 @@ export default function Landing(): JSX.Element {
         </div>
       </section>
 
-      {/* Pricing teaser */}
+      {/* Pricing */}
       <section id="pricing" className="mx-auto max-w-7xl px-4 py-20">
         <div className="rounded-2xl border border-white/10 bg-[#0f1217] p-8">
-          <div className="grid gap-10 md:grid-cols-2">
-            <div>
-              <h2 className="text-2xl font-semibold">Fair, Transparent Pricing</h2>
-              <p className="mt-3 text-white/70">
-                Free (for developers) plus paid plans for teams and enterprise with full security & support.
-              </p>
-              <ul className="mt-6 space-y-2 text-sm text-white/80">
+          <div className="text-center">
+            <h2 className="text-2xl font-semibold">Simple, Scalable Pricing</h2>
+            <p className="mt-3 text-white/70">
+              Choose the plan that matches your team size and scale with confidence.
+            </p>
+          </div>
+          <div className="mt-10 grid gap-6 md:grid-cols-3">
+            <div className="flex h-full flex-col rounded-xl border border-white/10 bg-[#0f1217] p-6">
+              <div className="text-sm text-white/60">Starter Pack</div>
+              <div className="mt-2 text-3xl font-semibold">$20 USD</div>
+              <div className="mt-1 text-sm text-white/70">7-day free trial</div>
+              <ul className="mt-4 space-y-2 text-sm text-white/80">
                 <li className="flex items-center gap-2">
-                  <CheckIcon className="h-4 w-4" />Unlimited public flows
+                  <CheckIcon className="h-4 w-4" />Shared database
                 </li>
                 <li className="flex items-center gap-2">
-                  <CheckIcon className="h-4 w-4" />Team seats & organization tenancies
+                  <CheckIcon className="h-4 w-4" />Standard rate limits
                 </li>
                 <li className="flex items-center gap-2">
-                  <CheckIcon className="h-4 w-4" />Enterprise support & SLA
+                  <CheckIcon className="h-4 w-4" />Core visual builder features
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckIcon className="h-4 w-4" />Community support
                 </li>
               </ul>
+              <a
+                href="#signup"
+                className="mt-6 inline-block rounded-lg bg-white px-4 py-2 text-sm font-semibold text-neutral-900"
+              >
+                Start Free Trial
+              </a>
             </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="rounded-xl border border-white/10 bg-[#0f1217] p-6">
-                <div className="text-sm text-white/60">Starter</div>
-                <div className="mt-2 text-3xl font-semibold">Free</div>
-                <p className="mt-2 text-sm text-white/70">
-                  For personal projects, hobbyists. All core features except enterprise.
-                </p>
-                <a
-                  href="#signup"
-                  className="mt-4 inline-block rounded-lg bg-white px-4 py-2 text-sm font-semibold text-neutral-900"
-                >
-                  Get Started Free
-                </a>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-[#0f1217] p-6">
-                <div className="text-sm text-white/60">Enterprise</div>
-                <div className="mt-2 text-3xl font-semibold">Contact Us</div>
-                <p className="mt-2 text-sm text-white/70">
-                  Includes SSO, data isolation, custom deployment, dedicated support & SLAs.
-                </p>
-                <a
-                  href="#contact"
-                  className="mt-4 inline-block rounded-lg border border-white/15 px-4 py-2 text-sm"
-                >
-                  Contact Sales
-                </a>
-              </div>
+            <div className="flex h-full flex-col rounded-xl border border-white/10 bg-[#0f1217] p-6">
+              <div className="text-sm text-white/60">Pro Pack</div>
+              <div className="mt-2 text-3xl font-semibold">$50 USD</div>
+              <div className="mt-1 text-sm text-white/70">No trial period</div>
+              <ul className="mt-4 space-y-2 text-sm text-white/80">
+                <li className="flex items-center gap-2">
+                  <CheckIcon className="h-4 w-4" />Separate database
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckIcon className="h-4 w-4" />Highly enabled rate limits
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckIcon className="h-4 w-4" />Team collaboration tools
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckIcon className="h-4 w-4" />Priority email support
+                </li>
+              </ul>
+              <a
+                href="#signup"
+                className="mt-6 inline-block rounded-lg border border-white/15 px-4 py-2 text-sm"
+              >
+                Upgrade to Pro
+              </a>
+            </div>
+            <div className="flex h-full flex-col rounded-xl border border-white/10 bg-[#0f1217] p-6">
+              <div className="text-sm text-white/60">Enterprise Pack</div>
+              <div className="mt-2 text-3xl font-semibold">Talk to sales</div>
+              <div className="mt-1 text-sm text-white/70">Custom pricing</div>
+              <ul className="mt-4 space-y-2 text-sm text-white/80">
+                <li className="flex items-center gap-2">
+                  <CheckIcon className="h-4 w-4" />Dedicated environments
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckIcon className="h-4 w-4" />Custom security & compliance
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckIcon className="h-4 w-4" />SSO and role-based access
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckIcon className="h-4 w-4" />Premium SLA & support
+                </li>
+              </ul>
+              <a
+                href="#contact"
+                className="mt-6 inline-block rounded-lg border border-white/15 px-4 py-2 text-sm"
+              >
+                Contact Sales
+              </a>
             </div>
           </div>
         </div>
@@ -528,10 +564,13 @@ export default function Landing(): JSX.Element {
             <div className="text-sm font-semibold">Legal & Company</div>
             <ul className="mt-3 space-y-2 text-sm text-white/70">
               <li>
-                <a href="#privacy">Privacy Policy</a>
+                <a href="/privacy-policy">Privacy Policy</a>
               </li>
               <li>
-                <a href="#terms">Terms of Service</a>
+                <a href="/terms-of-service">Terms of Service</a>
+              </li>
+              <li>
+                <a href="/refund-policy">Refund Policy</a>
               </li>
               <li>
                 <a href="#careers">Careers</a>
