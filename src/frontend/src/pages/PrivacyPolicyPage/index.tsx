@@ -17,9 +17,7 @@ export default function PrivacyPolicyPage() {
               Visual AI Agents Builder
             </span>
           </Link>
-          <Link to="/" className="text-sm text-white/70 hover:text-white">
-            Back to home
-          </Link>
+          <a href="/">Back to home</a>
         </div>
       </header>
 
