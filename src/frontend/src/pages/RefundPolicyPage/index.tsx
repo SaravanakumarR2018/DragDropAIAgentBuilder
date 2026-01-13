@@ -15,9 +15,9 @@ export default function RefundPolicyPage() {
         <section className="flex flex-col gap-3">
           <h2 className="text-xl font-semibold">Monthly subscriptions</h2>
           <p>
-            Subscriptions are billed on a monthly recurring basis. Once a
-            payment is made, your subscription remains active until the end of
-            that billing month.
+            Visual AI Agents Builder subscriptions are billed on a monthly
+            recurring basis. Once a payment is made, your subscription remains
+            active until the end of that billing month.
           </p>
           <p>
             If you cancel, your subscription will stay active until the month

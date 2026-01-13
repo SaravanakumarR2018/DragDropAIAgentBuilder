@@ -15,9 +15,9 @@ export default function PrivacyPolicyPage() {
         <section className="flex flex-col gap-3">
           <h2 className="text-xl font-semibold">Information we collect</h2>
           <p>
-            We collect information you provide when creating an account,
-            subscribing, or contacting support. We also collect usage data to
-            operate and improve the platform.
+            Visual AI Agents Builder collects information you provide when
+            creating an account, subscribing, or contacting support. We also
+            collect usage data to operate and improve the platform.
           </p>
         </section>
 

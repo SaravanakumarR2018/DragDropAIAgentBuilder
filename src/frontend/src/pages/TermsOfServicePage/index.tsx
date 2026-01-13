@@ -15,9 +15,9 @@ export default function TermsOfServicePage() {
         <section className="flex flex-col gap-3">
           <h2 className="text-xl font-semibold">Service overview</h2>
           <p>
-            Drag &amp; Drop AI Agent Builder provides an automated software
-            platform. There are no human-driven services involved in this
-            offering.
+            These Terms of Service apply to Visual AI Agents Builder (the
+            "Service"). The Service provides an automated software platform.
+            There are no human-driven services involved in this offering.
           </p>
         </section>
 
