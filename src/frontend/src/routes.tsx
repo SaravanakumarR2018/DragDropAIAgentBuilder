@@ -378,27 +378,15 @@ const router = createBrowserRouter(
         {/* Public policy routes */}
         <Route
           path="terms-of-service"
-          element={
-            <Suspense fallback={<LoadingPage />}>
-              <TermsOfServicePage />
-            </Suspense>
-          }
+          element={<TermsOfServicePage />}
         />
         <Route
           path="privacy-policy"
-          element={
-            <Suspense fallback={<LoadingPage />}>
-              <PrivacyPolicyPage />
-            </Suspense>
-          }
+          element={<PrivacyPolicyPage />}
         />
         <Route
           path="refund-policy"
-          element={
-            <Suspense fallback={<LoadingPage />}>
-              <RefundPolicyPage />
-            </Suspense>
-          }
+          element={<RefundPolicyPage />}
         />
 
         {/* Auth routes */}
