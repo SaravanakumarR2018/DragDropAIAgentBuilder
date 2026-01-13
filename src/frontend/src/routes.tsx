@@ -88,6 +88,9 @@ const LoginAdminPage = lazy(() =>
 const AdminPage = lazy(() => import("./pages/AdminPage"));
 const DeleteAccountPage = lazy(() => import("./pages/DeleteAccountPage"));
 const PlaygroundPage = lazy(() => import("./pages/Playground"));
+const TermsOfServicePage = lazy(() => import("./pages/TermsOfServicePage"));
+const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage"));
+const RefundPolicyPage = lazy(() => import("./pages/RefundPolicyPage"));
 
 // ---- Router ----
 const router = createBrowserRouter(
@@ -371,6 +374,32 @@ const router = createBrowserRouter(
             </Route>
           </Route>
         </Route>
+
+        {/* Public policy routes */}
+        <Route
+          path="terms-of-service"
+          element={
+            <Suspense fallback={<LoadingPage />}>
+              <TermsOfServicePage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="privacy-policy"
+          element={
+            <Suspense fallback={<LoadingPage />}>
+              <PrivacyPolicyPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="refund-policy"
+          element={
+            <Suspense fallback={<LoadingPage />}>
+              <RefundPolicyPage />
+            </Suspense>
+          }
+        />
 
         {/* Auth routes */}
         <Route
