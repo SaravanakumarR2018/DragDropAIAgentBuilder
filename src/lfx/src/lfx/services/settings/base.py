@@ -9,7 +9,7 @@ from typing import Any, Literal
 import orjson
 import yaml
 from aiofile import async_open
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator
 from pydantic.fields import FieldInfo
 from pydantic_settings import BaseSettings, EnvSettingsSource, PydanticBaseSettingsSource, SettingsConfigDict
 from typing_extensions import override
@@ -72,8 +72,38 @@ class Settings(BaseSettings):
     dev: bool = False
     """If True, Langflow will run in development mode."""
 
+    deployment_environment: Literal["staging", "prod", "production"] | None = Field(
+        default=None,
+        validation_alias=AliasChoices("LANGFLOW_ENVIRONMENT", "ENVIRONMENT"),
+    )
+    """Deployment environment name used to select environment-specific credentials."""
+
     website_domain: str | None = None
     """Primary website domain used for admin detection and other host-bound logic."""
+
+    staging_paddle_api_key: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices("STAGING_PADDLE_API_KEY", "LANGFLOW_STAGING_PADDLE_API_KEY"),
+    )
+    """Paddle API key for staging."""
+
+    staging_paddle_client_key: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices("STAGING_PADDLE_CLIENT_KEY", "LANGFLOW_STAGING_PADDLE_CLIENT_KEY"),
+    )
+    """Paddle client key for staging."""
+
+    prod_paddle_api_key: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices("PROD_PADDLE_API_KEY", "LANGFLOW_PROD_PADDLE_API_KEY"),
+    )
+    """Paddle API key for production."""
+
+    prod_paddle_client_key: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices("PROD_PADDLE_CLIENT_KEY", "LANGFLOW_PROD_PADDLE_CLIENT_KEY"),
+    )
+    """Paddle client key for production."""
 
     database_url: str | None = None
     """Database URL for Langflow. If not provided, Langflow will use a SQLite database.
@@ -203,6 +233,45 @@ class Settings(BaseSettings):
     """User agent for the API calls."""
     backend_only: bool = False
     """If set to True, Langflow will not serve the frontend."""
+
+    def get_paddle_credentials(self) -> tuple[str, str, str]:
+        """Return Paddle API credentials based on the deployment environment."""
+        environment = (self.deployment_environment or "staging").lower()
+        if environment == "production":
+            environment = "prod"
+
+        if environment == "prod":
+            api_key = self.prod_paddle_api_key
+            client_key = self.prod_paddle_client_key
+            missing_names = ["PROD_PADDLE_API_KEY", "PROD_PADDLE_CLIENT_KEY"]
+        else:
+            api_key = self.staging_paddle_api_key
+            client_key = self.staging_paddle_client_key
+            missing_names = ["STAGING_PADDLE_API_KEY", "STAGING_PADDLE_CLIENT_KEY"]
+
+        missing = [
+            name
+            for name, value in zip(
+                missing_names,
+                (
+                    api_key.get_secret_value().strip() if api_key else "",
+                    client_key.get_secret_value().strip() if client_key else "",
+                ),
+                strict=True,
+            )
+            if not value
+        ]
+
+        if missing:
+            logger.error(
+                "Missing Paddle credentials for %s environment: %s",
+                environment,
+                ", ".join(missing),
+            )
+            msg = "Paddle credentials are not configured."
+            raise ValueError(msg)
+
+        return api_key.get_secret_value(), client_key.get_secret_value(), environment
 
     # CORS Settings
     cors_origins: list[str] | str = "*"

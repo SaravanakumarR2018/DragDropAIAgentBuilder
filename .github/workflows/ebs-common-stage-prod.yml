@@ -60,9 +60,13 @@ jobs:
       - name: Install dependencies (sshpass + jq)
         run: sudo apt-get update && sudo apt-get install -y sshpass jq
 
-      - name: Prepare env file with website domain
+      - name: Prepare env file with website domain and Paddle credentials
         env:
           ENVIRONMENT: ${{ github.event.inputs.environment }}
+          STAGING_PADDLE_API_KEY: ${{ secrets.STAGING_PADDLE_API_KEY }}
+          STAGING_PADDLE_CLIENT_KEY: ${{ secrets.STAGING_PADDLE_CLIENT_KEY }}
+          PROD_PADDLE_API_KEY: ${{ secrets.PROD_PADDLE_API_KEY }}
+          PROD_PADDLE_CLIENT_KEY: ${{ secrets.PROD_PADDLE_CLIENT_KEY }}
         run: |
           set -euo pipefail
           ENV_FILE=".env-file"
@@ -87,12 +91,35 @@ jobs:
             WEBSITE_DOMAIN="$PROD_HOST"
           fi
 
-          echo "🔧 Injecting LANGFLOW_WEBSITE_DOMAIN=${WEBSITE_DOMAIN} into ${ENV_FILE}"
-          echo "" >> "$ENV_FILE"
-          if grep -q '^LANGFLOW_WEBSITE_DOMAIN=' "$ENV_FILE"; then
-            sed -i "s|^LANGFLOW_WEBSITE_DOMAIN=.*|LANGFLOW_WEBSITE_DOMAIN=${WEBSITE_DOMAIN}|" "$ENV_FILE"
+          update_env() {
+            local key="$1"
+            local value="$2"
+            if grep -q "^${key}=" "$ENV_FILE"; then
+              sed -i "s|^${key}=.*|${key}=${value}|" "$ENV_FILE"
+            else
+              echo "${key}=${value}" >> "$ENV_FILE"
+            fi
+          }
+
+          echo "🔧 Injecting LANGFLOW_WEBSITE_DOMAIN into ${ENV_FILE}"
+          update_env "LANGFLOW_WEBSITE_DOMAIN" "${WEBSITE_DOMAIN}"
+
+          update_env "LANGFLOW_ENVIRONMENT" "${ENVIRONMENT}"
+
+          if [ "$ENVIRONMENT" = "staging" ]; then
+            if [ -z "${STAGING_PADDLE_API_KEY}" ] || [ -z "${STAGING_PADDLE_CLIENT_KEY}" ]; then
+              echo "❌ Missing Paddle credentials for staging"
+              exit 1
+            fi
+            update_env "STAGING_PADDLE_API_KEY" "${STAGING_PADDLE_API_KEY}"
+            update_env "STAGING_PADDLE_CLIENT_KEY" "${STAGING_PADDLE_CLIENT_KEY}"
           else
-            echo "LANGFLOW_WEBSITE_DOMAIN=${WEBSITE_DOMAIN}" >> "$ENV_FILE"
+            if [ -z "${PROD_PADDLE_API_KEY}" ] || [ -z "${PROD_PADDLE_CLIENT_KEY}" ]; then
+              echo "❌ Missing Paddle credentials for production"
+              exit 1
+            fi
+            update_env "PROD_PADDLE_API_KEY" "${PROD_PADDLE_API_KEY}"
+            update_env "PROD_PADDLE_CLIENT_KEY" "${PROD_PADDLE_CLIENT_KEY}"
           fi
 
           {
