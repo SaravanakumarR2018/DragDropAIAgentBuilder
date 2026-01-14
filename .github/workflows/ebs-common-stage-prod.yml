@@ -63,6 +63,10 @@ jobs:
       - name: Prepare env file with website domain
         env:
           ENVIRONMENT: ${{ github.event.inputs.environment }}
+          STAGING_PADDLE_API_KEY: ${{ secrets.STAGING_PADDLE_API_KEY }}
+          STAGING_PADDLE_CLIENT_KEY: ${{ secrets.STAGING_PADDLE_CLIENT_KEY }}
+          PROD_PADDLE_API_KEY: ${{ secrets.PROD_PADDLE_API_KEY }}
+          PROD_PADDLE_CLIENT_KEY: ${{ secrets.PROD_PADDLE_CLIENT_KEY }}
         run: |
           set -euo pipefail
           ENV_FILE=".env-file"
@@ -83,8 +87,16 @@ jobs:
 
           if [ "$ENVIRONMENT" = "staging" ]; then
             WEBSITE_DOMAIN="$STAGING_HOST"
+            PADDLE_API_KEY="$STAGING_PADDLE_API_KEY"
+            PADDLE_CLIENT_KEY="$STAGING_PADDLE_CLIENT_KEY"
+            PADDLE_API_VAR="STAGING_PADDLE_API_KEY"
+            PADDLE_CLIENT_VAR="STAGING_PADDLE_CLIENT_KEY"
           else
             WEBSITE_DOMAIN="$PROD_HOST"
+            PADDLE_API_KEY="$PROD_PADDLE_API_KEY"
+            PADDLE_CLIENT_KEY="$PROD_PADDLE_CLIENT_KEY"
+            PADDLE_API_VAR="PROD_PADDLE_API_KEY"
+            PADDLE_CLIENT_VAR="PROD_PADDLE_CLIENT_KEY"
           fi
 
           echo "🔧 Injecting LANGFLOW_WEBSITE_DOMAIN=${WEBSITE_DOMAIN} into ${ENV_FILE}"
@@ -101,6 +113,28 @@ jobs:
             echo "PROD_HOST=${PROD_HOST}"
           } >> "$GITHUB_ENV"
 
+          echo "🔧 Injecting LANGFLOW_ENVIRONMENT=${ENVIRONMENT} into ${ENV_FILE}"
+          if grep -q '^LANGFLOW_ENVIRONMENT=' "$ENV_FILE"; then
+            sed -i "s|^LANGFLOW_ENVIRONMENT=.*|LANGFLOW_ENVIRONMENT=${ENVIRONMENT}|" "$ENV_FILE"
+          else
+            echo "LANGFLOW_ENVIRONMENT=${ENVIRONMENT}" >> "$ENV_FILE"
+          fi
+
+          if [ -z "${PADDLE_API_KEY}" ] || [ -z "${PADDLE_CLIENT_KEY}" ]; then
+            echo "⚠️ Paddle credentials are not set for ${ENVIRONMENT}. Skipping Paddle injection."
+          else
+            if grep -q "^${PADDLE_API_VAR}=" "$ENV_FILE"; then
+              sed -i "s|^${PADDLE_API_VAR}=.*|${PADDLE_API_VAR}=${PADDLE_API_KEY}|" "$ENV_FILE"
+            else
+              echo "${PADDLE_API_VAR}=${PADDLE_API_KEY}" >> "$ENV_FILE"
+            fi
+
+            if grep -q "^${PADDLE_CLIENT_VAR}=" "$ENV_FILE"; then
+              sed -i "s|^${PADDLE_CLIENT_VAR}=.*|${PADDLE_CLIENT_VAR}=${PADDLE_CLIENT_KEY}|" "$ENV_FILE"
+            else
+              echo "${PADDLE_CLIENT_VAR}=${PADDLE_CLIENT_KEY}" >> "$ENV_FILE"
+            fi
+          fi
       - name: Ensure admin user exists in Clerk
         env:
           ENVIRONMENT: ${{ github.event.inputs.environment }}
