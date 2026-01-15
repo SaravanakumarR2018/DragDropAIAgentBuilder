@@ -18,7 +18,7 @@ export const useLogout: useMutationFunctionType<undefined, void> = (
   options?,
 ) => {
   const { mutate, queryClient } = UseRequestProcessor();
-  const cookies = new Cookies();
+  const cookies = getCookiesInstance();
   const logout = useAuthStore((state) => state.logout);
   const isAutoLoginEnv = IS_AUTO_LOGIN;
 

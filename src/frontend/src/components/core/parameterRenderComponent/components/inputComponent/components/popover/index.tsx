@@ -1,5 +1,4 @@
 import { PopoverAnchor } from "@radix-ui/react-popover";
-
 import { X } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import ForwardedIconComponent from "@/components/common/genericIconComponent";
@@ -240,17 +239,21 @@ const CustomInputPopover = ({
       <PopoverAnchor>
         <div
           data-testid={`anchor-${id}`}
-          className={getAnchorClassName(
-            editNode,
-            disabled,
-            isFocused,
-            allowCustomValue,
-          )}
-          onClick={() =>
-            (!allowCustomValue || !nodeStyle) &&
-            !disabled &&
-            setShowOptions(true)
-          }
+          className={getAnchorClassName(editNode, disabled, isFocused)}
+          onClick={() => !nodeStyle && !disabled && setShowOptions(true)}
+          role="button"
+          tabIndex={disabled ? -1 : 0}
+          aria-disabled={disabled}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              if (!nodeStyle && !disabled) {
+                if (e.key === " ") {
+                  e.preventDefault();
+                }
+                setShowOptions(true);
+              }
+            }
+          }}
         >
           {!disabled && selectedOptions?.length > 0 ? (
             <div className="mr-5 flex flex-wrap gap-2">

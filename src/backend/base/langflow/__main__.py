@@ -15,6 +15,7 @@ import click
 import httpx
 import typer
 from dotenv import load_dotenv
+from fastapi import HTTPException
 from httpx import HTTPError
 from lfx.log.logger import configure, logger
 from lfx.services.settings.constants import DEFAULT_SUPERUSER, DEFAULT_SUPERUSER_PASSWORD
@@ -39,6 +40,89 @@ from langflow.utils.version import is_pre_release as langflow_is_pre_release
 console = Console(legacy_windows=True, emoji=False) if platform.system() == "Windows" else Console()
 
 app = typer.Typer(no_args_is_help=True)
+console = Console()
+if platform.system() == "Windows":
+    console = Console(legacy_windows=True, emoji=False)  # Initialize console with Windows-safe settings
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())  # type: ignore[attr-defined]
+
+# Add LFX commands as a sub-app
+try:
+    from lfx.cli.commands import serve_command
+    from lfx.cli.run import run as lfx_run
+
+    lfx_app = typer.Typer(name="lfx", help="Langflow Executor commands")
+    lfx_app.command(name="serve", help="Serve a flow as an API", no_args_is_help=True)(serve_command)
+    lfx_app.command(name="run", help="Run a flow directly", no_args_is_help=True)(lfx_run)
+
+    app.add_typer(lfx_app, name="lfx")
+except ImportError:
+    # LFX not available, skip adding the sub-app
+    pass
+
+
+class ProcessManager:
+    """Manages the lifecycle of the backend process."""
+
+    def __init__(self):
+        self.webapp_process = None
+        self.shutdown_in_progress = False
+        if platform.system() == "Windows":
+            self._farewell_emoji = ":)"  # ASCII smiley
+        else:
+            self._farewell_emoji = "👋"  # Unicode wave
+
+    # params are required for signal handlers, even if they are not used
+    def handle_sigterm(self, _signum: int, _frame) -> None:
+        """Handle SIGTERM signal gracefully."""
+        if self.shutdown_in_progress:
+            return  # Already shutting down, ignore
+        self.shutdown_in_progress = True
+        self.shutdown()
+
+    # params are required for signal handlers, even if they are not used
+    def handle_sigint(self, _signum: int, _frame) -> None:
+        """Handle SIGINT signal gracefully."""
+        if self.shutdown_in_progress:
+            return  # Already shutting down, ignore
+        self.shutdown_in_progress = True
+        self.shutdown()
+
+    def shutdown(self):
+        """Gracefully shutdown the webapp process."""
+        if self.webapp_process and self.webapp_process.is_alive():
+            # Just terminate the process - the actual shutdown progress is handled
+            # by the FastAPI lifespan context in main.py
+            self.webapp_process.terminate()
+            # The long wait allows the process to finish setup, preventing it from
+            # getting in a state where background tasks continue to do work after termination
+            # is sent.
+            self.webapp_process.join(timeout=30)
+            if self.webapp_process.is_alive():
+                logger.warning("Process didn't terminate gracefully, killing it.")
+                self.webapp_process.kill()
+                self.webapp_process.join()
+            self.print_farewell_message()
+
+        sys.exit(0)
+
+    def print_farewell_message(self) -> None:
+        """Print a nice farewell message after shutdown is complete."""
+        # Clear any progress indicator output that might be on the current line
+        sys.stdout.write("\r")  # Move cursor to beginning of line
+        sys.stdout.write(" " * 80)  # Clear the line with spaces
+        sys.stdout.write("\r")  # Move cursor back to beginning
+
+        click.echo()
+        farewell = click.style(f"{self._farewell_emoji} See you next time!", fg="bright_blue", bold=True)
+        click.echo(farewell)
+
+
+# Create a single instance of ProcessManager
+process_manager = ProcessManager()
+
+# Update signal handlers to use the instance methods
+signal.signal(signal.SIGTERM, process_manager.handle_sigterm)
+signal.signal(signal.SIGINT, process_manager.handle_sigint)
 
 # Add LFX commands as a sub-app
 try:
@@ -155,7 +239,6 @@ def set_var_for_macos_issue() -> None:
         os.environ["OBJC_DISABLE_INITIALIZE_FORK_SAFETY"] = "YES"
         # https://stackoverflow.com/questions/75747888/uwsgi-segmentation-fault-with-flask-python-app-behind-nginx-after-running-for-2 # noqa: E501
         os.environ["no_proxy"] = "*"  # to avoid error with gunicorn
-        logger.debug("Set OBJC_DISABLE_INITIALIZE_FORK_SAFETY to YES to avoid error")
 
 
 def wait_for_server_ready(host, port, protocol) -> None:
@@ -265,6 +348,14 @@ def run(
 ) -> None:
     """Run Langflow."""
     if env_file:
+        if is_settings_service_initialized():
+            err = (
+                "Settings service is already initialized. This indicates potential race conditions "
+                "with settings initialization. Ensure the settings service is not created during "
+                "module loading."
+            )
+            # i.e. ensures the env file is loaded before the settings service is initialized
+            raise ValueError(err)
         load_dotenv(env_file, override=True)
 
     # Set default log level if not provided
@@ -883,12 +974,10 @@ def api_key(
             stmt = select(ApiKey).where(ApiKey.user_id == superuser.id)
             api_key = (await session.exec(stmt)).first()
             if api_key:
-                await delete_api_key(session, api_key.id)
+                await delete_api_key(session, api_key.id, superuser.id)
 
             api_key_create = ApiKeyCreate(name="CLI")
-            unmasked_api_key = await create_api_key(session, api_key_create, user_id=superuser.id)
-            await session.commit()
-            return unmasked_api_key
+            return await create_api_key(session, api_key_create, user_id=superuser.id)
 
     unmasked_api_key = asyncio.run(aapi_key())
     # Create a banner to display the API key and tell the user it won't be shown again

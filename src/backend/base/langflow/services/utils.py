@@ -123,7 +123,6 @@ async def teardown_superuser(settings_service, session: AsyncSession) -> None:
 
         except Exception as exc:
             logger.exception(exc)
-            await session.rollback()
             msg = "Could not remove default superuser."
             raise RuntimeError(msg) from exc
 
@@ -191,11 +190,9 @@ async def clean_transactions(settings_service: SettingsService, session: AsyncSe
         )
 
         await session.exec(delete_stmt)
-        await session.commit()
         logger.debug("Successfully cleaned up old transactions")
     except (sqlalchemy_exc.SQLAlchemyError, asyncio.TimeoutError) as exc:
         logger.error(f"Error cleaning up transactions: {exc!s}")
-        await session.rollback()
         # Don't re-raise since this is a cleanup task
 
 
@@ -220,11 +217,9 @@ async def clean_vertex_builds(settings_service: SettingsService, session: AsyncS
         )
 
         await session.exec(delete_stmt)
-        await session.commit()
         logger.debug("Successfully cleaned up old vertex builds")
     except (sqlalchemy_exc.SQLAlchemyError, asyncio.TimeoutError) as exc:
         logger.error(f"Error cleaning up vertex builds: {exc!s}")
-        await session.rollback()
         # Don't re-raise since this is a cleanup task
 
 

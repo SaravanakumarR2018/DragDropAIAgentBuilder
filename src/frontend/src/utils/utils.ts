@@ -1,9 +1,10 @@
+import type { ColDef, ColGroupDef, ValueParserParams } from "ag-grid-community";
+import clsx, { type ClassValue } from "clsx";
 import TableAutoCellRender from "@/components/core/parameterRenderComponent/components/tableComponent/components/tableAutoCellRender";
 import TableDropdownCellEditor from "@/components/core/parameterRenderComponent/components/tableComponent/components/tableDropdownCellEditor";
 import useAlertStore from "@/stores/alertStore";
-import { ColDef, ColGroupDef, ValueParserParams } from "ag-grid-community";
-import clsx, { ClassValue } from "clsx";
 import { type ColumnField, FormatterType } from "@/types/utils/functions";
+import "moment-timezone";
 import type { Cookies } from "react-cookie";
 import { twMerge } from "tailwind-merge";
 import {
@@ -1023,10 +1024,14 @@ export const setAuthCookie = (
   tokenName: string,
   value: string,
 ) => {
+  // Only use secure flag if the connection is HTTPS
+  const isSecure =
+    typeof window !== "undefined" && window.location.protocol === "https:";
+
   cookies.set(tokenName, value, {
     path: "/",
-    secure: true,
-    sameSite: "strict",
+    secure: isSecure,
+    sameSite: isSecure ? "strict" : "lax",
   });
 };
 

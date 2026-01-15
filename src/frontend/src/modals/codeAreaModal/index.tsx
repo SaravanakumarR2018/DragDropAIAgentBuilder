@@ -217,7 +217,7 @@ export default function CodeAreaModal({
               fontSize={14}
               showGutter
               enableLiveAutocompletion
-              theme={dark ? "twilight" : "github"}
+              theme={dark ? "monokai" : "github"}
               name="CodeEditor"
               onChange={(value) => {
                 setCode(value);

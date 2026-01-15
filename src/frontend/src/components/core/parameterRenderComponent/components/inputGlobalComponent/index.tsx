@@ -136,7 +136,6 @@ export default function InputGlobalComponent({
       selectedOption={selectedOption}
       setSelectedOption={handlers.handleVariableSelect}
       onChange={handlers.handleInputChange}
-      allowCustomValue={allowCustomValue}
       isToolMode={isToolMode}
       hasRefreshButton={hasRefreshButton}
     />
