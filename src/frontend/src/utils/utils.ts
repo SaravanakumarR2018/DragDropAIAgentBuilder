@@ -1,6 +1,5 @@
 import type { ColDef, ColGroupDef, ValueParserParams } from "ag-grid-community";
 import clsx, { type ClassValue } from "clsx";
-import moment from "moment";
 import TableAutoCellRender from "@/components/core/parameterRenderComponent/components/tableComponent/components/tableAutoCellRender";
 import TableDropdownCellEditor from "@/components/core/parameterRenderComponent/components/tableComponent/components/tableDropdownCellEditor";
 import useAlertStore from "@/stores/alertStore";
@@ -880,7 +879,8 @@ export function testIdCase(str: string): string {
   return str.toLowerCase().replace(/\s+/g, "_");
 }
 
-export const convertUTCToLocalTimezone = (timestamp: string) => {
+export async function convertUTCToLocalTimezone (timestamp: string,):Promise<string>{
+  const moment =(await import("moment-timezone")).default;
   const localTimezone = moment.tz.guess();
   return moment.utc(timestamp).tz(localTimezone).format("MM/DD/YYYY HH:mm:ss");
 };

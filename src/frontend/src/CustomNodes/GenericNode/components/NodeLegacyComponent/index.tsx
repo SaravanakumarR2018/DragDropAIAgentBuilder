@@ -23,7 +23,6 @@ export default function NodeLegacyComponent({
   };
 
   const foundComponents = useGetReplacementComponents(replacement);
-
   return (
     <div
       className={cn(

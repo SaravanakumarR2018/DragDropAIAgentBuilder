@@ -54,7 +54,6 @@ const McpServerTab = ({ folderName }: { folderName: string }) => {
     handleOnNewValue,
     handleAuthSave,
     mcpJson,
-    hasAuthentication,
     isAuthApiKey,
     hasOAuthError,
   } = useMcpServer({
@@ -63,6 +62,12 @@ const McpServerTab = ({ folderName }: { folderName: string }) => {
     selectedPlatform,
     selectedTransport,
   });
+
+  // Check if authentication is configured (not "none")
+  const hasAuthentication =
+    currentAuthSettings?.auth_type && currentAuthSettings.auth_type !== "none";
+
+  const isLoadingMCPProjectAuth = isLoadingMCPProjectData || isPatchingFlowsMCP;
 
   return (
     <div>

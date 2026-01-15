@@ -10872,6 +10872,73 @@
         ],
         "title": "KnowledgeBaseInfo"
       },
+      "KnowledgeBaseInfo": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "embedding_provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Embedding Provider",
+            "default": "Unknown"
+          },
+          "embedding_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Embedding Model",
+            "default": "Unknown"
+          },
+          "size": {
+            "type": "integer",
+            "title": "Size",
+            "default": 0
+          },
+          "words": {
+            "type": "integer",
+            "title": "Words",
+            "default": 0
+          },
+          "characters": {
+            "type": "integer",
+            "title": "Characters",
+            "default": 0
+          },
+          "chunks": {
+            "type": "integer",
+            "title": "Chunks",
+            "default": 0
+          },
+          "avg_chunk_size": {
+            "type": "number",
+            "title": "Avg Chunk Size",
+            "default": 0.0
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "KnowledgeBaseInfo"
+      },
       "ListComponentResponse": {
         "properties": {
           "id": {
@@ -11567,6 +11634,79 @@
         },
         "type": "object",
         "title": "MessageUpdate"
+      },
+      "OpenAIResponsesRequest": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "description": "The flow ID to execute (used instead of OpenAI model)"
+          },
+          "input": {
+            "type": "string",
+            "title": "Input",
+            "description": "The input text to process"
+          },
+          "stream": {
+            "type": "boolean",
+            "title": "Stream",
+            "description": "Whether to stream the response",
+            "default": false
+          },
+          "background": {
+            "type": "boolean",
+            "title": "Background",
+            "description": "Whether to process in background",
+            "default": false
+          },
+          "tools": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tools",
+            "description": "Tools are not supported yet"
+          },
+          "previous_response_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Response Id",
+            "description": "ID of previous response to continue conversation"
+          },
+          "include": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Include",
+            "description": "Additional response data to include, e.g., ['tool_call.results']"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "input"
+        ],
+        "title": "OpenAIResponsesRequest",
+        "description": "OpenAI-compatible responses request with flow_id as model parameter."
       },
       "OpenAIResponsesRequest": {
         "properties": {

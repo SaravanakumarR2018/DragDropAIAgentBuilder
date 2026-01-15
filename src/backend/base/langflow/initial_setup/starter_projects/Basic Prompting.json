@@ -1109,6 +1109,7 @@
                 "required": true,
                 "show": true,
                 "title_case": false,
+                "toggle": false,
                 "tool_mode": false,
                 "trace_as_input": true,
                 "track_in_telemetry": false,
@@ -1134,6 +1135,7 @@
                 "required": false,
                 "show": false,
                 "title_case": false,
+                "toggle": false,
                 "tool_mode": false,
                 "trace_as_input": true,
                 "trace_as_metadata": true,
@@ -1257,7 +1259,7 @@
           "x": 1081.9499905915025,
           "y": 793.6091126848561
         },
-        "selected": false,
+        "selected": true,
         "type": "genericNode"
       }
     ],

@@ -5,7 +5,6 @@ import os
 from logging.config import fileConfig
 from typing import Any
 
-
 from alembic import context
 from sqlalchemy import pool, text
 from sqlalchemy.event import listen

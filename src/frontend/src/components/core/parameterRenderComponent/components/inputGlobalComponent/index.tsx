@@ -23,6 +23,7 @@ export default function InputGlobalComponent({
   id,
   load_from_db,
   password,
+  allowCustomValue = true,
   editNode = false,
   placeholder,
   isToolMode = false,

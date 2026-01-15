@@ -1,22 +1,8 @@
 // src/constants/constants.ts
 
-import {
-  BASE_URL_API as CUSTOM_BASE_URL_API,
-  BASE_URL_API_V2 as CUSTOM_BASE_URL_API_V2,
-} from "../customization/config-constants";
-import { customDefaultShortcuts } from "../customization/constants";
+import { customDefaultShortcuts } from "@/customization/constants";
+import custom from "../customization/config-constants";
 import type { languageMap } from "../types/components";
-
-const getEnvVar = (key: string, defaultValue: unknown = undefined) => {
-  if (typeof process !== "undefined" && process.env) {
-    return process.env[key] ?? defaultValue;
-  }
-  try {
-    return new Function(`return import.meta.env?.${key}`)() ?? defaultValue;
-  } catch {
-    return defaultValue;
-  }
-};
 
 /**
  * invalid characters for flow name
@@ -640,11 +626,19 @@ export const CONTROL_LOGIN_STATE = {
   password: "",
 };
 
+export const DEFAULT_TRIAL_ACCESS_UNTIL =
+  "2026-01-13T04:12:06.580Z";
+
 export const CONTROL_NEW_USER = {
   username: "",
   password: "",
   is_active: false,
   is_superuser: false,
+  optins: {
+    skip_trial_access: false,
+    trial_access_until: DEFAULT_TRIAL_ACCESS_UNTIL,
+    trial_access_days: 7,
+  },
 };
 
 export const tabsCode = [];
@@ -809,6 +803,7 @@ export const AUTHORIZED_DUPLICATE_REQUESTS = [
   "/refresh",
   "/login",
   "/auto_login",
+  "https://discord.com/api/v9/invites/EqksyE2EX9",
 ];
 
 export const BROKEN_EDGES_WARNING =
@@ -886,8 +881,10 @@ export const DRAG_EVENTS_CUSTOM_TYPESS = {
   "text/plain": "text/plain",
 };
 
-export const NOTE_NODE_MIN_WIDTH = 260;
-export const NOTE_NODE_MIN_HEIGHT = 100;
+export const NOTE_NODE_MIN_WIDTH = 324;
+export const NOTE_NODE_MIN_HEIGHT = 324;
+export const NOTE_NODE_MAX_HEIGHT = 800;
+export const NOTE_NODE_MAX_WIDTH = 1000;
 export const DEFAULT_NOTE_SIZE = 324;
 
 export const COLOR_OPTIONS = {
@@ -937,8 +934,7 @@ export const POLLING_MESSAGES = {
 export const BUILD_POLLING_INTERVAL = 25;
 
 export const IS_AUTO_LOGIN =
-  !getEnvVar("LANGFLOW_AUTO_LOGIN") ||
-  String(getEnvVar("LANGFLOW_AUTO_LOGIN"))?.toLowerCase() !== "false";
+  (import.meta.env.VITE_AUTO_LOGIN).toLowerCase() !== "false";
 
 export const AUTO_LOGIN_RETRY_DELAY = 2000;
 export const AUTO_LOGIN_MAX_RETRY_DELAY = 60000;

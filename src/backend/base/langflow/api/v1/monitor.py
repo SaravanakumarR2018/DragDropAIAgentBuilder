@@ -63,6 +63,24 @@ async def get_message_sessions(
         raise HTTPException(status_code=500, detail=str(e)) from e
 
 
+@router.get("/messages/sessions", dependencies=[Depends(get_current_active_user)])
+async def get_message_sessions(
+    session: DbSession,
+    flow_id: Annotated[UUID | None, Query()] = None,
+) -> list[str]:
+    try:
+        stmt = select(MessageTable.session_id).distinct()
+        stmt = stmt.where(col(MessageTable.session_id).isnot(None))
+
+        if flow_id:
+            stmt = stmt.where(MessageTable.flow_id == flow_id)
+
+        session_ids = await session.exec(stmt)
+        return list(session_ids)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
 @router.get("/messages")
 async def get_messages(
     session: DbSession,

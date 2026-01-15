@@ -26,7 +26,7 @@ export default function LoginPage(): JSX.Element {
 
   useSanitizeRedirectUrl();
 
-  const { login, clearAuthSession } = useContext(AuthContext);
+  const { login } = useContext(AuthContext);
   const setErrorData = useAlertStore((state) => state.setErrorData);
 
   function handleInput({

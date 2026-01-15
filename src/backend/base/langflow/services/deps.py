@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
+
+from lfx.log.logger import logger
 
 from langflow.services.schema import ServiceType
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
+    from lfx.services.settings.service import SettingsService
     from sqlmodel.ext.asyncio.session import AsyncSession
 
     from langflow.services.cache.service import AsyncBaseCacheService, CacheService
@@ -138,25 +141,36 @@ def get_settings_service() -> SettingsService:
     return get_service(ServiceType.SETTINGS_SERVICE, SettingsServiceFactory())
 
 
-def get_db_service() -> DatabaseService:
+def get_db_service(*, use_organisation: bool = True) -> DatabaseService:
     """Retrieves the DatabaseService instance from the service manager.
 
     Returns:
         The DatabaseService instance.
 
     """
+    from langflow.services.database.organisation import OrganizationService
+
+    if use_organisation and get_settings_service().auth_settings.CLERK_AUTH_ENABLED:
+        return OrganizationService.get_db_service_for_request()
+
     from langflow.services.database.factory import DatabaseServiceFactory
 
     return get_service(ServiceType.DATABASE_SERVICE, DatabaseServiceFactory())
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
-    msg = "get_session is deprecated, use session_scope instead"
-    raise NotImplementedError(msg)
+    """Retrieves an async session from the database service.
+
+    Yields:
+        AsyncSession: An async session object.
+
+    """
+    async with session_scope() as session:
+        yield session
 
 
 @asynccontextmanager
-async def session_scope() -> AsyncGenerator[AsyncSession, None]:
+async def session_scope(*, use_organisation: bool = True) -> AsyncGenerator[AsyncSession, None]:
     """Context manager for managing an async session scope.
 
     This context manager is used to manage an async session scope for database operations.
@@ -170,10 +184,15 @@ async def session_scope() -> AsyncGenerator[AsyncSession, None]:
         Exception: If an error occurs during the session scope.
 
     """
-    from lfx.services.deps import session_scope as lfx_session_scope
-
-    async with lfx_session_scope() as session:
-        yield session
+    db_service = get_db_service(use_organisation=use_organisation)
+    async with db_service.with_session() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception as e:
+            await logger.aexception("An error occurred during the session scope.", exception=e)
+            await session.rollback()
+            raise
 
 
 def get_cache_service() -> Union[CacheService, AsyncBaseCacheService]:  # noqa: UP007

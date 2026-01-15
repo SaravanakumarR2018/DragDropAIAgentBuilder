@@ -34,12 +34,7 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import col, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from langflow.initial_setup.constants import (
-    ASSISTANT_FOLDER_DESCRIPTION,
-    ASSISTANT_FOLDER_NAME,
-    STARTER_FOLDER_DESCRIPTION,
-    STARTER_FOLDER_NAME,
-)
+from langflow.initial_setup.constants import STARTER_FOLDER_DESCRIPTION, STARTER_FOLDER_NAME
 from langflow.services.auth.utils import create_super_user
 from langflow.services.database.models.flow.model import Flow, FlowCreate
 from langflow.services.database.models.folder.constants import (
@@ -911,7 +906,7 @@ async def load_flows_from_directory() -> None:
     if not flows_path:
         return
 
-    async with session_scope() as session:
+    async with session_scope(use_organisation=False) as session:
         # Find superuser by role instead of username to avoid issues with credential reset
         from langflow.services.database.models.user.model import User
 
@@ -973,7 +968,7 @@ async def load_bundles_from_urls() -> tuple[list[TemporaryDirectory], list[str]]
     if not bundle_urls:
         return [], []
 
-    async with session_scope() as session:
+    async with session_scope(use_organisation=False) as session:
         # Find superuser by role instead of username to avoid issues with credential reset
         from langflow.services.database.models.user.model import User
 
@@ -1077,19 +1072,27 @@ async def find_existing_flow(session, flow_id, flow_endpoint_name):
     return None
 
 
-async def create_or_update_starter_projects(all_types_dict: dict) -> None:
+async def create_or_update_starter_projects(
+    all_types_dict: dict,
+    *,
+    use_organisation: bool = False
+) -> None:
     """Create or update starter projects.
 
     Args:
         all_types_dict (dict): Dictionary containing all component types and their templates
+        do_create (bool, optional): Whether to create new projects. Defaults to True.
+        use_organisation (bool, optional): Whether to use organisation-scoped database sessions.
+            Defaults to False.
     """
     if not get_settings_service().settings.create_starter_projects:
         # no-op for environments that don't want to create starter projects.
         # note that this doesn't check if the starter projects are already loaded in the db;
         # this is intended to be used to skip all startup project logic.
+        await logger.adebug("Skipping starter project creation (disabled in settings).")
         return
 
-    async with session_scope() as session:
+    async with session_scope(use_organisation=use_organisation) as session:
         new_folder = await get_or_create_starter_folder(session)
         starter_projects = await load_starter_projects()
 
@@ -1098,8 +1101,7 @@ async def create_or_update_starter_projects(all_types_dict: dict) -> None:
             # 1. Delete all existing starter projects
             successfully_updated_projects = 0
             await delete_starter_projects(session, new_folder.id)
-            # Profile pictures are now served directly from the package installation directory
-            # No need to copy them to config_dir
+            await copy_profile_pictures()
 
             # 2. Update all starter projects with the latest component versions (this modifies the actual file data)
             for project_path, project in starter_projects:
@@ -1178,7 +1180,7 @@ async def create_or_update_starter_projects(all_types_dict: dict) -> None:
                     except Exception:  # noqa: BLE001
                         await logger.aexception(f"Error while creating starter project {project_name}")
                     successfully_created_projects += 1
-                await logger.adebug(f"Successfully created {successfully_created_projects} starter projects")
+            await logger.adebug(f"Successfully created {successfully_created_projects} starter projects")
 
 
 async def initialize_auto_login_default_superuser() -> None:
@@ -1195,7 +1197,7 @@ async def initialize_auto_login_default_superuser() -> None:
         msg = "SUPERUSER and SUPERUSER_PASSWORD must be set in the settings if AUTO_LOGIN is true."
         raise ValueError(msg)
 
-    async with session_scope() as async_session:
+    async with session_scope(use_organisation=False) as async_session:
         super_user = await create_super_user(db=async_session, username=username, password=password)
         await get_variable_service().initialize_user_variables(super_user.id, async_session)
         # Initialize agentic variables if agentic experience is enabled
@@ -1250,7 +1252,7 @@ async def get_or_create_default_folder(session: AsyncSession, user_id: UUID) -> 
                 legacy_folder.description = DEFAULT_FOLDER_DESCRIPTION
                 session.add(legacy_folder)
                 try:
-                    await session.flush()
+                    await session.commit()
                     await session.refresh(legacy_folder)
                     return FolderRead.model_validate(legacy_folder, from_attributes=True)
                 except sa.exc.IntegrityError:
@@ -1279,23 +1281,15 @@ async def get_or_create_default_folder(session: AsyncSession, user_id: UUID) -> 
 async def sync_flows_from_fs():
     flow_mtimes = {}
     fs_flows_polling_interval = get_settings_service().settings.fs_flows_polling_interval / 1000
-    storage_service = get_storage_service()
     try:
         while True:
             try:
-                async with session_scope() as session:
+                async with session_scope(use_organisation=False) as session:
                     stmt = select(Flow).where(col(Flow.fs_path).is_not(None))
                     flows = (await session.exec(stmt)).all()
                     for flow in flows:
                         mtime = flow_mtimes.setdefault(flow.id, 0)
-                        # Resolve path: if relative, construct full path using user's flows directory
-                        fs_path_str = flow.fs_path
-                        if not Path(fs_path_str).is_absolute():
-                            # Relative path - construct full path
-                            path = storage_service.data_dir / "flows" / str(flow.user_id) / fs_path_str
-                        else:
-                            # Absolute path - use as-is
-                            path = anyio.Path(fs_path_str)
+                        path = anyio.Path(flow.fs_path)
                         try:
                             if await path.exists():
                                 new_mtime = (await path.stat()).st_mtime
@@ -1307,7 +1301,7 @@ async def sync_flows_from_fs():
                                                 setattr(flow, field_name, new_value)
                                         if folder_id := update_data.get("folder_id"):
                                             flow.folder_id = UUID(folder_id)
-                                        await session.flush()
+                                        await session.commit()
                                         await session.refresh(flow)
                                     except Exception:  # noqa: BLE001
                                         await logger.aexception(

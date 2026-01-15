@@ -71,6 +71,10 @@ class Settings(BaseSettings):
 
     dev: bool = False
     """If True, Langflow will run in development mode."""
+
+    website_domain: str | None = None
+    """Primary website domain used for admin detection and other host-bound logic."""
+
     database_url: str | None = None
     """Database URL for Langflow. If not provided, Langflow will use a SQLite database.
     The driver shall be an async one like `sqlite+aiosqlite` (`sqlite` and `postgresql`
@@ -481,10 +485,12 @@ class Settings(BaseSettings):
             msg = f"Invalid database_url provided: '{value}'"
             raise ValueError(msg)
 
+        logger.debug("No database_url provided, trying LANGFLOW_DATABASE_URL env variable")
         if langflow_database_url := os.getenv("LANGFLOW_DATABASE_URL"):
             value = langflow_database_url
-            logger.debug("Using LANGFLOW_DATABASE_URL env variable")
+            logger.debug("Using LANGFLOW_DATABASE_URL env variable.")
         else:
+            logger.debug("No database_url env variable, using sqlite database")
             # Originally, we used sqlite:///./langflow.db
             # so we need to migrate to the new format
             # if there is a database in that location
@@ -500,14 +506,10 @@ class Settings(BaseSettings):
 
             if info.data["save_db_in_config_dir"]:
                 database_dir = info.data["config_dir"]
+                logger.debug(f"Saving database to config_dir: {database_dir}")
             else:
-                # Use langflow package path, not lfx, for backwards compatibility
-                try:
-                    import langflow
-
-                    database_dir = Path(langflow.__file__).parent.resolve()
-                except ImportError:
-                    database_dir = Path(__file__).parent.parent.parent.resolve()
+                database_dir = Path(__file__).parent.parent.parent.resolve()
+                logger.debug(f"Saving database to langflow directory: {database_dir}")
 
             pre_db_file_name = "langflow-pre.db"
             db_file_name = "langflow.db"
@@ -530,6 +532,7 @@ class Settings(BaseSettings):
                     logger.debug(f"Creating new database at {new_pre_path}")
                     final_path = new_pre_path
             elif Path(new_path).exists():
+                logger.debug(f"Database already exists at {new_path}, using it")
                 final_path = new_path
             elif Path(f"./{db_file_name}").exists():
                 try:
@@ -573,10 +576,15 @@ class Settings(BaseSettings):
 
         if not value:
             value = [BASE_COMPONENTS_PATH]
-        elif isinstance(value, Path):
-            value = [str(value)]
-        elif isinstance(value, list):
-            value = [str(p) if isinstance(p, Path) else p for p in value]
+            logger.debug("Setting default components path to components_path")
+        else:
+            if isinstance(value, Path):
+                value = [str(value)]
+            elif isinstance(value, list):
+                value = [str(p) if isinstance(p, Path) else p for p in value]
+            logger.debug("Adding default components path to components_path")
+
+        logger.debug(f"Components path: {value}")
         return value
 
     model_config = SettingsConfigDict(validate_assignment=True, extra="ignore", env_prefix="LANGFLOW_")
@@ -587,10 +595,13 @@ class Settings(BaseSettings):
         self.dev = dev
 
     def update_settings(self, **kwargs) -> None:
+        logger.debug("Updating settings")
         for key, value in kwargs.items():
             # value may contain sensitive information, so we don't want to log it
             if not hasattr(self, key):
+                logger.debug(f"Key {key} not found in settings")
                 continue
+            logger.debug(f"Updating {key}")
             if isinstance(getattr(self, key), list):
                 # value might be a '[something]' string
                 value_ = value
@@ -601,12 +612,17 @@ class Settings(BaseSettings):
                         item_ = str(item) if isinstance(item, Path) else item
                         if item_ not in getattr(self, key):
                             getattr(self, key).append(item_)
+                    logger.debug(f"Extended {key}")
                 else:
                     value_ = str(value_) if isinstance(value_, Path) else value_
                     if value_ not in getattr(self, key):
                         getattr(self, key).append(value_)
+                        logger.debug(f"Appended {key}")
+
             else:
                 setattr(self, key, value)
+                logger.debug(f"Updated {key}")
+            logger.debug(f"{key}: {getattr(self, key)}")
 
     @property
     def voice_mode_available(self) -> bool:

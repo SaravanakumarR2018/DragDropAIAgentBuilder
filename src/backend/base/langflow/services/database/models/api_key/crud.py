@@ -23,8 +23,7 @@ async def get_api_keys(session: AsyncSession, user_id: UUID) -> list[ApiKeyRead]
 
 
 async def create_api_key(session: AsyncSession, api_key_create: ApiKeyCreate, user_id: UUID) -> UnmaskedApiKeyRead:
-    # Generate a random API key with 32 bytes of randomness
-    generated_api_key = f"sk-{secrets.token_urlsafe(32)}"
+    generated_api_key = generate_api_key_for_user(user_id)
 
     api_key = ApiKey(
         api_key=generated_api_key,

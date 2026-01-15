@@ -41,19 +41,27 @@ export default defineConfig(({ mode }) => {
     base: BASENAME || "",
     build: {
       outDir: "build",
+      rollupOptions: {
+        output: {
+          // Add hash to filenames for cache busting
+          entryFileNames: `assets/[name].[hash].js`,
+          chunkFileNames: `assets/[name].[hash].js`,
+          assetFileNames: `assets/[name].[hash].[ext]`
+        }
+      }
     },
     define: {
-      "import.meta.env.BACKEND_URL": JSON.stringify(
+      "process.env.BACKEND_URL": JSON.stringify(
         envLangflow.BACKEND_URL ?? "http://localhost:7860",
       ),
-      "import.meta.env.ACCESS_TOKEN_EXPIRE_SECONDS": JSON.stringify(
+      "process.env.ACCESS_TOKEN_EXPIRE_SECONDS": JSON.stringify(
         envLangflow.ACCESS_TOKEN_EXPIRE_SECONDS ?? 60,
       ),
-      "import.meta.env.CI": JSON.stringify(envLangflow.CI ?? false),
-      "import.meta.env.LANGFLOW_AUTO_LOGIN": JSON.stringify(
+      "process.env.CI": JSON.stringify(envLangflow.CI ?? false),
+      "process.env.LANGFLOW_AUTO_LOGIN": JSON.stringify(
         envLangflow.LANGFLOW_AUTO_LOGIN ?? true,
       ),
-      "import.meta.env.LANGFLOW_MCP_COMPOSER_ENABLED": JSON.stringify(
+      "process.env.LANGFLOW_MCP_COMPOSER_ENABLED": JSON.stringify(
         envLangflow.LANGFLOW_MCP_COMPOSER_ENABLED ?? "true",
       ),
     },

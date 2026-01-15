@@ -78,6 +78,7 @@ export const usePatchFlowsMCP: useMutationFunctionType<
       });
     },
     ...options,
+    retry: 0,
   });
 
   return mutation;

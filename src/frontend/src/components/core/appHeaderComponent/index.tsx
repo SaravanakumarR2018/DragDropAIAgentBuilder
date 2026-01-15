@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import AlertDropdown from "@/alerts/alertDropDown";
 import LangflowLogo from "@/assets/LangflowLogo.svg?react";
-import { AssistantButton } from "@/components/common/assistant";
+import VisualaiLogo from "@/assets/visualailogo.png"
 import ForwardedIconComponent from "@/components/common/genericIconComponent";
-import ModelProviderCount from "@/components/common/modelProviderCountComponent";
+import OrganizationDisplay from "@/components/common/organizationDisplay";
 import ShadTooltip from "@/components/common/shadTooltipComponent";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -61,13 +61,24 @@ export default function AppHeader(): JSX.Element {
       >
         <Button
           unstyled
-          onClick={() => navigate("/")}
-          className="mr-1 flex h-8 w-8 items-center"
+          onClick={() => navigate("/flows")}
+          className="mr-1 flex h-8 w-8 items-center shrink-0"
           data-testid="icon-ChevronLeft"
         >
-          <LangflowLogo className="h-5 w-5" />
+          {ENABLE_DATASTAX_LANGFLOW ? (
+            <DataStaxLogo className="fill-black dark:fill-[white]" />
+          ) : (
+            <img src={VisualaiLogo} alt="Visual AI Logo" className="h-5 w-5" />
+          )}
         </Button>
-        <CustomOrgSelector />
+        {/* Display organization name when Clerk auth is enabled */}
+        <OrganizationDisplay />
+        {ENABLE_DATASTAX_LANGFLOW && (
+          <>
+            <CustomOrgSelector />
+            <CustomProductSelector />
+          </>
+        )}
       </div>
 
       {/* Middle Section */}
@@ -80,11 +91,6 @@ export default function AppHeader(): JSX.Element {
         className={`relative left-3 z-30 flex shrink-0 items-center gap-3`}
         data-testid="header_right_section_wrapper"
       >
-        {false && <ModelProviderCount />}
-        {LANGFLOW_AGENTIC_EXPERIENCE && <AssistantButton type="header" />}
-        <div className="hidden pr-2 whitespace-nowrap lg:inline-flex lg:items-center">
-          <CustomLangflowCounts />
-        </div>
         <AlertDropdown
           notificationRef={notificationContentRef}
           onClose={() => setActiveState(null)}

@@ -11,17 +11,16 @@ from fastapi import Depends, HTTPException, Request, Security, WebSocketExceptio
 from fastapi.security import APIKeyHeader, APIKeyQuery, OAuth2PasswordBearer
 from jose import JWTError, jwt
 from lfx.log.logger import logger
-from lfx.services.deps import injectable_session_scope, session_scope
 from lfx.services.settings.service import SettingsService
 from sqlalchemy.exc import IntegrityError
 from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.websockets import WebSocket
 
-from langflow.helpers.user import get_user_by_flow_id_or_endpoint_name
+from langflow.services.auth.clerk_utils import get_user_from_clerk_payload
 from langflow.services.database.models.api_key.crud import check_key
 from langflow.services.database.models.user.crud import get_user_by_id, get_user_by_username, update_user_last_login_at
 from langflow.services.database.models.user.model import User, UserRead
-from langflow.services.deps import get_settings_service
+from langflow.services.deps import get_db_service, get_session, get_settings_service, session_scope
 
 if TYPE_CHECKING:
     from langflow.services.database.models.api_key.model import ApiKey
@@ -40,63 +39,6 @@ AUTO_LOGIN_ERROR = (
     "Set LANGFLOW_SKIP_AUTH_AUTO_LOGIN=true to skip this check. "
     "Please update your authentication method."
 )
-
-REFRESH_TOKEN_TYPE: Final[str] = "refresh"  # noqa: S105
-ACCESS_TOKEN_TYPE: Final[str] = "access"  # noqa: S105
-
-# JWT key configuration error messages
-PUBLIC_KEY_NOT_CONFIGURED_ERROR: Final[str] = (
-    "Server configuration error: Public key not configured for asymmetric JWT algorithm."
-)
-SECRET_KEY_NOT_CONFIGURED_ERROR: Final[str] = "Server configuration error: Secret key not configured."  # noqa: S105
-
-
-class JWTKeyError(HTTPException):
-    """Raised when JWT key configuration is invalid."""
-
-    def __init__(self, detail: str, *, include_www_authenticate: bool = True):
-        headers = {"WWW-Authenticate": "Bearer"} if include_www_authenticate else None
-        super().__init__(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=detail,
-            headers=headers,
-        )
-
-
-def get_jwt_verification_key(settings_service: SettingsService) -> str:
-    """Get the appropriate key for JWT verification based on configured algorithm.
-
-    For asymmetric algorithms (RS256, RS512): returns public key
-    For symmetric algorithms (HS256): returns secret key
-    """
-    algorithm = settings_service.auth_settings.ALGORITHM
-
-    if algorithm.is_asymmetric():
-        verification_key = settings_service.auth_settings.PUBLIC_KEY
-        if not verification_key:
-            logger.error("Public key is not set in settings for RS256/RS512.")
-            raise JWTKeyError(PUBLIC_KEY_NOT_CONFIGURED_ERROR)
-        return verification_key
-
-    secret_key = settings_service.auth_settings.SECRET_KEY.get_secret_value()
-    if secret_key is None:
-        logger.error("Secret key is not set in settings.")
-        raise JWTKeyError(SECRET_KEY_NOT_CONFIGURED_ERROR)
-    return secret_key
-
-
-def get_jwt_signing_key(settings_service: SettingsService) -> str:
-    """Get the appropriate key for JWT signing based on configured algorithm.
-
-    For asymmetric algorithms (RS256, RS512): returns private key
-    For symmetric algorithms (HS256): returns secret key
-    """
-    algorithm = settings_service.auth_settings.ALGORITHM
-
-    if algorithm.is_asymmetric():
-        return settings_service.auth_settings.PRIVATE_KEY.get_secret_value()
-
-    return settings_service.auth_settings.SECRET_KEY.get_secret_value()
 
 
 # Source: https://github.com/mrtolkien/fastapi_simple_security/blob/master/fastapi_simple_security/security_api_key.py
@@ -226,8 +168,18 @@ async def get_current_user_by_jwt(
     if isinstance(token, Coroutine):
         token = await token
 
-    algorithm = settings_service.auth_settings.ALGORITHM
-    verification_key = get_jwt_verification_key(settings_service)
+    if settings_service.auth_settings.CLERK_AUTH_ENABLED:
+        return await get_user_from_clerk_payload(db)
+
+    secret_key = settings_service.auth_settings.SECRET_KEY.get_secret_value()
+    if secret_key is None:
+        logger.error("Secret key is not set in settings.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            # Careful not to leak sensitive information
+            detail="Authentication failure: Verify authentication settings.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     try:
         with warnings.catch_warnings():
@@ -335,6 +287,8 @@ async def get_webhook_user(flow_id: str, request: Request) -> UserRead:
     Raises:
         HTTPException: If authentication fails or user doesn't have permission
     """
+    from langflow.helpers.user import get_user_by_flow_id_or_endpoint_name
+
     settings_service = get_settings_service()
 
     if not settings_service.auth_settings.WEBHOOK_AUTH_ENABLE:
@@ -362,7 +316,7 @@ async def get_webhook_user(flow_id: str, request: Request) -> UserRead:
 
     try:
         # Validate API key directly without AUTO_LOGIN fallback
-        async with session_scope() as db:
+        async with get_db_service().with_session() as db:
             result = await check_key(db, api_key)
             if not result:
                 logger.warning("Invalid API key provided for webhook")
@@ -549,7 +503,7 @@ async def create_refresh_token(refresh_token: str, db: AsyncSession):
         user_id: UUID = payload.get("sub")  # type: ignore[assignment]
         token_type: str = payload.get("type")  # type: ignore[assignment]
 
-        if user_id is None or token_type != REFRESH_TOKEN_TYPE:
+        if user_id is None or token_type != "refresh":  # noqa: S105
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
         user_exists = await get_user_by_id(db, user_id)
@@ -651,7 +605,7 @@ async def get_current_user_mcp(
     token: Annotated[str, Security(oauth2_login)],
     query_param: Annotated[str, Security(api_key_query)],
     header_param: Annotated[str, Security(api_key_header)],
-    db: Annotated[AsyncSession, Depends(injectable_session_scope)],
+    db: Annotated[AsyncSession, Depends(get_session)],
 ) -> User:
     """MCP-specific user authentication that always allows fallback to username lookup.
 

@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
     from langflow.services.session.service import SessionService
-    from langflow.services.settings.service import SettingsService
 
 
 class StorageService(Service):

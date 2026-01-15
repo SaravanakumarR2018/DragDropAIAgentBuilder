@@ -7,6 +7,7 @@
   },
   "dependencies": {
     "@chakra-ui/number-input": "^2.1.2",
+    "@clerk/clerk-react": "^5.32.4",
     "@chakra-ui/system": "^2.6.2",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
