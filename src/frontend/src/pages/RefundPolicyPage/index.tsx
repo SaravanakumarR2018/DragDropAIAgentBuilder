@@ -28,23 +28,85 @@ export default function RefundPolicyPage() {
         </div>
 
         <section className="flex flex-col gap-3">
-          <h2 className="text-xl font-semibold">Monthly subscriptions</h2>
+          <h2 className="text-xl font-semibold">Subscriptions &amp; Billing</h2>
           <p className="text-white/80">
-            Visual AI Agents Builder subscriptions are billed on a monthly
-            recurring basis. Once a payment is made, your subscription remains
-            active until the end of that billing month.
+            Visual AI Agents Builder subscriptions are billed on a monthly recurring basis.
+            Once a payment is successfully processed, your subscription will remain active
+            until the end of the current billing period.
           </p>
           <p className="text-white/80">
-            If you cancel, your subscription will stay active until the month
-            ends and will not renew for the following month.
+            If you cancel your subscription, access will continue through the end of the
+            current billing period, and no further charges will be made. Refund eligibility
+            applies only to the initial subscription purchase, as outlined below.
           </p>
         </section>
 
         <section className="flex flex-col gap-3">
-          <h2 className="text-xl font-semibold">No refunds</h2>
+          <h2 className="text-xl font-semibold">14-Day Cancellation Right (Initial Purchase Only)</h2>
           <p className="text-white/80">
-            All payments are final. We do not provide refunds after a payment is
+            If you purchase Visual AI Agents Builder for personal use, you may cancel your
+            initial subscription within 14 days of the original purchase date and receive a
+            full refund.
+          </p>
+          <p className="text-white/80">
+            Refunds requested within this 14-day period will be issued to the original
+            payment method.
+          </p>
+        </section>
+
+        <section className="flex flex-col gap-3">
+          <h2 className="text-xl font-semibold">Digital Service Acknowledgement</h2>
+          <p className="text-white/80">
+            Visual AI Agents Builder is a digital service that is made available immediately
+            upon purchase.
+          </p>
+          <p className="text-white/80">
+            By creating an account, logging in, or otherwise accessing the platform, you
+            acknowledge that the service has begun. Once access has started, you may cancel
+            your subscription at any time through the billing portal; however, refunds,
+            non-refunds, and service continuation are governed by the terms outlined in this
+            policy. Service will continue until the end of the current billing period unless
+            otherwise stated.
+          </p>
+        </section>
+
+        <section className="flex flex-col gap-3">
+          <h2 className="text-xl font-semibold">Renewals &amp; Ongoing Subscription Payments</h2>
+          <p className="text-white/80">
+            The 14-day cancellation right applies only to the first subscription purchase.
+          </p>
+          <p className="text-white/80">
+            Subscription renewals are non-refundable. We do not provide refunds for partially
+            used billing periods or for unused time after cancellation. Your service will
+            remain active for the remainder of the billing period for which payment has been
             made.
+          </p>
+        </section>
+
+        <section className="flex flex-col gap-3">
+          <h2 className="text-xl font-semibold">Faulty or Unavailable Service</h2>
+          <p className="text-white/80">
+            This policy does not limit your statutory rights if the service is not as
+            described, is not functioning, or is unavailable due to a verified technical
+            issue. In such cases, a refund or other appropriate resolution may be provided.
+          </p>
+        </section>
+
+        <section className="flex flex-col gap-3">
+          <h2 className="text-xl font-semibold">Refund Abuse &amp; Charge Disputes</h2>
+          <p className="text-white/80">
+            We reserve the right to refuse refunds in cases of suspected fraud, abuse, or
+            repeated refund requests. If you experience a billing issue, please contact us
+            first so we can attempt to resolve it promptly.
+          </p>
+        </section>
+
+        <section className="flex flex-col gap-3">
+          <h2 className="text-xl font-semibold">How to Request a Refund or Cancel a Subscription</h2>
+          <p className="text-white/80">
+            You can cancel your subscription at any time through the billing portal. Details
+            regarding refund eligibility and service continuation through the end of the
+            billing period will be displayed within the portal at the time of cancellation.
           </p>
         </section>
       </main>
