@@ -1838,6 +1838,18 @@ export function templatesGenerator(data: APIObjectType) {
   }, {});
 }
 
+export function templatesByModuleGenerator(data: APIObjectType) {
+  return Object.keys(data).reduce((acc, curr) => {
+    Object.values(data[curr]).forEach((component) => {
+      const moduleName = component?.metadata?.module;
+      if (moduleName && !acc[moduleName]) {
+        acc[moduleName] = component;
+      }
+    });
+    return acc;
+  }, {} as Record<string, APIClassType>);
+}
+
 /**
  * Determines if a field is a SecretStr field type
  */
