@@ -65,8 +65,7 @@ export default function RefundPolicyPage() {
             acknowledge that the service has begun. Once access has started, you may cancel
             your subscription at any time through the billing portal; however, refunds,
             non-refunds, and service continuation are governed by the terms outlined in this
-            policy. Service will continue until the end of the current billing period unless
-            otherwise stated.
+            policy.
           </p>
         </section>
 
@@ -79,7 +78,8 @@ export default function RefundPolicyPage() {
             Subscription renewals are non-refundable. We do not provide refunds for partially
             used billing periods or for unused time after cancellation. Your service will
             remain active for the remainder of the billing period for which payment has been
-            made.
+            made for renewals for the months after the first month initial subscription
+            purchase
           </p>
         </section>
 
