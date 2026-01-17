@@ -510,12 +510,14 @@ export default function LandingPage(): JSX.Element {
                   <CheckIcon className="h-4 w-4" />Community support
                 </li>
               </ul>
-              <a
-                href="#signup"
-                className="mt-6 inline-block rounded-lg bg-white px-4 py-2 text-sm font-semibold text-neutral-900"
-              >
-                Start Free Trial
-              </a>
+              <div className="mt-auto pt-6">
+                <a
+                  href="#signup"
+                  className="inline-block rounded-lg bg-white px-4 py-2 text-sm font-semibold text-neutral-900"
+                >
+                  Start Free Trial
+                </a>
+              </div>
             </div>
             <div className="flex h-full flex-col rounded-xl border border-white/10 bg-[#0f1217] p-6">
               <div className="text-sm text-white/60">Pro Pack</div>
@@ -535,12 +537,14 @@ export default function LandingPage(): JSX.Element {
                   <CheckIcon className="h-4 w-4" />Priority email support
                 </li>
               </ul>
-              <a
-                href="#signup"
-                className="mt-6 inline-block rounded-lg border border-white/15 px-4 py-2 text-sm"
-              >
-                Upgrade to Pro
-              </a>
+              <div className="mt-auto pt-6">
+                <a
+                  href="#signup"
+                  className="inline-block rounded-lg border border-white/15 px-4 py-2 text-sm"
+                >
+                  Upgrade to Pro
+                </a>
+              </div>
             </div>
             <div className="flex h-full flex-col rounded-xl border border-white/10 bg-[#0f1217] p-6">
               <div className="text-sm text-white/60">Enterprise Pack</div>
@@ -559,12 +563,14 @@ export default function LandingPage(): JSX.Element {
                   <CheckIcon className="h-4 w-4" />Premium SLA & support
                 </li>
               </ul>
-              <a
-                href="#contact"
-                className="mt-6 inline-block rounded-lg border border-white/15 px-4 py-2 text-sm"
-              >
-                Upgrade to Enterprise
-              </a>
+              <div className="mt-auto pt-6">
+                <a
+                  href="#contact"
+                  className="inline-block rounded-lg border border-white/15 px-4 py-2 text-sm"
+                >
+                  Upgrade to Enterprise
+                </a>
+              </div>
             </div>
           </div>
         </div>

@@ -3,7 +3,7 @@ import logoicon from "../../assets/visualailogo.png";
 
 export default function RefundPolicyPage() {
   return (
-    <div className="min-h-screen bg-[#0f1217] text-white">
+    <div className="min-h-screen overflow-y-auto bg-[#0f1217] text-white">
       <div className="pointer-events-none fixed inset-0 -z-10">
         <div className="absolute -top-24 -left-24 h-72 w-72 rounded-full bg-gradient-to-br from-teal-500 to-blue-500/20 blur-3xl" />
         <div className="absolute -bottom-24 -right-24 h-72 w-72 rounded-full bg-gradient-to-br from-purple-500 to-pink-500/20 blur-3xl" />
