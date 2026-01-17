@@ -544,8 +544,7 @@ export default function LandingPage(): JSX.Element {
             </div>
             <div className="flex h-full flex-col rounded-xl border border-white/10 bg-[#0f1217] p-6">
               <div className="text-sm text-white/60">Enterprise Pack</div>
-              <div className="mt-2 text-3xl font-semibold">Talk to sales</div>
-              <div className="mt-1 text-sm text-white/70">Custom pricing</div>
+              <div className="mt-2 text-3xl font-semibold">$120/seat/month</div>
               <ul className="mt-4 space-y-2 text-sm text-white/80">
                 <li className="flex items-center gap-2">
                   <CheckIcon className="h-4 w-4" />Dedicated environments
@@ -564,7 +563,7 @@ export default function LandingPage(): JSX.Element {
                 href="#contact"
                 className="mt-6 inline-block rounded-lg border border-white/15 px-4 py-2 text-sm"
               >
-                Contact Sales
+                Upgrade to Enterprise
               </a>
             </div>
           </div>
