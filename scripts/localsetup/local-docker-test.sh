@@ -106,6 +106,16 @@ show_verbose_help() {
     To set it, run:
     export VITE_CLERK_PUBLISHABLE_KEY="pk_test_your_key_here"
 
+🔐 Optional Paddle Environment Variables:
+    STAGING_PADDLE_API_KEY - Paddle API key for staging
+    STAGING_PADDLE_CLIENT_KEY - Paddle client key for staging
+    PROD_PADDLE_API_KEY - Paddle API key for production
+    PROD_PADDLE_CLIENT_KEY - Paddle client key for production
+
+    To set them, run:
+    export STAGING_PADDLE_API_KEY="your_key_here"
+    export STAGING_PADDLE_CLIENT_KEY="your_key_here"
+
 💡 Examples:
     # Set the required environment variable
     export VITE_CLERK_PUBLISHABLE_KEY="pk_test_xxxxxxxxxxxx"
@@ -162,6 +172,7 @@ show_verbose_help() {
     - Postgres port is auto-calculated: 5432 + (Langflow_port - 7860)
       Example: Langflow on 7861 → Postgres on 5433
     - Custom tags help organize builds by feature/branch/version
+    - Paddle environment variables are optional and only passed if exported
 
 EOF
 }
@@ -539,7 +550,35 @@ run_docker() {
     # Start Langflow container with env-file and persistent volumes
     echo ""
     echo "🌊 Starting Langflow container with persistent config volume..."
-    LANGFLOW_CMD="docker run -d --name ${UNIQUE_CONTAINER_NAME} --network ${UNIQUE_NETWORK_NAME} --env-file .env-file -e LANGFLOW_DATABASE_URL=\"postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${UNIQUE_POSTGRES_CONTAINER}:5432/${POSTGRES_DB}\" -e LANGFLOW_CONFIG_DIR=\"/var/lib/langflow\" -e LANGFLOW_SAVE_DB_IN_CONFIG_DIR=\"false\" --user root -p ${LANGFLOW_HOST_PORT}:7860 -v ${LANGFLOW_VOLUME_NAME}:/var/lib/langflow ${IMAGE_TO_RUN}"
+    PADDLE_ENV_ARGS=()
+    PADDLE_ENV_DISPLAY=()
+
+    if [ -n "${STAGING_PADDLE_API_KEY:-}" ]; then
+        PADDLE_ENV_ARGS+=(-e "STAGING_PADDLE_API_KEY=${STAGING_PADDLE_API_KEY}")
+        PADDLE_ENV_DISPLAY+=("-e STAGING_PADDLE_API_KEY=***")
+    fi
+
+    if [ -n "${STAGING_PADDLE_CLIENT_KEY:-}" ]; then
+        PADDLE_ENV_ARGS+=(-e "STAGING_PADDLE_CLIENT_KEY=${STAGING_PADDLE_CLIENT_KEY}")
+        PADDLE_ENV_DISPLAY+=("-e STAGING_PADDLE_CLIENT_KEY=***")
+    fi
+
+    if [ -n "${PROD_PADDLE_API_KEY:-}" ]; then
+        PADDLE_ENV_ARGS+=(-e "PROD_PADDLE_API_KEY=${PROD_PADDLE_API_KEY}")
+        PADDLE_ENV_DISPLAY+=("-e PROD_PADDLE_API_KEY=***")
+    fi
+
+    if [ -n "${PROD_PADDLE_CLIENT_KEY:-}" ]; then
+        PADDLE_ENV_ARGS+=(-e "PROD_PADDLE_CLIENT_KEY=${PROD_PADDLE_CLIENT_KEY}")
+        PADDLE_ENV_DISPLAY+=("-e PROD_PADDLE_CLIENT_KEY=***")
+    fi
+
+    if [ -n "${LANGFLOW_ENVIRONMENT:-}" ]; then
+        PADDLE_ENV_ARGS+=(-e "LANGFLOW_ENVIRONMENT=${LANGFLOW_ENVIRONMENT}")
+        PADDLE_ENV_DISPLAY+=("-e LANGFLOW_ENVIRONMENT=${LANGFLOW_ENVIRONMENT}")
+    fi
+
+    LANGFLOW_CMD="docker run -d --name ${UNIQUE_CONTAINER_NAME} --network ${UNIQUE_NETWORK_NAME} --env-file .env-file -e LANGFLOW_DATABASE_URL=\"postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${UNIQUE_POSTGRES_CONTAINER}:5432/${POSTGRES_DB}\" -e LANGFLOW_CONFIG_DIR=\"/var/lib/langflow\" -e LANGFLOW_SAVE_DB_IN_CONFIG_DIR=\"false\" ${PADDLE_ENV_DISPLAY[*]} --user root -p ${LANGFLOW_HOST_PORT}:7860 -v ${LANGFLOW_VOLUME_NAME}:/var/lib/langflow ${IMAGE_TO_RUN}"
     display_command "$LANGFLOW_CMD" "Starting Langflow container"
     
     docker run -d \
@@ -549,6 +588,7 @@ run_docker() {
         -e LANGFLOW_DATABASE_URL="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${UNIQUE_POSTGRES_CONTAINER}:5432/${POSTGRES_DB}" \
         -e LANGFLOW_CONFIG_DIR="/var/lib/langflow" \
         -e LANGFLOW_SAVE_DB_IN_CONFIG_DIR="false" \
+        "${PADDLE_ENV_ARGS[@]}" \
         --user root \
         -p ${LANGFLOW_HOST_PORT}:7860 \
         -v ${LANGFLOW_VOLUME_NAME}:/var/lib/langflow \
