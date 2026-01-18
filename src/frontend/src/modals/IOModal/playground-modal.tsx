@@ -90,7 +90,6 @@ export default function IOModal({
   const {
     data: sessionsFromDb,
     isLoading: sessionsLoading,
-    refetch: refetchSessions,
   } = useGetSessionsFromFlowQuery(
     {
       id: currentFlowId,
@@ -211,6 +210,7 @@ export default function IOModal({
       files?: string[];
     }): Promise<void> => {
       if (isBuilding) return;
+      const activeSessionId = visibleSession ?? sessionId;
       const shouldAddOptimisticMessage =
         chatValue !== "" || (files && files.length > 0);
       if (shouldAddOptimisticMessage) {
@@ -221,7 +221,7 @@ export default function IOModal({
           text: chatValue,
           sender: "User",
           sender_name: "User",
-          session_id: sessionId,
+          session_id: activeSessionId,
           timestamp: new Date().toISOString(),
           files: files ?? [],
           edit: false,
@@ -239,7 +239,7 @@ export default function IOModal({
           startNodeId: chatInput?.id,
           files: files,
           silent: true,
-          session: sessionId,
+          session: activeSessionId,
           eventDelivery: eventDeliveryConfig,
         }).catch((err) => {
           console.error(err);
@@ -257,6 +257,7 @@ export default function IOModal({
       isBuilding,
       sessionId,
       setChatValue,
+      visibleSession,
     ],
   );
 
@@ -265,39 +266,45 @@ export default function IOModal({
       window.sessionStorage.setItem(currentFlowId, JSON.stringify(messages));
     }
     if (newChatOnPlayground && !sessionsLoading) {
-      const handleRefetchAndSetSession = async () => {
-        try {
-          const result = await refetchSessions();
-          if (result.data?.sessions && result.data.sessions.length > 0) {
-            setvisibleSession(
-              result.data.sessions[result.data.sessions.length - 1],
-            );
-          }
-        } catch (error) {
-          console.error("Error refetching sessions:", error);
+      const newSessionId = createNewSessionName();
+      setSessions((prevSessions) => {
+        if (prevSessions.includes(newSessionId)) {
+          return prevSessions;
         }
-      };
-
-      handleRefetchAndSetSession();
+        return [newSessionId, ...prevSessions];
+      });
+      setvisibleSession(newSessionId);
       setNewChatOnPlayground(false);
     }
-  }, [messages, playgroundPage]);
+  }, [
+    currentFlowId,
+    messages,
+    newChatOnPlayground,
+    playgroundPage,
+    sessionsLoading,
+    setNewChatOnPlayground,
+  ]);
 
   useEffect(() => {
     if (!visibleSession) {
-      setSessionId(createNewSessionName());
-      setCurrentSessionId(currentFlowId);
-    } else if (visibleSession) {
-      setSessionId(visibleSession);
-      setCurrentSessionId(visibleSession);
-      if (selectedViewField?.type === "Session") {
-        setSelectedViewField({
-          id: visibleSession,
-          type: "Session",
-        });
+      if (newChatOnPlayground) {
+        return;
       }
+      const newSessionId = createNewSessionName();
+      setSessionId(newSessionId);
+      setCurrentSessionId(newSessionId);
+      setvisibleSession(newSessionId);
+      return;
     }
-  }, [visibleSession]);
+    setSessionId(visibleSession);
+    setCurrentSessionId(visibleSession);
+    if (selectedViewField?.type === "Session") {
+      setSelectedViewField({
+        id: visibleSession,
+        type: "Session",
+      });
+    }
+  }, [newChatOnPlayground, visibleSession]);
 
   const setPlaygroundScrollBehaves = useUtilityStore(
     (state) => state.setPlaygroundScrollBehaves,
