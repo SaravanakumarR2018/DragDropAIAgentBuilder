@@ -1,6 +1,7 @@
 //import LangflowLogoColor from "@/assets/LangflowLogocolor.svg?react";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import ShortUniqueId from "short-unique-id";
 import { useShallow } from "zustand/react/shallow";
 import ThemeButtons from "@/components/core/appHeaderComponent/components/ThemeButtons";
 import { useGetMessagesQuery } from "@/controllers/API/queries/messages";
@@ -75,6 +76,7 @@ export default function IOModal({
   const setErrorData = useAlertStore((state) => state.setErrorData);
   const setSuccessData = useAlertStore((state) => state.setSuccessData);
   const deleteSession = useMessagesStore((state) => state.deleteSession);
+  const addMessage = useMessagesStore((state) => state.addMessage);
   const currentFlowId = useGetFlowId();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -209,6 +211,27 @@ export default function IOModal({
       files?: string[];
     }): Promise<void> => {
       if (isBuilding) return;
+      const shouldAddOptimisticMessage =
+        chatValue !== "" || (files && files.length > 0);
+      if (shouldAddOptimisticMessage) {
+        const uid = new ShortUniqueId();
+        addMessage({
+          id: `optimistic-${uid.randomUUID(10)}`,
+          flow_id: currentFlowId,
+          text: chatValue,
+          sender: "User",
+          sender_name: "User",
+          session_id: sessionId,
+          timestamp: new Date().toISOString(),
+          files: files ?? [],
+          edit: false,
+          background_color: "",
+          text_color: "",
+          properties: {
+            optimistic: true,
+          },
+        });
+      }
       setChatValue("");
       for (let i = 0; i < repeat; i++) {
         await buildFlow({
@@ -224,7 +247,17 @@ export default function IOModal({
         });
       }
     },
-    [isBuilding, setIsBuilding, chatValue, chatInput?.id, sessionId, buildFlow],
+    [
+      addMessage,
+      buildFlow,
+      chatInput?.id,
+      chatValue,
+      currentFlowId,
+      eventDeliveryConfig,
+      isBuilding,
+      sessionId,
+      setChatValue,
+    ],
   );
 
   useEffect(() => {
