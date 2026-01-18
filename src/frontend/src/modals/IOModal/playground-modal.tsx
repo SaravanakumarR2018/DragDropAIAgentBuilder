@@ -44,8 +44,8 @@ export default function IOModal({
   const outputs = useFlowStore((state) => state.outputs);
   const nodes = useFlowStore((state) => state.nodes);
   const buildFlow = useFlowStore((state) => state.buildFlow);
-  const setIsBuilding = useFlowStore((state) => state.setIsBuilding);
   const isBuilding = useFlowStore((state) => state.isBuilding);
+  const buildingSessionId = useFlowStore((state) => state.buildingSessionId);
   const newChatOnPlayground = useFlowStore(
     (state) => state.newChatOnPlayground,
   );
@@ -209,8 +209,8 @@ export default function IOModal({
       repeat: number;
       files?: string[];
     }): Promise<void> => {
-      if (isBuilding) return;
       const activeSessionId = visibleSession ?? sessionId;
+      if (isBuilding && buildingSessionId === activeSessionId) return;
       const shouldAddOptimisticMessage =
         chatValue !== "" || (files && files.length > 0);
       if (shouldAddOptimisticMessage) {
@@ -224,6 +224,22 @@ export default function IOModal({
           session_id: activeSessionId,
           timestamp: new Date().toISOString(),
           files: files ?? [],
+          edit: false,
+          background_color: "",
+          text_color: "",
+          properties: {
+            optimistic: true,
+          },
+        });
+        addMessage({
+          id: `optimistic-${uid.randomUUID(10)}`,
+          flow_id: currentFlowId,
+          text: "Thinking...",
+          sender: "Machine",
+          sender_name: "AI",
+          session_id: activeSessionId,
+          timestamp: new Date().toISOString(),
+          files: [],
           edit: false,
           background_color: "",
           text_color: "",
@@ -254,6 +270,7 @@ export default function IOModal({
       chatValue,
       currentFlowId,
       eventDeliveryConfig,
+      buildingSessionId,
       isBuilding,
       sessionId,
       setChatValue,

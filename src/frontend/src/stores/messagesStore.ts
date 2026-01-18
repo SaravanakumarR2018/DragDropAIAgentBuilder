@@ -16,14 +16,14 @@ export const useMessagesStore = create<MessagesStoreType>((set, get) => ({
     set(() => ({ messages: messages }));
   },
   addMessage: (message) => {
-    if (!message.properties?.optimistic && message.sender === "User") {
+    if (!message.properties?.optimistic) {
       const optimisticIndex = get().messages.findIndex(
         (msg) =>
           msg.properties?.optimistic &&
-          msg.sender === "User" &&
+          msg.sender === message.sender &&
           msg.session_id === message.session_id &&
           msg.flow_id === message.flow_id &&
-          msg.text === message.text,
+          (message.sender !== "User" || msg.text === message.text),
       );
       if (optimisticIndex !== -1) {
         const updatedMessages = [...get().messages];
