@@ -125,6 +125,10 @@ jobs:
             exit 1
           fi
 
+          echo "✅ Paddle secrets detected for ${ENVIRONMENT}"
+          echo "🔎 Existing env file entries:"
+          grep -E '^PADDLE_(API|CLIENT)_KEY=' "$ENV_FILE" || echo "ℹ️ Paddle keys not yet present in $ENV_FILE"
+
           if grep -q '^PADDLE_API_KEY=' "$ENV_FILE"; then
             sed -i "s|^PADDLE_API_KEY=.*|PADDLE_API_KEY=${PADDLE_API_KEY}|" "$ENV_FILE"
           else
@@ -136,6 +140,8 @@ jobs:
           else
             echo "PADDLE_CLIENT_KEY=${PADDLE_CLIENT_KEY}" >> "$ENV_FILE"
           fi
+
+          echo "✅ Paddle keys injected into $ENV_FILE"
 
       - name: Ensure admin user exists in Clerk
         env:

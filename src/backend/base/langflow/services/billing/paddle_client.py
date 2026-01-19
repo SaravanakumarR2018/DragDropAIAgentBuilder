@@ -21,11 +21,11 @@ def _resolve_secret(value: SecretStr | str | None) -> str | None:
     return value
 
 
-def _select_environment() -> Environment:
+def _select_environment() -> tuple[Environment, str]:
     environment_value = os.getenv(PADDLE_ENVIRONMENT_ENV_VAR, "production").strip().lower()
     if environment_value in {"sandbox", "staging", "test"}:
-        return Environment.SANDBOX
-    return Environment.PRODUCTION
+        return Environment.SANDBOX, "sandbox"
+    return Environment.PRODUCTION, "production"
 
 
 def initialize_paddle_client(api_key: SecretStr | str | None, client_key: SecretStr | str | None) -> Client | None:
@@ -39,13 +39,13 @@ def initialize_paddle_client(api_key: SecretStr | str | None, client_key: Secret
         logger.warning("Paddle API key is missing; skipping Paddle client initialization.")
         return None
 
-    environment = _select_environment()
+    environment, environment_label = _select_environment()
     _paddle_client = Client(resolved_api_key, options=Options(environment))
 
     if not _resolve_secret(client_key):
         logger.warning("Paddle client key is missing; frontend Paddle.js may not initialize.")
 
-    logger.info("Paddle client initialized.")
+    logger.info("Paddle client initialized.", environment=environment_label)
     return _paddle_client
 
 
