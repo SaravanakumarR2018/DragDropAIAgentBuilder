@@ -1,5 +1,3 @@
-"""LFX services module - pluggable service architecture for dependency injection."""
-
 from .interfaces import (
     CacheServiceProtocol,
     ChatServiceProtocol,
@@ -11,7 +9,6 @@ from .interfaces import (
 )
 from .manager import ServiceManager
 from .mcp_composer import MCPComposerService, MCPComposerServiceFactory
-from .registry import register_service
 from .session import NoopSession
 
 __all__ = [
@@ -26,5 +23,4 @@ __all__ = [
     "StorageServiceProtocol",
     "TracingServiceProtocol",
     "VariableServiceProtocol",
-    "register_service",
 ]

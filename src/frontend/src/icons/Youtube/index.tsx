@@ -1,5 +1,6 @@
-import React, { forwardRef } from "react";
-import YoutubeIconSVG from "./youtube";
+import type React from "react";
+import { forwardRef } from "react";
+import YouTubeIcon from "./youtube";
 
 export const YoutubeIcon = forwardRef<
   SVGSVGElement,

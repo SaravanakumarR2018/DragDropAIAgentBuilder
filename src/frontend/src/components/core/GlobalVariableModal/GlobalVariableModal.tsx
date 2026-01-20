@@ -3,7 +3,6 @@ import { ForwardedIconComponent } from "@/components/common/genericIconComponent
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs-button";
-import { PROVIDER_VARIABLE_MAPPING } from "@/constants/providerConstants";
 import { useGetTypes } from "@/controllers/API/queries/flows/use-get-types";
 import {
   useGetGlobalVariables,
@@ -15,7 +14,7 @@ import useAlertStore from "@/stores/alertStore";
 import getUnavailableFields from "@/stores/globalVariablesStore/utils/get-unavailable-fields";
 import { useTypesStore } from "@/stores/typesStore";
 import type { ResponseErrorDetailAPI } from "@/types/api";
-import type { GlobalVariable, TAB_TYPES } from "@/types/global_variables";
+import type { GlobalVariable } from "@/types/global_variables";
 import InputComponent from "../parameterRenderComponent/components/inputComponent";
 import { assignTab } from "./utils/assign-tab";
 import sortByName from "./utils/sort-by-name";

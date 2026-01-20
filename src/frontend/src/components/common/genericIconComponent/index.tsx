@@ -12,14 +12,6 @@ import { IconComponentProps } from "../../../types/components";
 import { getCachedIcon, getNodeIcon } from "../../../utils/styleUtils";
 import { cn } from "../../../utils/utils";
 
-type IconComponentType = React.ComponentType<{
-  className?: string;
-  style?: React.CSSProperties;
-  ref?: React.Ref<unknown>;
-  "data-testid"?: string;
-  isDark?: boolean;
-}>;
-
 export const ForwardedIconComponent = memo(
   forwardRef(
     (
@@ -162,7 +154,37 @@ export const ForwardedIconComponent = memo(
 
       return (
         <Suspense fallback={skipFallback ? undefined : fallback}>
-          <ErrorBoundary onError={handleError}>{content}</ErrorBoundary>
+          <ErrorBoundary onError={handleError}>
+            {TargetIcon?.render || TargetIcon?._payload ? (
+              <TargetIcon
+                className={className}
+                style={style}
+                ref={ref}
+                isDark={isDark}
+                data-testid={
+                  dataTestId
+                    ? dataTestId
+                    : id
+                      ? `${id}-${name}`
+                      : `icon-${name}`
+                }
+              />
+            ) : (
+              <div
+                className={className}
+                style={style}
+                data-testid={
+                  dataTestId
+                    ? dataTestId
+                    : id
+                      ? `${id}-${name}`
+                      : `icon-${name}`
+                }
+              >
+                {TargetIcon}
+              </div>
+            )}
+          </ErrorBoundary>
         </Suspense>
       );
     },

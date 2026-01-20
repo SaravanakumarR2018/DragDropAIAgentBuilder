@@ -2,9 +2,8 @@ from textwrap import dedent
 
 from lfx.components.data import URLComponent
 from lfx.components.input_output import ChatOutput, TextInputComponent
-from lfx.components.models_and_agents import PromptComponent
 from lfx.components.openai.openai_chat_model import OpenAIModelComponent
-from lfx.components.processing import ParserComponent
+from lfx.components.processing import ParserComponent, PromptComponent
 from lfx.graph import Graph
 
 

@@ -7,7 +7,6 @@ import { useCustomNavigate } from "@/customization/hooks/use-custom-navigate";
 import { track } from "@/customization/utils/analytics";
 import useAddFlow from "@/hooks/flows/use-add-flow";
 import type { Category } from "@/types/templates/types";
-import { cn } from "@/utils/utils";
 import type { newFlowModalPropsType } from "../../types/components";
 import BaseModal from "../baseModal";
 import GetStartedComponent from "./components/GetStartedComponent";

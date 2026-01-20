@@ -2,7 +2,6 @@ import type {
   ColDef,
   RowClickedEvent,
   SelectionChangedEvent,
-  ValueFormatterParams,
 } from "ag-grid-community";
 import { useRef, useState } from "react";
 

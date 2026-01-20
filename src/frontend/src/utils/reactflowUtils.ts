@@ -24,6 +24,17 @@ import {
 import { cloneDeep } from "lodash";
 import ShortUniqueId from "short-unique-id";
 import {
+  type Connection,
+  type Edge,
+  getOutgoers,
+  type Node,
+  type OnSelectionChangeParams,
+  type ReactFlowJsonObject,
+  type XYPosition,
+} from "@xyflow/react";
+import { cloneDeep } from "lodash";
+import ShortUniqueId from "short-unique-id";
+import {
   getLeftHandleId,
   getRightHandleId,
 } from "@/CustomNodes/utils/get-handle-id";
@@ -299,6 +310,129 @@ export function filterHiddenFieldsEdges(
   return newEdges;
 }
 
+export function detectBrokenEdgesEdges(nodes: AllNodeType[], edges: Edge[]) {
+  function generateAlertObject(sourceNode, targetNode, edge) {
+    const targetHandleObject: targetHandleType = scapeJSONParse(
+      edge.targetHandle,
+    );
+    const sourceHandleObject: sourceHandleType = scapeJSONParse(
+      edge.sourceHandle,
+    );
+    const name = sourceHandleObject.name;
+    const output = sourceNode.data.node!.outputs?.find(
+      (output) => output.name === name,
+    );
+
+    return {
+      source: {
+        nodeDisplayName: sourceNode.data.node!.display_name,
+        outputDisplayName: output?.display_name,
+      },
+      target: {
+        displayName: targetNode.data.node!.display_name,
+        field:
+          targetNode.data.node!.template[targetHandleObject.fieldName]
+            ?.display_name ??
+          targetHandleObject.fieldName ??
+          targetHandleObject.name,
+      },
+    };
+  }
+  let newEdges = cloneDeep(edges);
+  const BrokenEdges: {
+    source: {
+      nodeDisplayName: string;
+      outputDisplayName?: string;
+    };
+    target: {
+      displayName: string;
+      field: string;
+    };
+  }[] = [];
+  edges.forEach((edge) => {
+    // check if the source and target node still exists
+    const sourceNode = nodes.find((node) => node.id === edge.source);
+    const targetNode = nodes.find((node) => node.id === edge.target);
+    if (!sourceNode || !targetNode) {
+      newEdges = newEdges.filter((edg) => edg.id !== edge.id);
+      return;
+    }
+    // check if the source and target handle still exists
+    const sourceHandle = edge.sourceHandle; //right
+    const targetHandle = edge.targetHandle; //left
+    if (targetHandle) {
+      const targetHandleObject: targetHandleType = scapeJSONParse(targetHandle);
+      const field = targetHandleObject.fieldName;
+      let id: sourceHandleType | targetHandleType;
+
+      const templateFieldType = targetNode.data.node!.template[field]?.type;
+      const inputTypes = targetNode.data.node!.template[field]?.input_types;
+      const hasProxy = targetNode.data.node!.template[field]?.proxy;
+
+      if (
+        !field &&
+        targetHandleObject.name &&
+        targetNode.type === "genericNode"
+      ) {
+        const dataType = targetNode.data.type;
+        const outputTypes =
+          targetNode.data.node!.outputs?.find(
+            (output) => output.name === targetHandleObject.name,
+          )?.types ?? [];
+
+        id = {
+          dataType: dataType ?? "",
+          name: targetHandleObject.name,
+          id: targetNode.data.id,
+          output_types: outputTypes,
+        };
+      } else {
+        id = {
+          type: templateFieldType,
+          fieldName: field,
+          id: targetNode.data.id,
+          inputTypes: inputTypes,
+        };
+        if (hasProxy) {
+          id.proxy = targetNode.data.node!.template[field]?.proxy;
+        }
+      }
+      if (scapedJSONStringfy(id) !== targetHandle) {
+        newEdges = newEdges.filter((e) => e.id !== edge.id);
+        BrokenEdges.push(generateAlertObject(sourceNode, targetNode, edge));
+      }
+    }
+    if (sourceHandle) {
+      const parsedSourceHandle = scapeJSONParse(sourceHandle);
+      const name = parsedSourceHandle.name;
+      if (sourceNode.type == "genericNode") {
+        const output = sourceNode.data.node!.outputs?.find(
+          (output) => output.name === name,
+        );
+        if (output) {
+          const outputTypes =
+            output!.types.length === 1 ? output!.types : [output!.selected!];
+
+          const id: sourceHandleType = {
+            id: sourceNode.data.id,
+            name: name,
+            output_types: outputTypes,
+            dataType: sourceNode.data.type,
+          };
+          if (scapedJSONStringfy(id) !== sourceHandle) {
+            newEdges = newEdges.filter((e) => e.id !== edge.id);
+            BrokenEdges.push(generateAlertObject(sourceNode, targetNode, edge));
+          }
+        } else {
+          newEdges = newEdges.filter((e) => e.id !== edge.id);
+          BrokenEdges.push(generateAlertObject(sourceNode, targetNode, edge));
+        }
+      }
+    }
+  });
+  return BrokenEdges;
+}
+
 export function unselectAllNodesEdges(nodes: Node[], edges: Edge[]) {
   nodes.forEach((node: Node) => {
     node.selected = false;
@@ -350,17 +484,6 @@ export function isValidConnection(
     return null;
   };
 
-  // Check if target is an loop input (loop component)
-  const isLoopInput = !!targetHandleObject.output_types;
-
-  // For loop inputs, check if source types match any of the configured target output_types
-  // (which already includes original type + loop_types from the output configuration)
-  const loopInputTypeCheck =
-    isLoopInput &&
-    (sourceHandleObject.output_types.some((t) =>
-      targetHandleObject.output_types?.includes(t),
-    ) ||
-      targetHandleObject.output_types?.includes(sourceHandleObject.dataType));
   if (
     targetHandleObject.inputTypes?.some(
       (n) => n === sourceHandleObject.dataType,
@@ -1794,6 +1917,18 @@ export function templatesGenerator(data: APIObjectType) {
     });
     return acc;
   }, {});
+}
+
+export function templatesByModuleGenerator(data: APIObjectType) {
+  return Object.keys(data).reduce((acc, curr) => {
+    Object.values(data[curr]).forEach((component) => {
+      const moduleName = component?.metadata?.module;
+      if (moduleName && !acc[moduleName]) {
+        acc[moduleName] = component;
+      }
+    });
+    return acc;
+  }, {} as Record<string, APIClassType>);
 }
 
 /**

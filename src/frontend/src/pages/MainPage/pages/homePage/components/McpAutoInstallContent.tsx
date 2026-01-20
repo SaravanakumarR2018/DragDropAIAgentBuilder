@@ -3,18 +3,13 @@ import ShadTooltip from "@/components/common/shadTooltipComponent";
 import { Button } from "@/components/ui/button";
 import { toSpaceCase } from "@/utils/stringManipulation";
 import { cn } from "@/utils/utils";
-import type { MCPTransport } from "@/controllers/API/queries/mcp/use-patch-install-mcp";
 import { autoInstallers } from "../utils/mcpServerUtils";
 
 interface McpAutoInstallContentProps {
   isLocalConnection: boolean;
   installedMCPData?: Array<{ name?: string; available?: boolean }>;
   loadingMCP: string[];
-  installClient: (
-    name: string,
-    title?: string,
-    transport?: MCPTransport,
-  ) => void;
+  installClient: (name: string, title?: string) => void;
   installedClients?: string[];
 }
 
@@ -63,13 +58,7 @@ export const McpAutoInstallContent = ({
                 (client) => client.name === installer.name,
               )?.available
             }
-            onClick={() =>
-              installClient(
-                installer.name,
-                installer.title,
-                installer.transport,
-              )
-            }
+            onClick={() => installClient(installer.name, installer.title)}
           >
             <div className="flex items-center gap-4 text-sm font-medium">
               <ForwardedIconComponent

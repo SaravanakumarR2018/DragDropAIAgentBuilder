@@ -4,7 +4,6 @@ import {
   oneDark,
   oneLight,
 } from "react-syntax-highlighter/dist/cjs/styles/prism";
-import { CustomAPIGenerator } from "@/customization/components/custom-api-generator";
 import { useDarkStore } from "@/stores/darkStore";
 import IconComponent from "../../components/common/genericIconComponent";
 import { Button } from "../../components/ui/button";

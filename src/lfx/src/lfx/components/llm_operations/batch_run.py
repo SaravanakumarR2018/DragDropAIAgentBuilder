@@ -1,260 +1,210 @@
-from __future__ import annotations
+from typing import TYPE_CHECKING, cast
 
-from typing import TYPE_CHECKING, Any, cast
+import pandas as pd
+from langchain_core.documents import Document
+from pandas import DataFrame as pandas_DataFrame
 
-import toml  # type: ignore[import-untyped]
-
-from lfx.base.models.unified_models import (
-    get_language_model_options,
-    get_model_classes,
-    update_model_options_in_build_config,
-)
-from lfx.custom.custom_component.component import Component
-from lfx.io import BoolInput, DataFrameInput, MessageTextInput, ModelInput, MultilineInput, Output, SecretStrInput
-from lfx.log.logger import logger
-from lfx.schema.dataframe import DataFrame
+from lfx.schema.data import Data
 
 if TYPE_CHECKING:
-    from langchain_core.runnables import Runnable
+    from lfx.schema.message import Message
 
 
-class BatchRunComponent(Component):
-    display_name = "Batch Run"
-    description = "Runs an LLM on each row of a DataFrame column. If no column is specified, all columns are used."
-    documentation: str = "https://docs.langflow.org/batch-run"
-    icon = "List"
+class DataFrame(pandas_DataFrame):
+    """A pandas DataFrame subclass specialized for handling collections of Data objects.
 
-    inputs = [
-        ModelInput(
-            name="model",
-            display_name="Language Model",
-            info="Select your model provider",
-            real_time_refresh=True,
-            required=True,
-        ),
-        SecretStrInput(
-            name="api_key",
-            display_name="API Key",
-            info="Model Provider API key",
-            real_time_refresh=True,
-            advanced=True,
-        ),
-        MultilineInput(
-            name="system_message",
-            display_name="Instructions",
-            info="Multi-line system instruction for all rows in the DataFrame.",
-            required=False,
-        ),
-        DataFrameInput(
-            name="df",
-            display_name="DataFrame",
-            info="The DataFrame whose column (specified by 'column_name') we'll treat as text messages.",
-            required=True,
-        ),
-        MessageTextInput(
-            name="column_name",
-            display_name="Column Name",
-            info=(
-                "The name of the DataFrame column to treat as text messages. "
-                "If empty, all columns will be formatted in TOML."
-            ),
-            required=False,
-            advanced=False,
-        ),
-        MessageTextInput(
-            name="output_column_name",
-            display_name="Output Column Name",
-            info="Name of the column where the model's response will be stored.",
-            value="model_response",
-            required=False,
-            advanced=True,
-        ),
-        BoolInput(
-            name="enable_metadata",
-            display_name="Enable Metadata",
-            info="If True, add metadata to the output DataFrame.",
-            value=False,
-            required=False,
-            advanced=True,
-        ),
-    ]
+    This class extends pandas.DataFrame to provide seamless integration between
+    Langflow's Data objects and pandas' powerful data manipulation capabilities.
 
-    outputs = [
-        Output(
-            display_name="LLM Results",
-            name="batch_results",
-            method="run_batch",
-            info="A DataFrame with all original columns plus the model's response column.",
-        ),
-    ]
+    Args:
+        data: Input data in various formats:
+            - List[Data]: List of Data objects
+            - List[Dict]: List of dictionaries
+            - Dict: Dictionary of arrays/lists
+            - pandas.DataFrame: Existing DataFrame
+            - Any format supported by pandas.DataFrame
+        **kwargs: Additional arguments passed to pandas.DataFrame constructor
 
-    def update_build_config(self, build_config: dict, field_value: str, field_name: str | None = None):
-        """Dynamically update build config with user-filtered model options."""
-        return update_model_options_in_build_config(
-            component=self,
-            build_config=build_config,
-            cache_key_prefix="language_model_options",
-            get_options_func=get_language_model_options,
-            field_name=field_name,
-            field_value=field_value,
-        )
+    Examples:
+        >>> # From Data objects
+        >>> dataset = DataFrame([Data(data={"name": "John"}), Data(data={"name": "Jane"})])
 
-    def _format_row_as_toml(self, row: dict[str, Any]) -> str:
-        """Convert a dictionary (row) into a TOML-formatted string."""
-        formatted_dict = {str(col): {"value": str(val)} for col, val in row.items()}
-        return toml.dumps(formatted_dict)
+        >>> # From dictionaries
+        >>> dataset = DataFrame([{"name": "John"}, {"name": "Jane"}])
 
-    def _create_base_row(
-        self, original_row: dict[str, Any], model_response: str = "", batch_index: int = -1
-    ) -> dict[str, Any]:
-        """Create a base row with original columns and additional metadata."""
-        row = original_row.copy()
-        row[self.output_column_name] = model_response
-        row["batch_index"] = batch_index
-        return row
+        >>> # From dictionary of lists
+        >>> dataset = DataFrame({"name": ["John", "Jane"], "age": [30, 25]})
+    """
 
-    def _add_metadata(
-        self, row: dict[str, Any], *, success: bool = True, system_msg: str = "", error: str | None = None
-    ) -> None:
-        """Add metadata to a row if enabled."""
-        if not self.enable_metadata:
+    def __init__(
+        self,
+        data: list[dict] | list[Data] | pd.DataFrame | None = None,
+        text_key: str = "text",
+        default_value: str = "",
+        **kwargs,
+    ):
+        # Initialize pandas DataFrame first without data
+        super().__init__(**kwargs)  # Removed data parameter
+
+        # Store attributes as private members to avoid conflicts with pandas
+        self._text_key = text_key
+        self._default_value = default_value
+
+        if data is None:
             return
 
-        if success:
-            row["metadata"] = {
-                "has_system_message": bool(system_msg),
-                "input_length": len(row.get("text_input", "")),
-                "response_length": len(row[self.output_column_name]),
-                "processing_status": "success",
-            }
-        else:
-            row["metadata"] = {
-                "error": error,
-                "processing_status": "failed",
-            }
-
-    async def run_batch(self) -> DataFrame:
-        """Process each row in df[column_name] with the language model asynchronously."""
-        # Check if model is already an instance (for testing) or needs to be instantiated
-        if isinstance(self.model, list):
-            # Extract model configuration
-            model_selection = self.model[0]
-            model_name = model_selection.get("name")
-            provider = model_selection.get("provider")
-            metadata = model_selection.get("metadata", {})
-
-            # Get model class and parameters from metadata
-            model_class = get_model_classes().get(metadata.get("model_class"))
-            if model_class is None:
-                msg = f"No model class defined for {model_name}"
+        if isinstance(data, list):
+            if all(isinstance(x, Data) for x in data):
+                data = [d.data for d in data if hasattr(d, "data")]
+            elif not all(isinstance(x, dict) for x in data):
+                msg = "List items must be either all Data objects or all dictionaries"
                 raise ValueError(msg)
+            self._update(data, **kwargs)
+        elif isinstance(data, dict | pd.DataFrame):  # Fixed type check syntax
+            self._update(data, **kwargs)
 
-            api_key_param = metadata.get("api_key_param", "api_key")
-            model_name_param = metadata.get("model_name_param", "model")
+    def _update(self, data, **kwargs):
+        """Helper method to update DataFrame with new data."""
+        new_df = pd.DataFrame(data, **kwargs)
+        self._update_inplace(new_df)
 
-            # Get API key from global variables
-            from lfx.base.models.unified_models import get_api_key_for_provider
+    # Update property accessors
+    @property
+    def text_key(self) -> str:
+        return self._text_key
 
-            api_key = get_api_key_for_provider(self.user_id, provider, self.api_key)
-
-            if not api_key and provider != "Ollama":
-                msg = f"{provider} API key is required. Please configure it globally."
-                raise ValueError(msg)
-
-            # Instantiate the model
-            kwargs = {
-                model_name_param: model_name,
-                api_key_param: api_key,
-            }
-            model: Runnable = model_class(**kwargs)
-        else:
-            # Model is already an instance (typically in tests)
-            model = self.model
-
-        system_msg = self.system_message or ""
-        df: DataFrame = self.df
-        col_name = self.column_name or ""
-
-        # Validate inputs first
-        if not isinstance(df, DataFrame):
-            msg = f"Expected DataFrame input, got {type(df)}"
-            raise TypeError(msg)
-
-        if col_name and col_name not in df.columns:
-            msg = f"Column '{col_name}' not found in the DataFrame. Available columns: {', '.join(df.columns)}"
+    @text_key.setter
+    def text_key(self, value: str) -> None:
+        if value not in self.columns:
+            msg = f"Text key '{value}' not found in DataFrame columns"
             raise ValueError(msg)
+        self._text_key = value
 
-        try:
-            # Determine text input for each row
-            if col_name:
-                user_texts = df[col_name].astype(str).tolist()
+    @property
+    def default_value(self) -> str:
+        return self._default_value
+
+    @default_value.setter
+    def default_value(self, value: str) -> None:
+        self._default_value = value
+
+    def to_data_list(self) -> list[Data]:
+        """Converts the DataFrame back to a list of Data objects."""
+        list_of_dicts = self.to_dict(orient="records")
+        # suggested change: [Data(**row) for row in list_of_dicts]
+        return [Data(data=row) for row in list_of_dicts]
+
+    def add_row(self, data: dict | Data) -> "DataFrame":
+        """Adds a single row to the dataset.
+
+        Args:
+            data: Either a Data object or a dictionary to add as a new row
+
+        Returns:
+            DataFrame: A new DataFrame with the added row
+
+        Example:
+            >>> dataset = DataFrame([{"name": "John"}])
+            >>> dataset = dataset.add_row({"name": "Jane"})
+        """
+        if isinstance(data, Data):
+            data = data.data
+        new_df = self._constructor([data])
+        return cast("DataFrame", pd.concat([self, new_df], ignore_index=True))
+
+    def add_rows(self, data: list[dict | Data]) -> "DataFrame":
+        """Adds multiple rows to the dataset.
+
+        Args:
+            data: List of Data objects or dictionaries to add as new rows
+
+        Returns:
+            DataFrame: A new DataFrame with the added rows
+        """
+        processed_data = []
+        for item in data:
+            if isinstance(item, Data):
+                processed_data.append(item.data)
             else:
-                user_texts = [
-                    self._format_row_as_toml(cast("dict[str, Any]", row)) for row in df.to_dict(orient="records")
-                ]
+                processed_data.append(item)
+        new_df = self._constructor(processed_data)
+        return cast("DataFrame", pd.concat([self, new_df], ignore_index=True))
 
-            total_rows = len(user_texts)
-            await logger.ainfo(f"Processing {total_rows} rows with batch run")
+    @property
+    def _constructor(self):
+        def _c(*args, **kwargs):
+            return DataFrame(*args, **kwargs).__finalize__(self)
 
-            # Prepare the batch of conversations
-            conversations = [
-                [{"role": "system", "content": system_msg}, {"role": "user", "content": text}]
-                if system_msg
-                else [{"role": "user", "content": text}]
-                for text in user_texts
-            ]
+        return _c
 
-            # Configure the model with project info and callbacks
-            # Some models (e.g., ChatWatsonx) may have serialization issues with with_config()
-            # due to SecretStr or other non-serializable attributes
-            try:
-                model = model.with_config(
-                    {
-                        "run_name": self.display_name,
-                        "project_name": self.get_project_name(),
-                        "callbacks": self.get_langchain_callbacks(),
-                    }
-                )
-            except (TypeError, ValueError, AttributeError) as e:
-                # Log warning and continue without configuration
-                await logger.awarning(
-                    f"Could not configure model with callbacks and project info: {e!s}. "
-                    "Proceeding with batch processing without configuration."
-                )
-            # Process batches and track progress
-            responses_with_idx = list(
-                zip(
-                    range(len(conversations)),
-                    await model.abatch(list(conversations)),
-                    strict=True,
-                )
-            )
+    def __bool__(self):
+        """Truth value testing for the DataFrame.
 
-            # Sort by index to maintain order
-            responses_with_idx.sort(key=lambda x: x[0])
+        Returns True if the DataFrame has at least one row, False otherwise.
+        """
+        return not self.empty
 
-            # Build the final data with enhanced metadata
-            rows: list[dict[str, Any]] = []
-            for idx, (original_row, response) in enumerate(
-                zip(df.to_dict(orient="records"), responses_with_idx, strict=False)
-            ):
-                response_text = response[1].content if hasattr(response[1], "content") else str(response[1])
-                row = self._create_base_row(
-                    cast("dict[str, Any]", original_row), model_response=response_text, batch_index=idx
-                )
-                self._add_metadata(row, success=True, system_msg=system_msg)
-                rows.append(row)
+    __hash__ = None  # DataFrames are mutable and shouldn't be hashable
 
-                # Log progress
-                if (idx + 1) % max(1, total_rows // 10) == 0:
-                    await logger.ainfo(f"Processed {idx + 1}/{total_rows} rows")
+    def to_lc_documents(self) -> list[Document]:
+        """Converts the DataFrame to a list of Documents.
 
-            await logger.ainfo("Batch processing completed successfully")
-            return DataFrame(rows)
+        Returns:
+            list[Document]: The converted list of Documents.
+        """
+        list_of_dicts = self.to_dict(orient="records")
+        documents = []
+        for row in list_of_dicts:
+            data_copy = row.copy()
+            text = data_copy.pop(self._text_key, self._default_value)
+            if isinstance(text, str):
+                documents.append(Document(page_content=text, metadata=data_copy))
+            else:
+                documents.append(Document(page_content=str(text), metadata=data_copy))
+        return documents
 
-        except (KeyError, AttributeError) as e:
-            # Handle data structure and attribute access errors
-            await logger.aerror(f"Data processing error: {e!s}")
-            error_row = self._create_base_row(dict.fromkeys(df.columns, ""), model_response="", batch_index=-1)
-            self._add_metadata(error_row, success=False, error=str(e))
-            return DataFrame([error_row])
+    def _docs_to_dataframe(self, docs):
+        """Converts a list of Documents to a DataFrame.
+
+        Args:
+            docs: List of Document objects
+
+        Returns:
+            DataFrame: A new DataFrame with the converted Documents
+        """
+        return DataFrame(docs)
+
+    def __eq__(self, other):
+        """Override equality to handle comparison with empty DataFrames and non-DataFrame objects."""
+        if self.empty:
+            return False
+        if isinstance(other, list) and not other:  # Empty list case
+            return False
+        if not isinstance(other, DataFrame | pd.DataFrame):  # Non-DataFrame case
+            return False
+        return super().__eq__(other)
+
+    def to_data(self) -> Data:
+        """Convert this DataFrame to a Data object.
+
+        Returns:
+            Data: A Data object containing the DataFrame records under 'results' key.
+        """
+        dict_list = self.to_dict(orient="records")
+        return Data(data={"results": dict_list})
+
+    def to_message(self) -> "Message":
+        from lfx.schema.message import Message
+
+        # Process DataFrame similar to the _safe_convert method
+        # Remove empty rows
+        processed_df = self.dropna(how="all")
+        # Remove empty lines in each cell
+        processed_df = processed_df.replace(r"^\s*$", "", regex=True)
+        # Replace multiple newlines with a single newline
+        processed_df = processed_df.replace(r"\n+", "\n", regex=True)
+        # Replace pipe characters to avoid markdown table issues
+        processed_df = processed_df.replace(r"\|", r"\\|", regex=True)
+        processed_df = processed_df.map(lambda x: str(x).replace("\n", "<br/>") if isinstance(x, str) else x)
+        # Convert to markdown and wrap in a Message
+        return Message(text=processed_df.to_markdown(index=False))

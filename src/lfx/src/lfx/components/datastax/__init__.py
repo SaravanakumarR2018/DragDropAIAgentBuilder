@@ -5,19 +5,17 @@ from typing import TYPE_CHECKING, Any
 from lfx.components._importing import import_mod
 
 if TYPE_CHECKING:
-    from .astradb_assistant_manager import AstraAssistantManager
-    from .astradb_chatmemory import AstraDBChatMemory
+    from .astra_assistant_manager import AstraAssistantManager
+    from .astra_db import AstraDBChatMemory
+    from .astra_vectorize import AstraVectorizeComponent
     from .astradb_cql import AstraDBCQLToolComponent
-    from .astradb_graph import AstraDBGraphVectorStoreComponent
     from .astradb_tool import AstraDBToolComponent
-    from .astradb_vectorize import AstraVectorizeComponent
     from .astradb_vectorstore import AstraDBVectorStoreComponent
     from .create_assistant import AssistantsCreateAssistant
     from .create_thread import AssistantsCreateThread
     from .dotenv import Dotenv
     from .get_assistant import AssistantsGetAssistantName
     from .getenvvar import GetEnvVar
-    from .graph_rag import GraphRAGComponent
     from .list_assistants import AssistantsListAssistants
     from .run import AssistantsRun
 
@@ -27,16 +25,14 @@ _dynamic_imports = {
     "AssistantsGetAssistantName": "get_assistant",
     "AssistantsListAssistants": "list_assistants",
     "AssistantsRun": "run",
-    "AstraAssistantManager": "astradb_assistant_manager",
+    "AstraAssistantManager": "astra_assistant_manager",
     "AstraDBCQLToolComponent": "astradb_cql",
-    "AstraDBChatMemory": "astradb_chatmemory",
-    "AstraDBGraphVectorStoreComponent": "astradb_graph",
+    "AstraDBChatMemory": "astra_db",
     "AstraDBToolComponent": "astradb_tool",
     "AstraDBVectorStoreComponent": "astradb_vectorstore",
-    "AstraVectorizeComponent": "astradb_vectorize",
+    "AstraVectorizeComponent": "astra_vectorize",
     "Dotenv": "dotenv",
     "GetEnvVar": "getenvvar",
-    "GraphRAGComponent": "graph_rag",
 }
 
 __all__ = [
@@ -48,13 +44,11 @@ __all__ = [
     "AstraAssistantManager",
     "AstraDBCQLToolComponent",
     "AstraDBChatMemory",
-    "AstraDBGraphVectorStoreComponent",
     "AstraDBToolComponent",
     "AstraDBVectorStoreComponent",
     "AstraVectorizeComponent",
     "Dotenv",
     "GetEnvVar",
-    "GraphRAGComponent",
 ]
 
 

@@ -28,40 +28,6 @@ MCP_SERVERS_FILE = "_mcp_servers"
 SAMPLE_DATA_DIR = Path(__file__).parent / "sample_data"
 
 
-def is_permanent_storage_failure(error: Exception) -> bool:
-    """Check if a storage deletion error is a permanent failure (file/storage gone).
-
-    Permanent failures are safe to delete from DB because the file/storage is already gone.
-    Transient failures (network, permissions) should keep DB record for retry.
-
-    Args:
-        error: The exception raised during storage deletion
-
-    Returns:
-        True if this is a permanent failure (safe to delete from DB), False otherwise
-    """
-    # Check for standard Python file not found errors (local storage)
-    if isinstance(error, FileNotFoundError):
-        return True
-
-    # Check for S3 error codes (boto3/aioboto3)
-    # S3 errors have a 'response' attribute with Error.Code
-    if hasattr(error, "response"):
-        response = error.response
-        if isinstance(response, dict):
-            error_code = response.get("Error", {}).get("Code")
-            # Permanent failures: file/bucket doesn't exist
-            if error_code in ("NoSuchBucket", "NoSuchKey", "404"):
-                return True
-
-    # Fallback: Check error message for known permanent failure patterns
-    # This is less ideal but provides a safety net for edge cases
-    error_str = str(error)
-    permanent_patterns = ("NoSuchBucket", "NoSuchKey", "not found", "FileNotFoundError")
-
-    return any(pattern in error_str for pattern in permanent_patterns)
-
-
 async def get_mcp_file(current_user: CurrentActiveUser, *, extension: bool = False) -> str:
     # Create a unique MCP servers file with the user id appended
     return f"{MCP_SERVERS_FILE}_{current_user.id!s}" + (".json" if extension else "")
@@ -98,21 +64,12 @@ async def fetch_file_object(file_id: uuid.UUID, current_user: CurrentActiveUser,
 
     # Make sure the user has access to the file
     if file.user_id != current_user.id:
-        # Return 404 to prevent information disclosure about resource existence
-        raise HTTPException(status_code=404, detail="File not found")
+        raise HTTPException(status_code=403, detail="You don't have access to this file")
 
     return file
 
 
-async def save_file_routine(
-    file,
-    storage_service,
-    current_user: CurrentActiveUser,
-    file_content=None,
-    file_name=None,
-    *,
-    append: bool = False,
-):
+async def save_file_routine(file, storage_service, current_user: CurrentActiveUser, file_content=None, file_name=None):
     """Routine to save the file content to the storage service."""
     file_id = uuid.uuid4()
 
@@ -122,7 +79,7 @@ async def save_file_routine(
         file_name = file.filename
 
     # Save the file using the storage service.
-    await storage_service.save_file(flow_id=str(current_user.id), file_name=file_name, data=file_content, append=append)
+    await storage_service.save_file(flow_id=str(current_user.id), file_name=file_name, data=file_content)
 
     return file_id, file_name
 
@@ -135,8 +92,6 @@ async def upload_user_file(
     current_user: CurrentActiveUser,
     storage_service: Annotated[StorageService, Depends(get_storage_service)],
     settings_service: Annotated[SettingsService, Depends(get_settings_service)],
-    *,
-    append: bool = False,
 ) -> UploadFileResponse:
     """Upload a file for the current user and track it in the database."""
     # Get the max allowed file size from settings (in MB)
@@ -169,27 +124,12 @@ async def upload_user_file(
         mcp_file = await get_mcp_file(current_user)
         mcp_file_ext = await get_mcp_file(current_user, extension=True)
 
-        # Initialize existing_file for append mode
-        existing_file = None
-
         if new_filename == mcp_file_ext:
             # Check if an existing record exists; if so, delete it to replace with the new one
             existing_mcp_file = await get_file_by_name(mcp_file, current_user, session)
             if existing_mcp_file:
                 await delete_file(existing_mcp_file.id, current_user, session, storage_service)
-                # Flush the session to ensure the deletion is committed before creating the new file
-                await session.flush()
             unique_filename = new_filename
-        elif append:
-            # In append mode, check if file exists and reuse the same filename
-            existing_file = await get_file_by_name(root_filename, current_user, session)
-            if existing_file:
-                # File exists, append to it by reusing the same filename
-                # Extract the filename from the path
-                unique_filename = Path(existing_file.path).name
-            else:
-                # File doesn't exist yet, create new one with extension
-                unique_filename = f"{root_filename}.{file_extension}" if file_extension else root_filename
         else:
             # For normal files, ensure unique name by appending a count if necessary
             stmt = select(UserFile).where(
@@ -213,59 +153,32 @@ async def upload_user_file(
             # Create the unique filename with extension for storage
             unique_filename = f"{root_filename}.{file_extension}" if file_extension else root_filename
 
-        # Read file content, save with unique filename, and compute file size in one routine
+        # Read file content and save with unique filename
         try:
             file_id, stored_file_name = await save_file_routine(
-                file, storage_service, current_user, file_name=unique_filename, append=append
+                file, storage_service, current_user, file_name=unique_filename
             )
-            file_size = await storage_service.get_file_size(
-                flow_id=str(current_user.id),
-                file_name=stored_file_name,
-            )
-        except FileNotFoundError as e:
-            # S3 bucket doesn't exist or file not found, or file was uploaded but can't be found
-            raise HTTPException(status_code=404, detail=str(e)) from e
-        except PermissionError as e:
-            # Access denied or invalid credentials - return 500 as this is a server config issue
-            raise HTTPException(status_code=500, detail="Error accessing storage") from e
         except Exception as e:
-            # General error saving file or getting file size
-            raise HTTPException(status_code=500, detail=f"Error accessing file: {e}") from e
+            raise HTTPException(status_code=500, detail=f"Error saving file: {e}") from e
 
-        if append and existing_file:
-            existing_file.size = file_size
-            session.add(existing_file)
-            await session.commit()
-            await session.refresh(existing_file)
-            new_file = existing_file
-        else:
-            # Create a new file record
-            new_file = UserFile(
-                id=file_id,
-                user_id=current_user.id,
-                name=root_filename,
-                path=f"{current_user.id}/{stored_file_name}",
-                size=file_size,
-            )
+        # Compute the file size based on the path
+        file_size = await storage_service.get_file_size(
+            flow_id=str(current_user.id),
+            file_name=stored_file_name,
+        )
 
+        # Create a new file record
+        new_file = UserFile(
+            id=file_id,
+            user_id=current_user.id,
+            name=root_filename,
+            path=f"{current_user.id}/{stored_file_name}",
+            size=file_size,
+        )
         session.add(new_file)
-        try:
-            await session.flush()
-            await session.refresh(new_file)
-        except Exception as db_err:
-            # Database insert failed - clean up the uploaded file to avoid orphaned files
-            try:
-                await storage_service.delete_file(flow_id=str(current_user.id), file_name=stored_file_name)
-            except OSError as e:
-                #  If delete fails, just log the error
-                await logger.aerror(f"Failed to clean up uploaded file {stored_file_name}: {e}")
 
-            raise HTTPException(
-                status_code=500, detail=f"Error inserting file metadata into database: {db_err}"
-            ) from db_err
-    except HTTPException:
-        # Re-raise HTTP exceptions (like 409 conflicts) without modification
-        raise
+        await session.commit()
+        await session.refresh(new_file)
     except Exception as e:
         # Optionally, you could also delete the file from disk if the DB insert fails.
         raise HTTPException(status_code=500, detail=f"Database error: {e}") from e
@@ -328,7 +241,7 @@ async def load_sample_files(current_user: CurrentActiveUser, session: DbSession,
 
         session.add(sample_file)
 
-        await session.flush()
+        await session.commit()
         await session.refresh(sample_file)
 
 
@@ -375,84 +288,19 @@ async def delete_files_batch(
         if not files:
             raise HTTPException(status_code=404, detail="No files found")
 
-        # Track storage deletion failures
-        storage_failures = []
-        # Track database deletion failures
-        db_failures = []
-
         # Delete all files from the storage service
         for file in files:
-            # Extract just the filename from the path (strip user_id prefix)
-            file_name = Path(file.path).name
-            storage_deleted = False
+            await storage_service.delete_file(flow_id=str(current_user.id), file_name=file.path)
+            await session.delete(file)
 
-            try:
-                await storage_service.delete_file(flow_id=str(current_user.id), file_name=file_name)
-                storage_deleted = True
-            except OSError as err:
-                # Check if this is a "permanent" failure where file/storage is gone
-                # These are safe to delete from DB even if storage deletion failed
-                if is_permanent_storage_failure(err):
-                    # File/storage is permanently gone - safe to delete from DB
-                    await logger.awarning(
-                        "File %s not found in storage (permanent failure), will remove from database: %s",
-                        file_name,
-                        err,
-                    )
-                    storage_deleted = True  # Treat as "deleted" for DB purposes
-                else:
-                    # Transient failure (network, timeout, permissions) - keep in DB for retry
-                    storage_failures.append(f"{file_name}: {err}")
-                    await logger.awarning(
-                        "Failed to delete file %s from storage (transient error, keeping in database for retry): %s",
-                        file_name,
-                        err,
-                    )
-
-            # Only delete from database if storage deletion succeeded OR it was a permanent failure
-            if storage_deleted:
-                try:
-                    await session.delete(file)
-                except OSError as db_error:
-                    # Log database deletion failure but continue processing remaining files
-                    db_failures.append(f"{file_name}: {db_error}")
-                    await logger.aerror(
-                        "Failed to delete file %s from database: %s",
-                        file_name,
-                        db_error,
-                    )
-
-        # If there were storage failures, include them in the response
-        if storage_failures:
-            await logger.awarning(
-                "Batch delete completed with %d storage failures: %s", len(storage_failures), storage_failures
-            )
-        # If there were database failures, log them
-        if db_failures:
-            await logger.aerror("Batch delete completed with %d database failures: %s", len(db_failures), db_failures)
-            # If all database deletions failed, raise an error
-            if len(db_failures) == len(files):
-                raise HTTPException(status_code=500, detail=f"Failed to delete any files from database: {db_failures}")
-
-        # Calculate how many files were actually deleted from database
-        # Files successfully deleted = total - (kept due to transient storage failures) - (DB deletion failures)
-        files_deleted = len(files) - len(storage_failures) - len(db_failures)
-        files_kept = len(storage_failures)  # Files with transient storage failures kept in DB
-
-        # Build response message
-        if files_deleted == len(files):
-            message = f"{files_deleted} files deleted successfully"
-        elif files_deleted > 0:
-            message = f"{files_deleted} files deleted successfully"
-            if files_kept > 0:
-                message += f", {files_kept} files kept in database due to transient storage errors (can retry)"
-        else:
-            message = "No files were deleted from database"
+        # Delete all files from the database
+        await session.commit()  # Commit deletion
 
     except Exception as e:
+        await session.rollback()  # Rollback on failure
         raise HTTPException(status_code=500, detail=f"Error deleting files: {e}") from e
 
-    return {"message": message}
+    return {"message": f"{len(files)} files deleted successfully"}
 
 
 @router.post("/batch/", status_code=HTTPStatus.OK)
@@ -480,7 +328,7 @@ async def download_files_batch(
             for file in files:
                 # Get the file content from storage
                 file_content = await storage_service.get_file(
-                    flow_id=str(current_user.id), file_name=Path(file.path).name
+                    flow_id=str(current_user.id), file_name=file.path.split("/")[-1]
                 )
 
                 # Get the file extension from the original filename
@@ -504,8 +352,6 @@ async def download_files_batch(
             headers={"Content-Disposition": f"attachment; filename={filename}"},
         )
 
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=f"File not found: {e}") from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error downloading files: {e}") from e
 
@@ -574,25 +420,19 @@ async def download_file(
             raise HTTPException(status_code=404, detail="File not found")
 
         # Get the basename of the file path
-        file_name = Path(file.path).name
+        file_name = file.path.split("/")[-1]
+
+        # Get file stream
+        file_stream = await storage_service.get_file(flow_id=str(current_user.id), file_name=file_name)
+
+        if file_stream is None:
+            raise HTTPException(status_code=404, detail="File stream not available")
 
         # If return_content is True, read the file content and return it
         if return_content:
-            # For content return, get the full file
-            file_content = await storage_service.get_file(flow_id=str(current_user.id), file_name=file_name)
-            if file_content is None:
-                raise HTTPException(status_code=404, detail="File not found")
-            return await read_file_content(file_content, decode=True)
+            return await read_file_content(file_stream, decode=True)
 
-        # Check file exists before streaming (to catch errors before response headers are sent)
-        # This is important because once StreamingResponse starts, we can't change the status code
-        try:
-            await storage_service.get_file_size(flow_id=str(current_user.id), file_name=file_name)
-        except FileNotFoundError as e:
-            raise HTTPException(status_code=404, detail=f"File not found: {e}") from e
-
-        # Wrap the async generator in byte_stream_generator to ensure proper iteration
-        file_stream = storage_service.get_file_stream(flow_id=str(current_user.id), file_name=file_name)
+        # For streaming, ensure file_stream is an async iterator returning bytes
         byte_stream = byte_stream_generator(file_stream)
 
         # Create the filename with extension
@@ -608,8 +448,6 @@ async def download_file(
 
     except HTTPException:
         raise
-    except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=f"File not found: {e}") from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error downloading file: {e}") from e
 
@@ -628,7 +466,7 @@ async def edit_file_name(
 
         # Update the file name
         file.name = name
-        session.add(file)
+        await session.commit()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error editing file: {e}") from e
 
@@ -649,52 +487,13 @@ async def delete_file(
         if not file_to_delete:
             raise HTTPException(status_code=404, detail="File not found")
 
-        # Extract just the filename from the path (strip user_id prefix)
-        file_name = Path(file_to_delete.path).name
+        # Delete the file from the storage service
+        await storage_service.delete_file(flow_id=str(current_user.id), file_name=file_to_delete.path)
 
-        # Delete the file from the storage service first
-        storage_deleted = False
-        try:
-            await storage_service.delete_file(flow_id=str(current_user.id), file_name=file_name)
-            storage_deleted = True
-        except Exception as err:
-            # Check if this is a "permanent" failure where file/storage is gone
-            # These are safe to delete from DB even if storage deletion failed
-            if is_permanent_storage_failure(err):
-                await logger.awarning(
-                    "File %s not found in storage (permanent failure), will remove from database: %s",
-                    file_name,
-                    err,
-                )
-                storage_deleted = True
-            else:
-                # Transient failure (network, timeout, permissions) - keep in DB for retry
-                await logger.awarning(
-                    "Failed to delete file %s from storage (transient error, keeping in database for retry): %s",
-                    file_name,
-                    err,
-                )
-                # Don't delete from DB - user can retry
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Failed to delete file from storage. Please try again. Error: {err}",
-                ) from err
+        # Delete from the database
+        await session.delete(file_to_delete)
+        await session.commit()
 
-        # Only delete from database if storage deletion succeeded OR it was a permanent failure
-        if storage_deleted:
-            try:
-                await session.delete(file_to_delete)
-            except Exception as db_error:
-                await logger.aerror(
-                    "Failed to delete file %s from database: %s",
-                    file_to_delete.name,
-                    db_error,
-                )
-                raise HTTPException(
-                    status_code=500, detail=f"Error deleting file from database: {db_error}"
-                ) from db_error
-
-            return {"detail": f"File {file_to_delete.name} deleted successfully"}
     except HTTPException:
         # Re-raise HTTPException to avoid being caught by the generic exception handler
         raise
@@ -702,6 +501,7 @@ async def delete_file(
         # Log and return a generic server error
         await logger.aerror("Error deleting file %s: %s", file_id, e)
         raise HTTPException(status_code=500, detail=f"Error deleting file: {e}") from e
+    return {"detail": f"File {file_to_delete.name} deleted successfully"}
 
 
 @router.delete("")
@@ -718,77 +518,16 @@ async def delete_all_files(
         results = await session.exec(stmt)
         files = results.all()
 
-        storage_failures = []
-        db_failures = []
-
         # Delete all files from the storage service
         for file in files:
-            # Extract just the filename from the path (strip user_id prefix)
-            file_name = Path(file.path).name
-            storage_deleted = False
+            await storage_service.delete_file(flow_id=str(current_user.id), file_name=file.path)
+            await session.delete(file)
 
-            try:
-                await storage_service.delete_file(flow_id=str(current_user.id), file_name=file_name)
-                storage_deleted = True
-            except OSError as err:
-                # Check if this is a "permanent" failure where file/storage is gone
-                # These are safe to delete from DB even if storage deletion failed
-                if is_permanent_storage_failure(err):
-                    # File/storage is permanently gone - safe to delete from DB
-                    await logger.awarning(
-                        "File %s not found in storage, also removing from database: %s",
-                        file_name,
-                        err,
-                    )
-                    storage_deleted = True
-                else:
-                    # Transient failure (network, timeout, permissions) - keep in DB for retry
-                    storage_failures.append(f"{file_name}: {err}")
-                    await logger.awarning(
-                        "Failed to delete file %s from storage (transient error, keeping in database for retry): %s",
-                        file_name,
-                        err,
-                    )
-
-            # Only delete from database if storage deletion succeeded OR it was a permanent failure
-            if storage_deleted:
-                try:
-                    await session.delete(file)
-                except OSError as db_error:
-                    # Log database deletion failure but continue processing remaining files
-                    db_failures.append(f"{file_name}: {db_error}")
-                    await logger.aerror(
-                        "Failed to delete file %s from database: %s",
-                        file_name,
-                        db_error,
-                    )
-
-        if storage_failures:
-            await logger.awarning(
-                "Batch delete completed with %d storage failures: %s", len(storage_failures), storage_failures
-            )
-
-        if db_failures:
-            await logger.aerror("Batch delete completed with %d database failures: %s", len(db_failures), db_failures)
-            # If all database deletions failed, raise an error
-            if len(db_failures) == len(files):
-                raise HTTPException(status_code=500, detail=f"Failed to delete any files from database: {db_failures}")
-
-        # Calculate how many files were actually deleted from database
-        # Files successfully deleted = total - (kept due to transient storage failures) - (DB deletion failures)
-        files_deleted = len(files) - len(storage_failures) - len(db_failures)
-        files_kept = len(storage_failures) + len(db_failures)
-
-        if files_deleted == len(files):
-            message = f"All {files_deleted} files deleted successfully"
-        elif files_deleted > 0:
-            message = f"{files_deleted} files deleted successfully"
-            if files_kept > 0:
-                message += f", {files_kept} files failed to delete. See logs for details."
-        else:
-            message = "Failed to delete files. See logs for details."
+        # Delete all files from the database
+        await session.commit()  # Commit deletion
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error deleting all files: {e}") from e
+        await session.rollback()  # Rollback on failure
+        raise HTTPException(status_code=500, detail=f"Error deleting files: {e}") from e
 
-    return {"message": message}
+    return {"message": "All files deleted successfully"}

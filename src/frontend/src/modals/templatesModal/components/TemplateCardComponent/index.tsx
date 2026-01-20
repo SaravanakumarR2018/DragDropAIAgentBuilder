@@ -6,11 +6,6 @@ import IconComponent, {
 } from "../../../../components/common/genericIconComponent";
 import type { TemplateCardComponentProps } from "../../../../types/templates/types";
 
-interface TemplateCardComponentExtendedProps
-  extends TemplateCardComponentProps {
-  disabled?: boolean;
-}
-
 export default function TemplateCardComponent({
   example,
   onClick,

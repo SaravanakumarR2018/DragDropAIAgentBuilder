@@ -115,7 +115,7 @@ class TestApiKey:
 
     def test_get_api_key_success(self):
         """Test getting API key when it exists."""
-        with patch.dict(os.environ, {"LANGFLOW_API_KEY": "test-api-key"}):  # pragma: allowlist secret
+        with patch.dict(os.environ, {"LANGFLOW_API_KEY": "test-api-key"}):
             assert get_api_key() == "test-api-key"
 
     def test_get_api_key_not_set(self):

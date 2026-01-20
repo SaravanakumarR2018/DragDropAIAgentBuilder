@@ -20,20 +20,13 @@ export const LangflowCounts = () => {
         side="bottom"
         styleClasses="z-10"
       >
-        <Button
-          unstyled
+        <div
           onClick={() => window.open(GITHUB_URL, "_blank")}
           className="hit-area-hover flex items-center gap-2 rounded-md p-1 text-muted-foreground"
         >
-          <div className="relative items-center rounded-md px-2 py-1 flex">
-            <FaGithub className="h-4 w-4" />
-            <Case condition={Boolean(formattedStars) && formattedStars !== "0"}>
-              <span className="text-xs font-semibold pl-2">
-                {formattedStars}
-              </span>
-            </Case>
-          </div>
-        </Button>
+          <FaGithub className="h-4 w-4" />
+          <span className="text-xs font-semibold">{formatNumber(stars)}</span>
+        </div>
       </ShadTooltip>
 
       <ShadTooltip

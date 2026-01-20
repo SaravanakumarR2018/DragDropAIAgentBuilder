@@ -1,4 +1,4 @@
-import type { Edge, Node, ReactFlowJsonObject } from "@xyflow/react";
+import type { ReactFlowJsonObject } from "@xyflow/react";
 import type { AxiosRequestConfig } from "axios";
 import type { useMutationFunctionType } from "@/types/api";
 import { api } from "../../api";

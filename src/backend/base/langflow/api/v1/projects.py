@@ -22,16 +22,12 @@ from langflow.api.utils import CurrentActiveUser, DbSession, cascade_delete_flow
 from langflow.api.utils.mcp.config_utils import validate_mcp_server_for_project
 from langflow.api.v1.auth_helpers import handle_auth_settings_update
 from langflow.api.v1.flows import create_flows
-from langflow.api.v1.mcp_projects import (
-    get_project_sse_url,  # noqa: F401
-    get_project_streamable_http_url,
-    register_project_with_composer,
-)
+from langflow.api.v1.mcp_projects import get_project_sse_url, register_project_with_composer
 from langflow.api.v1.schemas import FlowListCreate
 from langflow.api.v2.mcp import update_server
 from langflow.helpers.flow import generate_unique_flow_name
 from langflow.helpers.folders import generate_unique_folder_name
-from langflow.initial_setup.constants import ASSISTANT_FOLDER_NAME, STARTER_FOLDER_NAME
+from langflow.initial_setup.constants import STARTER_FOLDER_NAME
 from langflow.services.auth.mcp_encryption import encrypt_auth_settings
 from langflow.services.database.models.api_key.crud import create_api_key
 from langflow.services.database.models.api_key.model import ApiKeyCreate
@@ -105,26 +101,22 @@ async def create_project(
         # Auto-register MCP server for this project with configured default auth
         if get_settings_service().settings.add_projects_to_mcp_servers:
             try:
-                # Build Streamable HTTP URL (preferred transport) and legacy SSE URL (for docs/errors)
-                streamable_http_url = await get_project_streamable_http_url(new_project.id)
-                # legacy SSE URL
-                # sse_url = await get_project_sse_url(new_project.id)
+                # Build SSE URL
+                sse_url = await get_project_sse_url(new_project.id)
 
                 # Prepare server config based on auth type same as new project
                 if default_auth.get("auth_type", "none") == "apikey":
                     # Create API key for API key authentication
                     api_key_name = f"MCP Project {new_project.name} - default"
                     unmasked_api_key = await create_api_key(session, ApiKeyCreate(name=api_key_name), current_user.id)
-                    # Starting v>=1.7.1, we use Streamable HTTP transport by default
+
                     command = "uvx"
                     args = [
                         "mcp-proxy",
-                        "--transport",
-                        "streamablehttp",
                         "--headers",
                         "x-api-key",
                         unmasked_api_key.api_key,
-                        streamable_http_url,
+                        sse_url,
                     ]
                 elif default_auth.get("auth_type", "none") == "oauth":
                     msg = "OAuth authentication is not yet implemented for MCP server creation during project creation."
@@ -135,9 +127,7 @@ async def create_project(
                     command = "uvx"
                     args = [
                         "mcp-proxy",
-                        "--transport",
-                        "streamablehttp",
-                        streamable_http_url,
+                        sse_url,
                     ]
 
                 server_config = {"command": command, "args": args}
@@ -201,9 +191,7 @@ async def create_project(
                 update(Flow).where(Flow.id.in_(project.flows_list)).values(folder_id=new_project.id)  # type: ignore[attr-defined]
             )
             await session.exec(update_statement_flows)
-
-        # Convert to FolderRead while session is still active to avoid detached instance errors
-        folder_read = FolderRead.model_validate(new_project, from_attributes=True)
+            await session.commit()
     except HTTPException:
         # Re-raise HTTP exceptions (like 409 conflicts) without modification
         raise
@@ -292,9 +280,7 @@ async def read_project(
         # If no pagination requested, return all flows for the current user
         flows_from_current_user_in_project = [flow for flow in project.flows if flow.user_id == current_user.id]
         project.flows = flows_from_current_user_in_project
-
-        # Convert to FolderReadWithFlows while session is still active to avoid detached instance errors
-        return FolderReadWithFlows.model_validate(project, from_attributes=True)
+        return project  # noqa: TRY300
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
@@ -477,9 +463,6 @@ async def update_project(
             )
             await session.exec(update_statement_components)
 
-        # Convert to FolderRead while session is still active to avoid detached instance errors
-        folder_read = FolderRead.model_validate(existing_project, from_attributes=True)
-
     except HTTPException:
         # Re-raise HTTP exceptions (like 409 conflicts) without modification
         raise
@@ -512,15 +495,6 @@ async def delete_project(
 
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-
-    # Prevent deletion of the Langflow Assistant folder
-    if project.name == ASSISTANT_FOLDER_NAME:
-        msg = f"Cannot delete the '{ASSISTANT_FOLDER_NAME}' folder, that contains pre-built flows."
-        await logger.adebug(msg)
-        raise HTTPException(
-            status_code=403,
-            detail=msg,
-        )
 
     # Check if project has OAuth authentication and stop MCP Composer if needed
     if project.auth_settings and project.auth_settings.get("auth_type") == "oauth":
@@ -672,7 +646,7 @@ async def upload_file(
         )
 
     session.add(new_project)
-    await session.flush()
+    await session.commit()
     await session.refresh(new_project)
     del data["folder_name"]
     del data["folder_description"]

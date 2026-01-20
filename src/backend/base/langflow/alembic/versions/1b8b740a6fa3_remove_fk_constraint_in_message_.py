@@ -11,7 +11,6 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 import sqlmodel
 from alembic import op
-from sqlalchemy.engine.reflection import Inspector
 
 from langflow.utils import migration
 
@@ -40,7 +39,7 @@ def constraint_exists(constraint_name: str, conn) -> bool:
     Returns:
         bool: True if the constraint exists, False otherwise
     """
-    inspector = Inspector.from_engine(conn)
+    inspector = sa.inspect(conn)
 
     # Get all table names
     tables = inspector.get_table_names()

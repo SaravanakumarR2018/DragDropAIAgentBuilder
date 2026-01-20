@@ -1,4 +1,4 @@
-import type { CellClickedEvent } from "ag-grid-community";
+import type { ColDef, ColGroupDef } from "ag-grid-community";
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import IconComponent from "@/components/common/genericIconComponent";

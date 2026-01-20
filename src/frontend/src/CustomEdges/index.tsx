@@ -4,21 +4,8 @@ import {
   getBezierPath,
   Position,
 } from "@xyflow/react";
-import IconComponent from "@/components/common/genericIconComponent";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu";
 import useFlowStore from "@/stores/flowStore";
 import { scapeJSONParse } from "@/utils/reactflowUtils";
-
-const UNRECOGNIZED_DOM_PROPS = [
-  "targetPosition",
-  "sourcePosition",
-  "pathOptions",
-];
 
 export function DefaultEdge({
   sourceHandleId,
@@ -77,13 +64,6 @@ export function DefaultEdge({
   });
 
   const { animated, selectable, deletable, selected, ...domSafeProps } = props;
-
-  //Remove unrecognized DOM props
-  UNRECOGNIZED_DOM_PROPS.forEach((prop) => {
-    if (prop in domSafeProps) {
-      delete domSafeProps[prop];
-    }
-  });
 
   return (
     <>

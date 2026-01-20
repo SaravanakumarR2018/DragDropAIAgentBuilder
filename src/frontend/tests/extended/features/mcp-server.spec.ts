@@ -666,7 +666,7 @@ test(
 
     await page.getByTestId("canvas_controls_dropdown").click();
 
-    await page.getByTestId("fit_view").click();
+    // See if the color matches
 
     await zoomOut(page, 3);
     await page.getByTestId("canvas_controls_dropdown").click({ force: true });
@@ -691,6 +691,53 @@ test(
     await page.getByTestId("add-mcp-server-button").click();
 
     await page.waitForTimeout(500);
+
+    await page.waitForSelector(
+      '[data-testid="dropdown_str_tool"]:not([disabled])',
+      {
+        timeout: 10000,
+        state: "visible",
+      },
+    );
+
+    await adjustScreenView(page, { numberOfZoomOut: 3 });
+
+    await expect(page.getByTestId("dropdown_str_tool")).toBeHidden();
+
+    try {
+      await page.getByText("Add MCP Server", { exact: true }).click({
+        timeout: 5000,
+      });
+    } catch (_error) {
+      await page.getByTestId("mcp-server-dropdown").click({ timeout: 3000 });
+      await page.getByText("Add MCP Server", { exact: true }).click({
+        timeout: 5000,
+      });
+    }
+
+    await page.waitForSelector('[data-testid="add-mcp-server-button"]', {
+      state: "visible",
+      timeout: 30000,
+    });
+
+    await page.getByTestId("stdio-tab").click();
+
+    await page.waitForSelector('[data-testid="stdio-name-input"]', {
+      state: "visible",
+      timeout: 30000,
+    });
+
+    const randomSuffix = Math.floor(Math.random() * 90000) + 10000; // 5-digit random number
+    const testName = `test_server_${randomSuffix}`;
+    await page.getByTestId("stdio-name-input").fill(testName);
+
+    await page.getByTestId("stdio-command-input").fill("uvx mcp-server-fetch");
+
+    await page.getByTestId("add-mcp-server-button").click();
+
+    await expect(page.getByTestId("dropdown_str_tool")).toBeVisible({
+      timeout: 30000,
+    });
 
     await page.waitForSelector(
       '[data-testid="dropdown_str_tool"]:not([disabled])',

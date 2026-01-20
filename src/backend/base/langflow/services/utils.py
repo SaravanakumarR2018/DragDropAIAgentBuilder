@@ -23,7 +23,6 @@ if TYPE_CHECKING:
     from lfx.services.settings.manager import SettingsService
     from sqlmodel.ext.asyncio.session import AsyncSession
 
-
 async def get_or_create_super_user(session: AsyncSession, username, password, is_default):
     from langflow.services.database.models.user.model import User
 
@@ -119,23 +118,31 @@ async def teardown_superuser(settings_service, session: AsyncSession) -> None:
             # if it has logged in, it means the user is using it to login
             if user and user.is_superuser is True and not user.last_login_at:
                 await session.delete(user)
+                await session.commit()
                 await logger.adebug("Default superuser removed successfully.")
 
         except Exception as exc:
             logger.exception(exc)
+            await session.rollback()
             msg = "Could not remove default superuser."
             raise RuntimeError(msg) from exc
 
 
 async def teardown_services() -> None:
     """Teardown all the services."""
-    async with session_scope() as session:
-        await teardown_superuser(get_settings_service(), session)
+    try:
+        async with get_db_service(use_organisation=False).with_session() as session:
+            await teardown_superuser(get_settings_service(), session)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception(exc)
 
-    from lfx.services.manager import get_service_manager
+    try:
+        from lfx.services.manager import get_service_manager
 
-    service_manager = get_service_manager()
-    await service_manager.teardown()
+        service_manager = get_service_manager()
+        await service_manager.teardown()
+    except Exception as exc:  # noqa: BLE001
+        logger.exception(exc)
 
 
 def initialize_settings_service() -> None:
@@ -184,9 +191,11 @@ async def clean_transactions(settings_service: SettingsService, session: AsyncSe
         )
 
         await session.exec(delete_stmt)
+        await session.commit()
         logger.debug("Successfully cleaned up old transactions")
     except (sqlalchemy_exc.SQLAlchemyError, asyncio.TimeoutError) as exc:
         logger.error(f"Error cleaning up transactions: {exc!s}")
+        await session.rollback()
         # Don't re-raise since this is a cleanup task
 
 
@@ -211,9 +220,11 @@ async def clean_vertex_builds(settings_service: SettingsService, session: AsyncS
         )
 
         await session.exec(delete_stmt)
+        await session.commit()
         logger.debug("Successfully cleaned up old vertex builds")
     except (sqlalchemy_exc.SQLAlchemyError, asyncio.TimeoutError) as exc:
         logger.error(f"Error cleaning up vertex builds: {exc!s}")
+        await session.rollback()
         # Don't re-raise since this is a cleanup task
 
 
@@ -239,7 +250,6 @@ def register_all_service_factories() -> None:
     from langflow.services.task import factory as task_factory
     from langflow.services.telemetry import factory as telemetry_factory
     from langflow.services.tracing import factory as tracing_factory
-    from langflow.services.transaction import factory as transaction_factory
     from langflow.services.variable import factory as variable_factory
 
     # Register all factories
@@ -252,7 +262,6 @@ def register_all_service_factories() -> None:
     service_manager.register_factory(variable_factory.VariableServiceFactory())
     service_manager.register_factory(telemetry_factory.TelemetryServiceFactory())
     service_manager.register_factory(tracing_factory.TracingServiceFactory())
-    service_manager.register_factory(transaction_factory.TransactionServiceFactory())
     service_manager.register_factory(state_factory.StateServiceFactory())
     service_manager.register_factory(job_queue_factory.JobQueueServiceFactory())
     service_manager.register_factory(task_factory.TaskServiceFactory())
@@ -276,16 +285,14 @@ async def initialize_services(*, fix_migration: bool = False) -> None:
 
     # Setup the superuser
     await initialize_database(fix_migration=fix_migration)
-    db_service = get_db_service()
+    db_service = get_db_service(use_organisation=False)
     await db_service.initialize_alembic_log_file()
-    async with session_scope() as session:
+    async with session_scope(use_organisation=False) as session:
         settings_service = get_service(ServiceType.SETTINGS_SERVICE)
         await setup_superuser(settings_service, session)
     try:
-        await get_db_service().assign_orphaned_flows_to_superuser()
+        await get_db_service(use_organisation=False).assign_orphaned_flows_to_superuser()
     except sqlalchemy_exc.IntegrityError as exc:
         await logger.awarning(f"Error assigning orphaned flows to the superuser: {exc!s}")
-
-    async with session_scope() as session:
-        await clean_transactions(settings_service, session)
-        await clean_vertex_builds(settings_service, session)
+    await clean_transactions(settings_service, session)
+    await clean_vertex_builds(settings_service, session)

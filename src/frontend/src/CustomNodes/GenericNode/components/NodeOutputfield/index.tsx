@@ -34,7 +34,6 @@ import {
   logTypeIsError,
   logTypeIsUnknown,
 } from "../../../../utils/utils";
-import { nodeColorsName } from "../../../../utils/styleUtils";
 import HandleRenderComponent from "../handleRenderComponent";
 import OutputComponent from "../OutputComponent";
 import OutputModal from "../outputModal";
@@ -386,7 +385,7 @@ function NodeOutputField({
         </div>
 
         {data.node?.frozen && (
-          <div data-testid="frozen-icon">
+          <div className="pr-1" data-testid="frozen-icon">
             <SnowflakeIcon />
           </div>
         )}

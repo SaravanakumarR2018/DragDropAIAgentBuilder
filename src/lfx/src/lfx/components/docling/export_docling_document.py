@@ -86,9 +86,7 @@ class ExportDoclingDocumentComponent(Component):
         return build_config
 
     def export_document(self) -> list[Data]:
-        documents, warning = extract_docling_documents(self.data_inputs, self.doc_key)
-        if warning:
-            self.status = warning
+        documents = extract_docling_documents(self.data_inputs, self.doc_key)
 
         results: list[Data] = []
         try:

@@ -6,13 +6,7 @@ import { track } from "@/customization/utils/analytics";
 import useAddFlow from "@/hooks/flows/use-add-flow";
 import { useFolderStore } from "@/stores/foldersStore";
 import { updateIds } from "@/utils/reactflowUtils";
-import { cn } from "@/utils/utils";
 import type { CardData } from "../../../../types/templates/types";
-
-interface TemplateGetStartedCardComponentProps extends CardData {
-  loading: boolean;
-  onFlowCreating: (loading: boolean) => void;
-}
 
 export default function TemplateGetStartedCardComponent({
   bgImage,
@@ -59,10 +53,7 @@ export default function TemplateGetStartedCardComponent({
 
   return flow ? (
     <div
-      className={cn(
-        "group relative flex h-full min-h-[200px] w-full cursor-pointer flex-col overflow-hidden rounded-3xl border focus-visible:border-ring md:min-h-[250px]",
-        loading ? "cursor-default opacity-80" : "cursor-pointer",
-      )}
+      className="group relative flex h-full min-h-[200px] w-full cursor-pointer flex-col overflow-hidden rounded-3xl border focus-visible:border-ring md:min-h-[250px]"
       tabIndex={1}
       onKeyDown={handleKeyDown}
       onClick={handleClick}

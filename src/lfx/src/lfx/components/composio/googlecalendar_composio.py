@@ -2,7 +2,7 @@ from lfx.base.composio.composio_base import ComposioBaseComponent
 
 
 class ComposioGoogleCalendarAPIComponent(ComposioBaseComponent):
-    display_name: str = "GoogleCalendar"
+    display_name: str = "Google Calendar"
     icon = "Googlecalendar"
     documentation: str = "https://docs.composio.dev"
     app_name = "googlecalendar"

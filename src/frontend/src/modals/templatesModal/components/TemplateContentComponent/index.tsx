@@ -21,25 +21,21 @@ interface TemplateContentComponentProps extends TemplateContentProps {
 export default function TemplateContentComponent({
   currentTab,
   categories,
-  loading,
-  onFlowCreating,
-}: TemplateContentComponentProps) {
+}: TemplateContentProps) {
   const allExamples = useFlowsManagerStore((state) => state.examples);
 
-  const examples = useMemo(() => {
-    return allExamples
-      .filter((example) => {
-        if (!ENABLE_KNOWLEDGE_BASES && example.name?.includes("Knowledge")) {
-          return false;
-        }
-        return true;
-      })
-      .filter(
-        (example) =>
-          example.tags?.includes(currentTab ?? "") ||
-          currentTab === "all-templates",
-      );
-  }, [allExamples, currentTab]);
+  const examples = allExamples
+    .filter((example) => {
+      if (!ENABLE_KNOWLEDGE_BASES && example.name?.includes("Knowledge")) {
+        return false;
+      }
+      return true;
+    })
+    .filter(
+      (example) =>
+        example.tags?.includes(currentTab ?? "") ||
+        currentTab === "all-templates",
+    );
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredExamples, setFilteredExamples] = useState(examples);

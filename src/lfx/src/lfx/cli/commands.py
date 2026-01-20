@@ -6,12 +6,10 @@ import json
 import os
 import sys
 import tempfile
-from functools import partial
 from pathlib import Path
 
 import typer
 import uvicorn
-from asyncer import syncify
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.panel import Panel
@@ -34,8 +32,7 @@ console = Console()
 API_KEY_MASK_LENGTH = 8
 
 
-@partial(syncify, raise_sync_error=False)
-async def serve_command(
+def serve_command(
     script_path: str | None = typer.Argument(
         None,
         help=(
@@ -46,7 +43,7 @@ async def serve_command(
     host: str = typer.Option("127.0.0.1", "--host", "-h", help="Host to bind the server to"),
     port: int = typer.Option(8000, "--port", "-p", help="Port to bind the server to"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Show diagnostic output and execution details"),  # noqa: FBT001, FBT003
-    env_file: Path | None = typer.Option(
+    env_file: Path | None = typer.Option(  # noqa: B008
         None,
         "--env-file",
         help="Path to the .env file containing environment variables",
@@ -204,12 +201,12 @@ async def serve_command(
             raise typer.Exit(1)
 
         if resolved_path.suffix == ".json":
-            graph = await load_graph_from_path(resolved_path, resolved_path.suffix, verbose_print, verbose=verbose)
+            graph = load_graph_from_path(resolved_path, resolved_path.suffix, verbose_print, verbose=verbose)
         elif resolved_path.suffix == ".py":
             verbose_print("Loading graph from Python script...")
             from lfx.cli.script_loader import load_graph_from_script
 
-            graph = await load_graph_from_script(resolved_path)
+            graph = load_graph_from_script(resolved_path)
             verbose_print("✓ Graph loaded from Python script")
         else:
             err_msg = "Error: Only JSON flow files (.json) or Python scripts (.py) are supported. "
@@ -303,18 +300,13 @@ async def serve_command(
         console.print()
 
         # Start the server
-        # Use uvicorn.Server to properly handle async context
-        # uvicorn.run() uses asyncio.run() internally which fails when
-        # an event loop is already running (due to syncify decorator)
         try:
-            config = uvicorn.Config(
+            uvicorn.run(
                 serve_app,
                 host=host,
                 port=port,
                 log_level=log_level,
             )
-            server = uvicorn.Server(config)
-            await server.serve()
         except KeyboardInterrupt:
             verbose_print("\n👋 Server stopped")
             raise typer.Exit(0) from None

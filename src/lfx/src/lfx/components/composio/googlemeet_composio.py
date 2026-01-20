@@ -2,7 +2,7 @@ from lfx.base.composio.composio_base import ComposioBaseComponent
 
 
 class ComposioGooglemeetAPIComponent(ComposioBaseComponent):
-    display_name: str = "GoogleMeet"
+    display_name: str = "Google Meet"
     icon = "Googlemeet"
     documentation: str = "https://docs.composio.dev"
     app_name = "googlemeet"

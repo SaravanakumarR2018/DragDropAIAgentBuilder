@@ -4,8 +4,8 @@ const Icon = (props) => (
     fill="none"
     viewBox="0 0 24 24"
     id="Contentful--Streamline-Svg-Logos"
-    height="19"
-    width="19"
+    height="24"
+    width="24"
   >
     <desc>Contentful Streamline Icon: https://streamlinehq.com</desc>
     <path

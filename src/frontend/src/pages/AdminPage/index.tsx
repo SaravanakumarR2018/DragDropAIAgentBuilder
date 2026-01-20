@@ -219,6 +219,7 @@ export default function AdminPage() {
             user: {
               is_active: user.is_active,
               is_superuser: user.is_superuser,
+              optins: user.optins,
             },
           },
           {
@@ -332,6 +333,9 @@ export default function AdminPage() {
                       <TableHead className="h-10">Superuser</TableHead>
                       <TableHead className="h-10">Created At</TableHead>
                       <TableHead className="h-10">Updated At</TableHead>
+                      <TableHead className="h-10">Skip Trial Access</TableHead>
+                      <TableHead className="h-10">Trial Access Until</TableHead>
+                      <TableHead className="h-10">Trial Access Days</TableHead>
                       <TableHead className="h-10 w-[100px] text-right"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -428,6 +432,15 @@ export default function AdminPage() {
                                 .toISOString()
                                 .split("T")[0]
                             }
+                          </TableCell>
+                          <TableCell className="truncate py-2">
+                            {user.optins?.skip_trial_access ? "Yes" : "No"}
+                          </TableCell>
+                          <TableCell className="truncate py-2">
+                            {user.optins?.trial_access_until || "—"}
+                          </TableCell>
+                          <TableCell className="truncate py-2">
+                            {user.optins?.trial_access_days || "—"}
                           </TableCell>
                           <TableCell className="flex w-[100px] py-2 text-right">
                             <div className="flex">

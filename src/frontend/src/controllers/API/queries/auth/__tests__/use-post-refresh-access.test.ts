@@ -1,21 +1,8 @@
 // Refresh token functionality tests
 
 // Mock all dependencies before imports
-const mockCookieManagerSet = jest.fn();
-
-jest.mock("@/utils/cookie-manager", () => ({
-  cookieManager: {
-    set: mockCookieManagerSet,
-    get: jest.fn(),
-    remove: jest.fn(),
-    getCookies: jest.fn(),
-    clearAuthCookies: jest.fn(),
-  },
-  getCookiesInstance: jest.fn(() => ({
-    get: jest.fn(),
-    set: jest.fn(),
-    remove: jest.fn(),
-  })),
+jest.mock("@/utils/utils", () => ({
+  setAuthCookie: jest.fn(),
 }));
 
 jest.mock(
@@ -39,8 +26,13 @@ jest.mock("@/controllers/API/services/request-processor", () => ({
   })),
 }));
 
+jest.mock("react-cookie", () => ({
+  Cookies: jest.fn().mockImplementation(() => ({})),
+}));
+
 import { useRefreshAccessToken } from "../use-post-refresh-access";
 
+const mockSetAuthCookie = require("@/utils/utils").setAuthCookie;
 const mockApiPost = require("@/controllers/API/api").api.post;
 
 describe("refresh token functionality", () => {
@@ -64,7 +56,8 @@ describe("refresh token functionality", () => {
       expect(mockApiPost).toHaveBeenCalledWith(
         expect.stringContaining("refresh"),
       );
-      expect(mockCookieManagerSet).toHaveBeenCalledWith(
+      expect(mockSetAuthCookie).toHaveBeenCalledWith(
+        expect.any(Object), // cookies instance
         "refresh_token_lf",
         "new-refresh-token",
       );
@@ -108,12 +101,12 @@ describe("refresh token functionality", () => {
         // Expected to throw
       }
 
-      expect(mockCookieManagerSet).not.toHaveBeenCalled();
+      expect(mockSetAuthCookie).not.toHaveBeenCalled();
     });
   });
 
   describe("cookie management", () => {
-    it("should use cookieManager for setting refresh token", async () => {
+    it("should use useSetCookieAuth hook for setting refresh token", async () => {
       const mockRefreshResponse = {
         access_token: "access-token",
         refresh_token: "refresh-token-xyz",
@@ -125,8 +118,9 @@ describe("refresh token functionality", () => {
       const refreshMutation = useRefreshAccessToken();
       await refreshMutation.mutate();
 
-      expect(mockCookieManagerSet).toHaveBeenCalledTimes(1);
-      expect(mockCookieManagerSet).toHaveBeenCalledWith(
+      expect(mockSetAuthCookie).toHaveBeenCalledTimes(1);
+      expect(mockSetAuthCookie).toHaveBeenCalledWith(
+        expect.any(Object), // cookies instance
         "refresh_token_lf",
         "refresh-token-xyz",
       );
@@ -145,7 +139,8 @@ describe("refresh token functionality", () => {
       const response = await refreshMutation.mutate();
 
       // Verify cookie was set before response was returned
-      expect(mockCookieManagerSet).toHaveBeenCalledWith(
+      expect(mockSetAuthCookie).toHaveBeenCalledWith(
+        expect.any(Object), // cookies instance
         "refresh_token_lf",
         "refresh-token-abc",
       );

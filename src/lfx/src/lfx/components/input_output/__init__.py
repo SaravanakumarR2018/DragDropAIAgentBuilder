@@ -9,17 +9,15 @@ if TYPE_CHECKING:
     from lfx.components.input_output.chat_output import ChatOutput
     from lfx.components.input_output.text import TextInputComponent
     from lfx.components.input_output.text_output import TextOutputComponent
-    from lfx.components.input_output.webhook import WebhookComponent
 
 _dynamic_imports = {
     "ChatInput": "chat",
     "ChatOutput": "chat_output",
     "TextInputComponent": "text",
     "TextOutputComponent": "text_output",
-    "WebhookComponent": "webhook",
 }
 
-__all__ = ["ChatInput", "ChatOutput", "TextInputComponent", "TextOutputComponent", "WebhookComponent"]
+__all__ = ["ChatInput", "ChatOutput", "TextInputComponent", "TextOutputComponent"]
 
 
 def __getattr__(attr_name: str) -> Any:

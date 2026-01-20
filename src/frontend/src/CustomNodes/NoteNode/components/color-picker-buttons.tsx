@@ -1,15 +1,8 @@
-import { memo, useCallback, useRef } from "react";
+import { memo } from "react";
 import { Button } from "@/components/ui/button";
 import { COLOR_OPTIONS } from "@/constants/constants";
-import type { NoteDataType } from "@/types/flow";
+import type { noteDataType } from "@/types/flow";
 import { cn } from "@/utils/utils";
-
-interface ColorPickerButtonsProps {
-  bgColor: string;
-  data: NoteDataType;
-  /** Flow store's setNode function for updating node data */
-  setNode: (id: string, updater: (node: any) => any) => void;
-}
 
 export const ColorPickerButtons = memo(
   ({ bgColor, data, setNode }: ColorPickerButtonsProps) => {

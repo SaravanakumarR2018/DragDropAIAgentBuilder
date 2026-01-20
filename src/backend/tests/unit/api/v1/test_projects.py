@@ -14,6 +14,9 @@ from langflow.services.deps import session_scope
 CYRILLIC_NAME = "Новый проект"
 CYRILLIC_DESC = "Описание проекта с кириллицей"  # noqa: RUF001
 
+CYRILLIC_NAME = "Новый проект"
+CYRILLIC_DESC = "Описание проекта с кириллицей"  # noqa: RUF001
+
 
 @pytest.fixture
 def basic_case():

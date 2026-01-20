@@ -52,13 +52,33 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 COPY ./src /app/src
 
+ARG VITE_AUTO_LOGIN=true
+ENV VITE_AUTO_LOGIN=$VITE_AUTO_LOGIN
+    
 COPY src/frontend /tmp/src/frontend
 WORKDIR /tmp/src/frontend
+
+ARG VITE_CLERK_AUTH_ENABLED=false
+ARG VITE_CLERK_PUBLISHABLE_KEY=""
+ENV VITE_CLERK_AUTH_ENABLED=$VITE_CLERK_AUTH_ENABLED
+ENV VITE_CLERK_PUBLISHABLE_KEY=$VITE_CLERK_PUBLISHABLE_KEY
+
 RUN --mount=type=cache,target=/root/.npm \
     npm ci \
     && ESBUILD_BINARY_PATH="" NODE_OPTIONS="--max-old-space-size=12288" JOBS=1 npm run build \
     && cp -r build /app/src/backend/langflow/frontend \
     && rm -rf /tmp/src/frontend
+
+# Build the marketing landing page served from nginx
+COPY src/new-landingpage /tmp/src/new-landingpage
+WORKDIR /tmp/src/new-landingpage
+
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci \
+    && npm run build \
+    && mkdir -p /app/new-landingpage \
+    && cp -r dist /app/new-landingpage/dist \
+    && rm -rf /tmp/src/new-landingpage
 
 WORKDIR /app
 
@@ -74,7 +94,7 @@ FROM python:3.12.3-slim AS runtime
 
 RUN apt-get update \
     && apt-get upgrade -y \
-    && apt-get install -y curl git libpq5 gnupg \
+    && apt-get install -y curl git libpq5 gnupg nginx gettext-base supervisor \
     && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
     && apt-get install -y nodejs \
     && apt-get clean \
@@ -82,6 +102,11 @@ RUN apt-get update \
     && useradd user -u 1000 -g 0 --no-create-home --home-dir /app/data
 
 COPY --from=builder --chown=1000 /app/.venv /app/.venv
+COPY --from=builder --chown=1000 /app/new-landingpage /app/new-landingpage
+COPY docker/nginx/nginx.conf /etc/nginx/nginx.conf.template
+COPY docker/supervisord.conf /etc/supervisor/supervisord.conf
+COPY docker/entrypoint.sh /usr/local/bin/langflow-entrypoint.sh
+RUN chmod +x /usr/local/bin/langflow-entrypoint.sh
 
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
@@ -92,11 +117,11 @@ LABEL org.opencontainers.image.licenses=MIT
 LABEL org.opencontainers.image.url=https://github.com/langflow-ai/langflow
 LABEL org.opencontainers.image.source=https://github.com/langflow-ai/langflow
 
-USER user
 WORKDIR /app
 
 ENV LANGFLOW_HOST=0.0.0.0
-ENV LANGFLOW_PORT=7860
+ENV LANGFLOW_PORT=7861
+ENV LANGFLOW_BACKEND_PORT=7861
+ENV NGINX_PORT=7860
 
-CMD ["langflow", "run"]
-
+CMD ["/usr/local/bin/langflow-entrypoint.sh"]

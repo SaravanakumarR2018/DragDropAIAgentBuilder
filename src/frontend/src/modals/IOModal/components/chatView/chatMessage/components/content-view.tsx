@@ -3,7 +3,6 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ForwardedIconComponent } from "@/components/common/genericIconComponent";
 import { TextShimmer } from "@/components/ui/TextShimmer";
-import { extractLanguage, isCodeBlock } from "@/utils/codeBlockUtils";
 import { cn } from "@/utils/utils";
 import CodeTabsComponent from "../../../../../../components/core/codeTabsComponent";
 import LogoIcon from "./chat-logo-icon";

@@ -304,15 +304,6 @@ export function ParameterRenderComponent({
             value={templateValue}
           />
         );
-      case "model":
-        return (
-          <ModelInputComponent
-            {...baseInputProps}
-            options={templateData?.options || []}
-            placeholder={templateData?.placeholder}
-            externalOptions={templateData?.external_options}
-          />
-        );
       default:
         return <EmptyParameterComponent {...baseInputProps} />;
     }

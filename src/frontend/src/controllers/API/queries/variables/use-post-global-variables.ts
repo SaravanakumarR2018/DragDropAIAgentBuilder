@@ -1,5 +1,5 @@
 import type { UseMutationResult } from "@tanstack/react-query";
-import { VALID_CATEGORIES } from "@/constants/constants";
+import type { AxiosResponse } from "axios";
 import type { useMutationFunctionType } from "@/types/api";
 import { api } from "../../api";
 import { getURL } from "../../helpers/constants";
@@ -44,22 +44,14 @@ export const usePostGlobalVariables: useMutationFunctionType<
     return res.data;
   };
 
-  const mutation: UseMutationResult<
-    PostGlobalVariablesResponse,
-    unknown,
-    PostGlobalVariablesParams
-  > = mutate(["usePostGlobalVariables"], postGlobalVariablesFunction, {
-    onSettled: (data, error, variables) => {
-      queryClient.refetchQueries({ queryKey: ["useGetGlobalVariables"] });
-      if (variables.category) {
-        queryClient.refetchQueries({
-          queryKey: ["category-variable", variables.category],
-        });
-      }
-    },
-    retry: false,
-    ...options,
-  });
+  const mutation: UseMutationResult<any, any, PostGlobalVariablesParams> =
+    mutate(["usePostGlobalVariables"], postGlobalVariablesFunction, {
+      onSettled: () => {
+        queryClient.refetchQueries({ queryKey: ["useGetGlobalVariables"] });
+      },
+      retry: false,
+      ...options,
+    });
 
   return mutation;
 };

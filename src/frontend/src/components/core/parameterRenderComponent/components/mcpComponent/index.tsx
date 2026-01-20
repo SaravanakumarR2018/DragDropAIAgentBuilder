@@ -187,11 +187,7 @@ export default function McpComponent({
           )}
         </div>
       ) : (
-        <Button
-          size="sm"
-          onClick={handleAddButtonClick}
-          data-testid="add-mcp-server-simple-button"
-        >
+        <Button size="sm" onClick={handleAddButtonClick}>
           <span>Add MCP Server</span>
         </Button>
       )}

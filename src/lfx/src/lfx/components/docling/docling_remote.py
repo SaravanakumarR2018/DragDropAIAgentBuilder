@@ -39,7 +39,6 @@ class DoclingRemoteComponent(BaseFileComponent):
         "htm",
         "html",
         "jpeg",
-        "jpg",
         "json",
         "md",
         "pdf",

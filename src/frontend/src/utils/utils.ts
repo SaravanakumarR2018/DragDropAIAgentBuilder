@@ -4,8 +4,9 @@ import moment from "moment";
 import TableAutoCellRender from "@/components/core/parameterRenderComponent/components/tableComponent/components/tableAutoCellRender";
 import TableDropdownCellEditor from "@/components/core/parameterRenderComponent/components/tableComponent/components/tableDropdownCellEditor";
 import useAlertStore from "@/stores/alertStore";
+import { ColDef, ColGroupDef, ValueParserParams } from "ag-grid-community";
+import clsx, { ClassValue } from "clsx";
 import { type ColumnField, FormatterType } from "@/types/utils/functions";
-import "moment-timezone";
 import type { Cookies } from "react-cookie";
 import { twMerge } from "tailwind-merge";
 import {
@@ -880,7 +881,8 @@ export function testIdCase(str: string): string {
   return str.toLowerCase().replace(/\s+/g, "_");
 }
 
-export const convertUTCToLocalTimezone = (timestamp: string) => {
+export async function convertUTCToLocalTimezone (timestamp: string,):Promise<string>{
+  const moment =(await import("moment-timezone")).default;
   const localTimezone = moment.tz.guess();
   return moment.utc(timestamp).tz(localTimezone).format("MM/DD/YYYY HH:mm:ss");
 };
@@ -1024,14 +1026,10 @@ export const setAuthCookie = (
   tokenName: string,
   value: string,
 ) => {
-  // Only use secure flag if the connection is HTTPS
-  const isSecure =
-    typeof window !== "undefined" && window.location.protocol === "https:";
-
   cookies.set(tokenName, value, {
     path: "/",
-    secure: isSecure,
-    sameSite: isSecure ? "strict" : "lax",
+    secure: true,
+    sameSite: "strict",
   });
 };
 

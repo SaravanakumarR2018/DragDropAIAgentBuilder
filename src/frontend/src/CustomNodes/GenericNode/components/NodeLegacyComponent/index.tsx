@@ -23,7 +23,6 @@ export default function NodeLegacyComponent({
   };
 
   const foundComponents = useGetReplacementComponents(replacement);
-
   return (
     <div
       className={cn(
@@ -49,27 +48,20 @@ export default function NodeLegacyComponent({
         </Button>
       </div>
       <div className="text-mmd text-muted-foreground w-full">
-        {replacement &&
-        Array.isArray(replacement) &&
-        replacement.length > 0 &&
-        foundComponents.some((component) => component) ? (
+        {replacement && Array.isArray(replacement) && replacement.length > 0 ? (
           <span className="block items-center">
             Use{" "}
             {foundComponents.map((component, index) => (
               <>
-                {component && (
-                  <>
-                    {index > 0 && ", "}
-                    <Button
-                      variant="link"
-                      className=" !text-accent-pink-foreground !text-mmd !inline-block"
-                      size={null}
-                      onClick={() => handleFilterComponent(replacement[index])}
-                    >
-                      <span>{component}</span>
-                    </Button>
-                  </>
-                )}
+                {index > 0 && ", "}
+                <Button
+                  variant="link"
+                  className=" !text-accent-pink-foreground !text-mmd !inline-block"
+                  size={null}
+                  onClick={() => handleFilterComponent(replacement[index])}
+                >
+                  <span>{component}</span>
+                </Button>
               </>
             ))}
             .

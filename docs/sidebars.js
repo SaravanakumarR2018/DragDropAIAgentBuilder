@@ -166,6 +166,7 @@ module.exports = {
       type: "category",
       label: "Deploy",
       items: [
+        "Components/concepts-components",
         {
           type:"doc",
           id: "Deployment/deployment-overview",

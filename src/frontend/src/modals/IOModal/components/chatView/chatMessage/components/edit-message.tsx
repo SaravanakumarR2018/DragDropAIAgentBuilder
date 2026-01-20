@@ -3,7 +3,6 @@ import rehypeMathjax from "rehype-mathjax/browser";
 import rehypeRaw from "rehype-raw";
 import remarkGfm from "remark-gfm";
 import { EMPTY_OUTPUT_SEND_MESSAGE } from "@/constants/constants";
-import { extractLanguage, isCodeBlock } from "@/utils/codeBlockUtils";
 import { preprocessChatMessage } from "@/utils/markdownUtils";
 import { cn } from "@/utils/utils";
 import CodeTabsComponent from "../../../../../../components/core/codeTabsComponent";

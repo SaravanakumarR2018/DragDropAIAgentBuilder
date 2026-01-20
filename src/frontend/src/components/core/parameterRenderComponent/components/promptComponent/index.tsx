@@ -34,7 +34,7 @@ export default function PromptAreaComponent({
       // 1) Leave ```code``` blocks untouched
       if (codeFence) return match;
 
-      // 2) Balanced & odd-length brace runs mean "real variable"
+      // 2) Balanced & odd-length brace runs mean “real variable”
       const lenOpen = openRun?.length ?? 0;
       const lenClose = closeRun?.length ?? 0;
       const isVariable = lenOpen === lenClose && lenOpen % 2 === 1;

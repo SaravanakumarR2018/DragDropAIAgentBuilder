@@ -19,7 +19,7 @@ from lfx.utils.constants import (
 class ChatInput(ChatComponent):
     display_name = "Chat Input"
     description = "Get chat inputs from the Playground."
-    documentation: str = "https://docs.langflow.org/chat-input-and-output"
+    documentation: str = "https://docs.langflow.org/components-io#chat-input"
     icon = "MessagesSquare"
     name = "ChatInput"
     minimized = True
@@ -60,13 +60,6 @@ class ChatInput(ChatComponent):
             info="The session ID of the chat. If empty, the current session ID parameter will be used.",
             advanced=True,
         ),
-        MessageTextInput(
-            name="context_id",
-            display_name="Context ID",
-            info="The context ID of the chat. Adds an extra layer to the local memory.",
-            value="",
-            advanced=True,
-        ),
         FileInput(
             name="files",
             display_name="Files",
@@ -89,16 +82,14 @@ class ChatInput(ChatComponent):
         # Filter out None/empty values
         files = [f for f in files if f is not None and f != ""]
 
-        session_id = self.session_id or self.graph.session_id or ""
         message = await Message.create(
             text=self.input_value,
             sender=self.sender,
             sender_name=self.sender_name,
-            session_id=session_id,
-            context_id=self.context_id,
+            session_id=self.session_id,
             files=files,
         )
-        if session_id and isinstance(message, Message) and self.should_store_message:
+        if self.session_id and isinstance(message, Message) and self.should_store_message:
             stored_message = await self.send_message(
                 message,
             )

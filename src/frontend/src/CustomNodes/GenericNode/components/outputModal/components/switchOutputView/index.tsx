@@ -33,18 +33,6 @@ const SwitchOutputView: React.FC<SwitchOutputViewProps> = ({
     (flowPool[nodeId]?.length ?? 1) - 1
   ];
 
-  // Get the node to access output configuration
-  const currentNode = nodes.find((node) => node.id === nodeId);
-  const outputConfig = currentNode?.data?.node?.outputs?.find(
-    (output) => output.name === outputName,
-  );
-
-  // Check if this is a Tool output
-  const isToolOutput =
-    outputConfig &&
-    (outputConfig.method === "to_toolkit" ||
-      (outputConfig.types && outputConfig.types.includes("Tool")));
-
   const results: OutputLogType | LogsLogType =
     (type === "Outputs"
       ? flowPoolNode?.data?.outputs?.[outputName]

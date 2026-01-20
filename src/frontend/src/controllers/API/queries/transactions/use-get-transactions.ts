@@ -1,9 +1,6 @@
 import { keepPreviousData } from "@tanstack/react-query";
 import type { ColDef, ColGroupDef } from "ag-grid-community";
-import type {
-  TransactionLogsRow,
-  useQueryFunctionType,
-} from "../../../../types/api";
+import type { useQueryFunctionType } from "../../../../types/api";
 import { extractColumnsFromRows } from "../../../../utils/utils";
 import { api } from "../../api";
 import { getURL } from "../../helpers/constants";

@@ -1,4 +1,3 @@
-import { getFetchCredentials } from "@/customization/utils/get-fetch-credentials";
 import type { FlowType } from "@/types/flow";
 import { downloadFlow, processFlows } from "@/utils/reactflowUtils";
 import type { useMutationFunctionType } from "../../../../types/api";

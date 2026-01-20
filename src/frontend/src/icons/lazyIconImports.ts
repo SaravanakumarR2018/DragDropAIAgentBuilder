@@ -28,22 +28,6 @@ export const lazyIconsMapping = {
     import("@/icons/AssemblyAI").then((mod) => ({
       default: mod.AssemblyAIIcon,
     })),
-  Elevenlabs: () =>
-    import("@/icons/Elevenlabs").then((mod) => ({
-      default: mod.ElevenlabsIcon,
-    })),
-  Googlebigquery: () =>
-    import("@/icons/Googlebigquery").then((mod) => ({
-      default: mod.GooglebigqueryIcon,
-    })),
-  Heygen: () =>
-    import("@/icons/Heygen").then((mod) => ({ default: mod.HeygenIcon })),
-  Peopledatalabs: () =>
-    import("@/icons/Peopledatalabs").then((mod) => ({
-      default: mod.PeopledatalabsIcon,
-    })),
-  Snowflake: () =>
-    import("@/icons/Snowflake").then((mod) => ({ default: mod.SnowflakeIcon })),
   Googledocs: () =>
     import("@/icons/googledocs").then((mod) => ({
       default: mod.GoogledocsIcon,
@@ -54,8 +38,6 @@ export const lazyIconsMapping = {
     })),
   Klaviyo: () =>
     import("@/icons/klaviyo").then((mod) => ({ default: mod.KlaviyoIcon })),
-  Klipfolio: () =>
-    import("@/icons/Klipfolio").then((mod) => ({ default: mod.KlipfolioIcon })),
   One_Drive: () =>
     import("@/icons/one_drive").then((mod) => ({ default: mod.One_DriveIcon })),
   Wrike: () =>
@@ -63,12 +45,10 @@ export const lazyIconsMapping = {
   Miro: () => import("@/icons/miro").then((mod) => ({ default: mod.MiroIcon })),
   Figma: () =>
     import("@/icons/figma").then((mod) => ({ default: mod.FigmaIcon })),
-  discord: () =>
+  Discord: () =>
     import("@/icons/discord").then((mod) => ({
       default: mod.DiscordIcon,
     })),
-  Digicert: () =>
-    import("@/icons/Digicert").then((mod) => ({ default: mod.DigicertIcon })),
   Contentful: () =>
     import("@/icons/contentful").then((mod) => ({
       default: mod.ContentfulIcon,
@@ -77,14 +57,6 @@ export const lazyIconsMapping = {
     import("@/icons/calendly").then((mod) => ({
       default: mod.CalendlyIcon,
     })),
-  CapsuleCRM: () =>
-    import("@/icons/Capsulecrm").then((mod) => ({
-      default: mod.CapsulecrmIcon,
-    })),
-  Canvas: () =>
-    import("@/icons/Canvas").then((mod) => ({ default: mod.CanvasIcon })),
-  Canvaas: () =>
-    import("@/icons/Canvas").then((mod) => ({ default: mod.CanvasIcon })),
   Attio: () =>
     import("@/icons/attio").then((mod) => ({ default: mod.AttioIcon })),
   Asana: () =>
@@ -298,9 +270,6 @@ export const lazyIconsMapping = {
     import("@/icons/JigsawStack").then((mod) => ({
       default: mod.JigsawStackIcon,
     })),
-  Jira: () => import("@/icons/Jira").then((mod) => ({ default: mod.JiraIcon })),
-  Jotform: () =>
-    import("@/icons/Jotform").then((mod) => ({ default: mod.JotformIcon })),
   Linear: () =>
     import("@/icons/linear").then((mod) => ({ default: mod.LinearIcon })),
   LangChain: () =>
@@ -474,6 +443,14 @@ export const lazyIconsMapping = {
   VectorStores: () =>
     import("@/icons/vectorstores").then((mod) => ({
       default: mod.VectorStoresIcon,
+    })),
+  VertexAI: () =>
+    import("@/icons/VertexAI").then((mod) => ({ default: mod.VertexAIIcon })),
+  Weaviate: () =>
+    import("@/icons/Weaviate").then((mod) => ({ default: mod.WeaviateIcon })),
+  Wikipedia: () =>
+    import("@/icons/Wikipedia/Wikipedia").then((mod) => ({
+      default: mod.default,
     })),
   Windsurf: () =>
     import("@/icons/Windsurf").then((mod) => ({ default: mod.WindsurfIcon })),

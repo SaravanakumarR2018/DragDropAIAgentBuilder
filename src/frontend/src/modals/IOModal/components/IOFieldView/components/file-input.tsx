@@ -7,7 +7,10 @@ import useFileSizeValidator from "@/shared/hooks/use-file-size-validator";
 import useAlertStore from "@/stores/alertStore";
 import IconComponent from "../../../../../components/common/genericIconComponent";
 import { Button } from "../../../../../components/ui/button";
-import { ALLOWED_IMAGE_INPUT_EXTENSIONS } from "../../../../../constants/constants";
+import {
+  ALLOWED_IMAGE_INPUT_EXTENSIONS,
+  BASE_URL_API,
+} from "../../../../../constants/constants";
 import useFlowsManagerStore from "../../../../../stores/flowsManagerStore";
 import type { IOFileInputProps } from "../../../../../types/components";
 

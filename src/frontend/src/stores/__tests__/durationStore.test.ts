@@ -16,17 +16,15 @@ describe("useDurationStore", () => {
     useDurationStore.setState({
       durations: {},
       intervals: {},
-      startTimes: {},
     });
   });
 
   describe("initial state", () => {
-    it("should initialize with empty durations, intervals, and startTimes", () => {
+    it("should initialize with empty durations and intervals", () => {
       const { result } = renderHook(() => useDurationStore());
 
       expect(result.current.durations).toEqual({});
       expect(result.current.intervals).toEqual({});
-      expect(result.current.startTimes).toEqual({});
     });
   });
 
@@ -107,62 +105,75 @@ describe("useDurationStore", () => {
     });
   });
 
-  describe("startTimer", () => {
-    beforeEach(() => {
-      jest.useFakeTimers();
-      jest.setSystemTime(new Date("2024-01-01T00:00:00.000Z"));
-    });
-
-    afterEach(() => {
-      jest.useRealTimers();
-    });
-
-    it("should start timer for new chat ID with Date.now()", () => {
-      const { result } = renderHook(() => useDurationStore());
-      const expectedTime = Date.now();
-
-      act(() => {
-        result.current.startTimer("chat-1");
-      });
-
-      expect(result.current.startTimes["chat-1"]).toBe(expectedTime);
-      expect(result.current.durations["chat-1"]).toBe(0);
-    });
-
-    it("should reset timer for existing chat ID", () => {
+  describe("incrementDuration", () => {
+    it("should increment duration by 10 for new chat ID", () => {
       const { result } = renderHook(() => useDurationStore());
 
       act(() => {
-        result.current.setDuration("chat-1", 5000);
-        result.current.startTimer("chat-1");
+        result.current.incrementDuration("chat-1");
       });
 
-      expect(result.current.durations["chat-1"]).toBe(0);
-      expect(result.current.startTimes["chat-1"]).toBe(Date.now());
+      expect(result.current.durations["chat-1"]).toBe(10);
+    });
+
+    it("should increment duration by 10 for existing chat ID", () => {
+      const { result } = renderHook(() => useDurationStore());
+
+      act(() => {
+        result.current.setDuration("chat-1", 50);
+        result.current.incrementDuration("chat-1");
+      });
+
+      expect(result.current.durations["chat-1"]).toBe(60);
+    });
+
+    it("should increment multiple times correctly", () => {
+      const { result } = renderHook(() => useDurationStore());
+
+      act(() => {
+        result.current.incrementDuration("chat-1");
+        result.current.incrementDuration("chat-1");
+        result.current.incrementDuration("chat-1");
+      });
+
+      expect(result.current.durations["chat-1"]).toBe(30);
     });
 
     it("should handle multiple chat IDs independently", () => {
       const { result } = renderHook(() => useDurationStore());
-      const time1 = Date.now();
 
       act(() => {
-        result.current.startTimer("chat-1");
+        result.current.incrementDuration("chat-1");
+        result.current.incrementDuration("chat-2");
+        result.current.incrementDuration("chat-1");
       });
 
-      // Advance time
-      jest.advanceTimersByTime(1000);
-      const time2 = Date.now();
-
-      act(() => {
-        result.current.startTimer("chat-2");
-      });
-
-      expect(result.current.startTimes["chat-1"]).toBe(time1);
-      expect(result.current.startTimes["chat-2"]).toBe(time2);
       expect(result.current.durations).toEqual({
-        "chat-1": 0,
-        "chat-2": 0,
+        "chat-1": 20,
+        "chat-2": 10,
       });
+    });
+
+    it("should handle incrementing from zero", () => {
+      const { result } = renderHook(() => useDurationStore());
+
+      act(() => {
+        result.current.setDuration("chat-1", 0);
+        result.current.incrementDuration("chat-1");
+      });
+
+      expect(result.current.durations["chat-1"]).toBe(10);
+    });
+
+    it("should handle incrementing from negative values", () => {
+      const { result } = renderHook(() => useDurationStore());
+
+      act(() => {
+        result.current.setDuration("chat-1", -5);
+        result.current.incrementDuration("chat-1");
+      });
+
+      expect(result.current.durations["chat-1"]).toBe(5);
     });
   });
 
@@ -225,25 +236,21 @@ describe("useDurationStore", () => {
   });
 
   describe("clearInterval", () => {
-    it("should clear interval for existing chat ID but preserve startTime", () => {
+    it("should clear interval for existing chat ID", () => {
       const { result } = renderHook(() => useDurationStore());
       const mockInterval = setInterval(() => {}, 1000) as NodeJS.Timeout;
 
       act(() => {
-        result.current.startTimer("chat-1");
         result.current.setInterval("chat-1", mockInterval);
       });
 
-      const originalStartTime = result.current.startTimes["chat-1"];
       expect(result.current.intervals["chat-1"]).toBe(mockInterval);
-      expect(originalStartTime).toBeDefined();
 
       act(() => {
         result.current.clearInterval("chat-1");
       });
 
       expect(result.current.intervals["chat-1"]).toBeUndefined();
-      expect(result.current.startTimes["chat-1"]).toBe(originalStartTime);
       expect(mockClearInterval).toHaveBeenCalledWith(mockInterval);
     });
 
@@ -296,104 +303,6 @@ describe("useDurationStore", () => {
     });
   });
 
-  describe("clearStartTime", () => {
-    it("should clear startTime for existing chat ID", () => {
-      const { result } = renderHook(() => useDurationStore());
-
-      act(() => {
-        result.current.startTimer("chat-1");
-      });
-
-      expect(result.current.startTimes["chat-1"]).toBeDefined();
-
-      act(() => {
-        result.current.clearStartTime("chat-1");
-      });
-
-      expect(result.current.startTimes["chat-1"]).toBeUndefined();
-    });
-
-    it("should handle clearing non-existent chat ID gracefully", () => {
-      const { result } = renderHook(() => useDurationStore());
-
-      act(() => {
-        result.current.clearStartTime("non-existent-chat");
-      });
-
-      expect(result.current.startTimes).toEqual({});
-    });
-
-    it("should only remove specified chat ID startTime", () => {
-      const { result } = renderHook(() => useDurationStore());
-
-      act(() => {
-        result.current.startTimer("chat-1");
-        result.current.startTimer("chat-2");
-      });
-
-      const startTime2 = result.current.startTimes["chat-2"];
-
-      act(() => {
-        result.current.clearStartTime("chat-1");
-      });
-
-      expect(result.current.startTimes["chat-1"]).toBeUndefined();
-      expect(result.current.startTimes["chat-2"]).toBe(startTime2);
-    });
-
-    it("should clear startTime when duration is finalized", () => {
-      const { result } = renderHook(() => useDurationStore());
-      const mockInterval = setInterval(() => {}, 1000) as NodeJS.Timeout;
-
-      act(() => {
-        result.current.startTimer("chat-1");
-        result.current.setInterval("chat-1", mockInterval);
-      });
-
-      expect(result.current.startTimes["chat-1"]).toBeDefined();
-
-      // Simulate finalizing the duration
-      act(() => {
-        result.current.setDuration("chat-1", 5000);
-        result.current.clearInterval("chat-1");
-        result.current.clearStartTime("chat-1");
-      });
-
-      expect(result.current.startTimes["chat-1"]).toBeUndefined();
-      expect(result.current.durations["chat-1"]).toBe(5000);
-      expect(result.current.intervals["chat-1"]).toBeUndefined();
-
-      clearInterval(mockInterval);
-    });
-
-    it("should allow independent management of startTime and interval", () => {
-      const { result } = renderHook(() => useDurationStore());
-      const mockInterval = setInterval(() => {}, 1000) as NodeJS.Timeout;
-
-      act(() => {
-        result.current.startTimer("chat-1");
-        result.current.setInterval("chat-1", mockInterval);
-      });
-
-      const startTime = result.current.startTimes["chat-1"];
-
-      // Clear interval but preserve startTime
-      act(() => {
-        result.current.clearInterval("chat-1");
-      });
-
-      expect(result.current.intervals["chat-1"]).toBeUndefined();
-      expect(result.current.startTimes["chat-1"]).toBe(startTime);
-
-      // Now explicitly clear startTime
-      act(() => {
-        result.current.clearStartTime("chat-1");
-      });
-
-      expect(result.current.startTimes["chat-1"]).toBeUndefined();
-    });
-  });
-
   describe("integration scenarios", () => {
     it("should handle complete chat session lifecycle", () => {
       const { result } = renderHook(() => useDurationStore());
@@ -408,10 +317,11 @@ describe("useDurationStore", () => {
       expect(result.current.durations["chat-session-1"]).toBe(0);
       expect(result.current.intervals["chat-session-1"]).toBe(mockInterval);
 
-      // Simulate timer with startTimer
+      // Simulate timer increments
       act(() => {
-        result.current.startTimer("chat-session-1");
-        result.current.setDuration("chat-session-1", 30);
+        result.current.incrementDuration("chat-session-1");
+        result.current.incrementDuration("chat-session-1");
+        result.current.incrementDuration("chat-session-1");
       });
 
       expect(result.current.durations["chat-session-1"]).toBe(30);
@@ -444,9 +354,12 @@ describe("useDurationStore", () => {
 
       // Simulate different progress for each chat
       act(() => {
-        result.current.setDuration("chat-1", 10);
-        result.current.setDuration("chat-2", 20);
-        result.current.setDuration("chat-3", 30);
+        result.current.incrementDuration("chat-1");
+        result.current.incrementDuration("chat-2");
+        result.current.incrementDuration("chat-2");
+        result.current.incrementDuration("chat-3");
+        result.current.incrementDuration("chat-3");
+        result.current.incrementDuration("chat-3");
       });
 
       expect(result.current.durations).toEqual({
@@ -470,91 +383,6 @@ describe("useDurationStore", () => {
       clearInterval(mockInterval3);
     });
 
-    it("should preserve startTime when playground is closed and reopened", () => {
-      const { result } = renderHook(() => useDurationStore());
-      const mockInterval1 = setInterval(() => {}, 1000) as NodeJS.Timeout;
-
-      // Start initial timer
-      act(() => {
-        result.current.startTimer("chat-1");
-        result.current.setInterval("chat-1", mockInterval1);
-      });
-
-      const originalStartTime = result.current.startTimes["chat-1"];
-      expect(originalStartTime).toBeDefined();
-      expect(result.current.intervals["chat-1"]).toBe(mockInterval1);
-
-      // Simulate closing playground (only clears interval, not startTime)
-      act(() => {
-        result.current.clearInterval("chat-1");
-      });
-
-      expect(result.current.intervals["chat-1"]).toBeUndefined();
-      expect(result.current.startTimes["chat-1"]).toBe(originalStartTime);
-
-      // Simulate reopening playground with new interval
-      const mockInterval2 = setInterval(() => {}, 1000) as NodeJS.Timeout;
-      act(() => {
-        result.current.setInterval("chat-1", mockInterval2);
-      });
-
-      // StartTime should still be the original one
-      expect(result.current.startTimes["chat-1"]).toBe(originalStartTime);
-      expect(result.current.intervals["chat-1"]).toBe(mockInterval2);
-
-      // Clean up
-      clearInterval(mockInterval2);
-    });
-
-    it("should handle full timer lifecycle with startTime preservation", () => {
-      const { result } = renderHook(() => useDurationStore());
-
-      // Start timer
-      act(() => {
-        result.current.startTimer("chat-1");
-      });
-
-      const originalStartTime = result.current.startTimes["chat-1"];
-
-      // Set interval
-      const mockInterval1 = setInterval(() => {}, 1000) as NodeJS.Timeout;
-      act(() => {
-        result.current.setInterval("chat-1", mockInterval1);
-      });
-
-      // Close playground (preserves startTime)
-      act(() => {
-        result.current.clearInterval("chat-1");
-      });
-
-      expect(result.current.startTimes["chat-1"]).toBe(originalStartTime);
-
-      // Reopen playground multiple times
-      for (let i = 0; i < 3; i++) {
-        const mockInterval = setInterval(() => {}, 1000) as NodeJS.Timeout;
-        act(() => {
-          result.current.setInterval("chat-1", mockInterval);
-        });
-
-        expect(result.current.startTimes["chat-1"]).toBe(originalStartTime);
-
-        act(() => {
-          result.current.clearInterval("chat-1");
-        });
-
-        expect(result.current.startTimes["chat-1"]).toBe(originalStartTime);
-      }
-
-      // Finally, when duration is complete, clear everything
-      act(() => {
-        result.current.setDuration("chat-1", 5000);
-        result.current.clearStartTime("chat-1");
-      });
-
-      expect(result.current.startTimes["chat-1"]).toBeUndefined();
-      expect(result.current.durations["chat-1"]).toBe(5000);
-    });
-
     it("should handle session restart", () => {
       const { result } = renderHook(() => useDurationStore());
       const mockInterval1 = setInterval(() => {}, 1000) as NodeJS.Timeout;
@@ -562,9 +390,10 @@ describe("useDurationStore", () => {
 
       // Start session
       act(() => {
-        result.current.startTimer("chat-1");
+        result.current.setDuration("chat-1", 0);
         result.current.setInterval("chat-1", mockInterval1);
-        result.current.setDuration("chat-1", 20);
+        result.current.incrementDuration("chat-1");
+        result.current.incrementDuration("chat-1");
       });
 
       expect(result.current.durations["chat-1"]).toBe(20);
@@ -572,13 +401,12 @@ describe("useDurationStore", () => {
       // Restart session with new interval
       act(() => {
         result.current.clearInterval("chat-1");
-        result.current.startTimer("chat-1");
+        result.current.setDuration("chat-1", 0);
         result.current.setInterval("chat-1", mockInterval2);
       });
 
       expect(result.current.durations["chat-1"]).toBe(0);
       expect(result.current.intervals["chat-1"]).toBe(mockInterval2);
-      expect(result.current.startTimes["chat-1"]).toBeDefined();
       expect(mockClearInterval).toHaveBeenCalledWith(mockInterval1);
 
       // Clean up
@@ -592,11 +420,10 @@ describe("useDurationStore", () => {
 
       act(() => {
         result.current.setDuration("", 100);
-        result.current.startTimer("");
+        result.current.incrementDuration("");
       });
 
-      expect(result.current.durations[""]).toBe(0);
-      expect(result.current.startTimes[""]).toBeDefined();
+      expect(result.current.durations[""]).toBe(110);
     });
 
     it("should handle special character chat IDs", () => {
@@ -605,11 +432,10 @@ describe("useDurationStore", () => {
 
       act(() => {
         result.current.setDuration(specialChatId, 50);
-        result.current.startTimer(specialChatId);
+        result.current.incrementDuration(specialChatId);
       });
 
-      expect(result.current.durations[specialChatId]).toBe(0);
-      expect(result.current.startTimes[specialChatId]).toBeDefined();
+      expect(result.current.durations[specialChatId]).toBe(60);
     });
 
     it("should handle very long chat IDs", () => {
@@ -618,11 +444,10 @@ describe("useDurationStore", () => {
 
       act(() => {
         result.current.setDuration(longChatId, 25);
-        result.current.startTimer(longChatId);
+        result.current.incrementDuration(longChatId);
       });
 
-      expect(result.current.durations[longChatId]).toBe(0);
-      expect(result.current.startTimes[longChatId]).toBeDefined();
+      expect(result.current.durations[longChatId]).toBe(35);
     });
 
     it("should handle rapid successive operations", () => {
@@ -631,13 +456,16 @@ describe("useDurationStore", () => {
 
       act(() => {
         // Rapid operations
-        result.current.startTimer("rapid-chat");
+        result.current.setDuration("rapid-chat", 0);
+        result.current.incrementDuration("rapid-chat");
         result.current.setInterval("rapid-chat", mockInterval);
+        result.current.incrementDuration("rapid-chat");
         result.current.setDuration("rapid-chat", 100);
+        result.current.incrementDuration("rapid-chat");
         result.current.clearInterval("rapid-chat");
       });
 
-      expect(result.current.durations["rapid-chat"]).toBe(100);
+      expect(result.current.durations["rapid-chat"]).toBe(110);
       expect(result.current.intervals["rapid-chat"]).toBeUndefined();
       expect(mockClearInterval).toHaveBeenCalledWith(mockInterval);
     });
@@ -649,14 +477,17 @@ describe("useDurationStore", () => {
       act(() => {
         result.current.setDuration("persistent-1", 100);
         result.current.setDuration("persistent-2", 200);
+        result.current.incrementDuration("persistent-1");
       });
+
+      const durations = result.current.durations;
 
       // Operations on one chat shouldn't affect others
       act(() => {
         result.current.setDuration("persistent-3", 300);
       });
 
-      expect(result.current.durations["persistent-1"]).toBe(100);
+      expect(result.current.durations["persistent-1"]).toBe(110);
       expect(result.current.durations["persistent-2"]).toBe(200);
       expect(result.current.durations["persistent-3"]).toBe(300);
     });

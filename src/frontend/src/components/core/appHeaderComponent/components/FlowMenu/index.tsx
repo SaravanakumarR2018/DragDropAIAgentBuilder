@@ -23,6 +23,9 @@ import useFlowsManagerStore from "@/stores/flowsManagerStore";
 import { useShortcutsStore } from "@/stores/shortcuts";
 import { swatchColors } from "@/utils/styleUtils";
 import { cn, getNumberFromString } from "@/utils/utils";
+import { useHotkeys } from "react-hotkeys-hook";
+import { useShallow } from "zustand/react/shallow";
+import "./flowMenuResponsive.css";
 
 export const MenuBar = memo((): JSX.Element => {
   const setSuccessData = useAlertStore((state) => state.setSuccessData);
@@ -33,6 +36,7 @@ export const MenuBar = memo((): JSX.Element => {
   const saveFlow = useSaveFlow();
   const autoSaving = useFlowsManagerStore((state) => state.autoSaving);
   const {
+    isFlowLocked,
     currentFlowName,
     currentFlowId,
     currentFlowFolderId,
@@ -40,6 +44,7 @@ export const MenuBar = memo((): JSX.Element => {
     currentFlowGradient,
   } = useFlowStore(
     useShallow((state) => ({
+      isFlowLocked: state.currentFlow?.locked,
       currentFlowName: state.currentFlow?.name,
       currentFlowId: state.currentFlow?.id,
       currentFlowFolderId: state.currentFlow?.folder_id,
@@ -136,6 +141,7 @@ export const MenuBar = memo((): JSX.Element => {
               <span
                 ref={measureRef}
                 className="w-fit max-w-[35vw] truncate whitespace-pre text-mmd font-semibold sm:max-w-full sm:text-sm"
+                data-tooltip={currentFlowName || "Untitled Flow"}
                 aria-hidden="true"
                 data-testid="flow_name"
               >

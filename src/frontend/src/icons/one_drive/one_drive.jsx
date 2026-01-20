@@ -2,8 +2,8 @@ const Icon = (props) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     viewBox="0 0 48 48"
-    width="20px"
-    height="20px"
+    width="24px"
+    height="24px"
   >
     <linearGradient
       id="NqAl5bicO~9wmXV3Tvu1Ra"

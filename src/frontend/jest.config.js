@@ -17,7 +17,7 @@ module.exports = {
   ],
   testPathIgnorePatterns: ["/node_modules/", "test-utils.tsx"],
   transform: {
-    "^.+\\.(ts|tsx)$": "<rootDir>/transform-import-meta.js",
+    "^.+\\.(ts|tsx)$": "ts-jest",
   },
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json"],
   // Ignore node_modules except for packages that need transformation

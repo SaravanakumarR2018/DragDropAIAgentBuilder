@@ -5,9 +5,6 @@ from typing import TYPE_CHECKING, Any, cast
 
 import nanoid
 from lfx.log.logger import logger
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from typing_extensions import override
 
 from langflow.schema.data import Data
@@ -26,7 +23,6 @@ if TYPE_CHECKING:
 
 class LangWatchTracer(BaseTracer):
     flow_id: str
-    tracer_provider = None
 
     def __init__(self, trace_name: str, trace_type: str, project_name: str, trace_id: UUID):
         self.trace_name = trace_name
@@ -40,8 +36,9 @@ class LangWatchTracer(BaseTracer):
             if not self._ready:
                 return
 
-            # Pass the dedicated tracer_provider here
-            self.trace = self._client.trace(trace_id=str(self.trace_id), tracer_provider=self.tracer_provider)
+            self.trace = self._client.trace(
+                trace_id=str(self.trace_id),
+            )
             self.trace.__enter__()
             self.spans: dict[str, ContextSpan] = {}
 
@@ -66,32 +63,10 @@ class LangWatchTracer(BaseTracer):
             return False
         try:
             import langwatch
-            from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-
-            # Initialize the shared provider if it doesn't exist
-            if self.tracer_provider is None:
-                api_key = os.environ["LANGWATCH_API_KEY"]
-                endpoint = os.environ.get("LANGWATCH_ENDPOINT", "https://app.langwatch.ai")
-
-                resource = Resource.create(attributes={"service.name": "langflow"})
-                exporter = OTLPSpanExporter(
-                    endpoint=f"{endpoint}/api/otel/v1/traces", headers={"Authorization": f"Bearer {api_key}"}
-                )
-                provider = TracerProvider(resource=resource)
-                provider.add_span_processor(BatchSpanProcessor(exporter))
-                LangWatchTracer.tracer_provider = provider
-
-                # Initialize LangWatch client but skip OTEL setup to avoid touching the global provider
-                # causing it to not receive traces from FastAPIInstrumentor
-                langwatch.setup(
-                    api_key=api_key,
-                    endpoint_url=endpoint,
-                    skip_open_telemetry_setup=True,
-                )
 
             self._client = langwatch
-        except ImportError as e:
-            logger.exception(f"{e}")
+        except ImportError:
+            logger.exception("Could not import langwatch. Please install it with `pip install langwatch`.")
             return False
         return True
 

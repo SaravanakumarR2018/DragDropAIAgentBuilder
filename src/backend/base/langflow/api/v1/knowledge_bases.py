@@ -15,20 +15,12 @@ from langflow.services.deps import get_settings_service
 router = APIRouter(tags=["Knowledge Bases"], prefix="/knowledge_bases")
 
 
-_KNOWLEDGE_BASES_DIR: Path | None = None
-
-
-def _get_knowledge_bases_dir() -> Path:
-    """Lazy load the knowledge bases directory from settings."""
-    global _KNOWLEDGE_BASES_DIR  # noqa: PLW0603
-    if _KNOWLEDGE_BASES_DIR is None:
-        settings = get_settings_service().settings
-        knowledge_directory = settings.knowledge_bases_dir
-        if not knowledge_directory:
-            msg = "Knowledge bases directory is not set in the settings."
-            raise ValueError(msg)
-        _KNOWLEDGE_BASES_DIR = Path(knowledge_directory).expanduser()
-    return _KNOWLEDGE_BASES_DIR
+settings = get_settings_service().settings
+knowledge_directory = settings.knowledge_bases_dir
+if not knowledge_directory:
+    msg = "Knowledge bases directory is not set in the settings."
+    raise ValueError(msg)
+KNOWLEDGE_BASES_DIR = Path(knowledge_directory).expanduser()
 
 
 class KnowledgeBaseInfo(BaseModel):
@@ -49,7 +41,7 @@ class BulkDeleteRequest(BaseModel):
 
 def get_kb_root_path() -> Path:
     """Get the knowledge bases root path."""
-    return _get_knowledge_bases_dir()
+    return KNOWLEDGE_BASES_DIR
 
 
 def get_directory_size(path: Path) -> int:
@@ -260,7 +252,7 @@ def get_kb_metadata(kb_path: Path) -> dict:
         )
 
         # Access the raw collection
-        collection = chroma._collection  # noqa: SLF001
+        collection = chroma._collection
 
         # Fetch all documents and metadata
         results = collection.get(include=["documents", "metadatas"])

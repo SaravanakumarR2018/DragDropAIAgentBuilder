@@ -1,10 +1,6 @@
 import type { UseMutationResult } from "@tanstack/react-query";
 import type { useMutationFunctionType } from "@/types/api";
-import type {
-  AuthSettingsType,
-  ComposerUrlResponseType,
-  MCPSettingsType,
-} from "@/types/mcp";
+import type { AuthSettingsType, MCPSettingsType } from "@/types/mcp";
 import { api } from "../../api";
 import { getURL } from "../../helpers/constants";
 import { UseRequestProcessor } from "../../services/request-processor";
@@ -20,7 +16,12 @@ interface PatchFlowMCPRequest {
 
 interface PatchFlowMCPResponse {
   message: string;
-  result?: ComposerUrlResponseType;
+  result?: {
+    project_id: string;
+    sse_url?: string;
+    uses_composer: boolean;
+    error_message?: string;
+  };
 }
 
 export const usePatchFlowsMCP: useMutationFunctionType<
@@ -44,7 +45,7 @@ export const usePatchFlowsMCP: useMutationFunctionType<
     PatchFlowMCPResponse,
     any,
     PatchFlowMCPRequest
-  > = mutate(["usePatchFlowsMCP", params.project_id], patchFlowMCP, {
+  > = mutate(["usePatchFlowsMCP"], patchFlowMCP, {
     onSuccess: (data, variables, context) => {
       const authSettings = (variables as unknown as PatchFlowMCPRequest)
         .auth_settings;
@@ -72,12 +73,12 @@ export const usePatchFlowsMCP: useMutationFunctionType<
       }
     },
     onSettled: () => {
-      // Invalidate only this specific project's queries to avoid affecting other projects
-      queryClient.invalidateQueries({
-        queryKey: ["useGetFlowsMCP", params.project_id],
-      });
+      // Use invalidateQueries instead of refetchQueries to avoid race conditions
+      // This marks the queries as stale but doesn't immediately refetch them
+      queryClient.invalidateQueries({ queryKey: ["useGetFlowsMCP"] });
     },
     ...options,
+    retry: 0,
   });
 
   return mutation;

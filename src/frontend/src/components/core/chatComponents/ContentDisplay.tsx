@@ -3,7 +3,6 @@ import Markdown from "react-markdown";
 import rehypeMathjax from "rehype-mathjax/browser";
 import remarkGfm from "remark-gfm";
 import type { ContentType } from "@/types/chat";
-import { extractLanguage, isCodeBlock } from "@/utils/codeBlockUtils";
 import ForwardedIconComponent from "../../common/genericIconComponent";
 import SimplifiedCodeTabComponent from "../codeTabsComponent";
 import DurationDisplay from "./DurationDisplay";

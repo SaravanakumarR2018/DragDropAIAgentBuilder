@@ -3,7 +3,8 @@ import { debounce } from "lodash";
 import { useMemo, useRef, useState } from "react";
 import {
   COLOR_OPTIONS,
-  DEFAULT_NOTE_SIZE,
+  NOTE_NODE_MAX_HEIGHT,
+  NOTE_NODE_MAX_WIDTH,
   NOTE_NODE_MIN_HEIGHT,
   NOTE_NODE_MIN_WIDTH,
 } from "@/constants/constants";
@@ -69,10 +70,12 @@ function NoteNode({
   data: NoteDataType;
   selected?: boolean;
 }) {
-  const nodeRef = useRef<HTMLDivElement>(null);
-  const [isResizing, setIsResizing] = useState(false);
-  const [isEditingDescription, setIsEditingDescription] = useAlternate(false);
-
+  const bgColor =
+    Object.keys(COLOR_OPTIONS).find(
+      (key) => key === data.node?.template.backgroundColor,
+    ) ?? Object.keys(COLOR_OPTIONS)[0];
+  const nodeDiv = useRef<HTMLDivElement>(null);
+  const [_resizedNote, setResizedNote] = useState(false);
   const currentFlow = useFlowStore((state) => state.currentFlow);
   const setNode = useFlowStore((state) => state.setNode);
 
@@ -106,17 +109,38 @@ function NoteNode({
   const nodeWidth = nodeData?.width ?? DEFAULT_NOTE_SIZE;
   const nodeHeight = nodeData?.height ?? DEFAULT_NOTE_SIZE;
 
-  // Debounced resize handler to avoid excessive state updates during drag
+  const nodeDataWidth = useMemo(
+    () => nodeData?.measured?.width ?? DEFAULT_WIDTH,
+    [nodeData?.measured?.width],
+  );
+  const nodeDataHeight = useMemo(
+    () => nodeData?.measured?.height ?? DEFAULT_HEIGHT,
+    [nodeData?.measured?.height],
+  );
+
+  const dataId = useMemo(() => data.id, [data.id]);
+  const dataDescription = useMemo(
+    () => data.node?.description,
+    [data.node?.description],
+  );
+
   const debouncedResize = useMemo(
     () =>
       debounce((width: number, height: number) => {
-        setNode(data.id, (node) => ({ ...node, width, height }));
+        setNode(data.id, (node) => {
+          return {
+            ...node,
+            width: width,
+            height: height,
+          };
+        });
       }, 5),
     [setNode, data.id],
   );
 
-  // Only render toolbar when note is selected
-  const toolbar = useMemo(
+  const [editNameDescription, set] = useAlternate(false);
+
+  const MemoNoteToolbarComponent = useMemo(
     () =>
       selected ? (
         <div className="absolute -top-12 left-1/2 z-50 -translate-x-1/2">
@@ -126,29 +150,17 @@ function NoteNode({
     [data, bgColorKey, selected],
   );
 
-  // Generate text color classes based on background (light text on dark bg, dark on light)
-  const getTextColorClass = (opacity?: number) => {
-    if (!hasCustomColor) {
-      return COLOR_OPTIONS[bgColorKey] === null
-        ? ""
-        : "dark:!ring-background dark:text-background";
-    }
-    const base = textColorMode === "light" ? "!text-white" : "!text-black";
-    return opacity
-      ? base
-          .replace("white", `white/${opacity}`)
-          .replace("black", `black/${opacity}`)
-      : base;
-  };
-
-  const hasVisibleBg = hasCustomColor || COLOR_OPTIONS[bgColorKey] !== null;
-
   return (
     <>
       <NodeResizer
-        minWidth={NOTE_NODE_MIN_WIDTH}
-        minHeight={NOTE_NODE_MIN_HEIGHT}
-        onResize={(_, { width, height }) => debouncedResize(width, height)}
+        minWidth={Math.max(DEFAULT_WIDTH, NOTE_NODE_MIN_WIDTH)}
+        minHeight={Math.max(DEFAULT_HEIGHT, NOTE_NODE_MIN_HEIGHT)}
+        maxWidth={NOTE_NODE_MAX_WIDTH}
+        maxHeight={NOTE_NODE_MAX_HEIGHT}
+        onResize={(_, params) => {
+          const { width, height } = params;
+          debouncedResize(width, height);
+        }}
         isVisible={selected}
         lineClassName="!border !border-muted-foreground"
         onResizeStart={() => setIsResizing(true)}
@@ -162,9 +174,9 @@ function NoteNode({
         ref={nodeRef}
         data-testid="note_node"
         style={{
-          width: nodeWidth,
-          height: nodeHeight,
-          backgroundColor: resolvedBgColor,
+          minWidth: nodeDataWidth,
+          minHeight: nodeDataHeight,
+          backgroundColor: COLOR_OPTIONS[bgColor] ?? "#00000000",
         }}
         className={cn(
           "relative flex h-full w-full flex-col gap-3 rounded-xl p-3",
@@ -190,18 +202,14 @@ function NoteNode({
           <NodeDescription
             inputClassName={cn(
               "border-0 ring-0 focus:ring-0 resize-none shadow-none rounded-sm h-full min-w-full",
-              hasCustomColor
-                ? getTextColorClass()
-                : COLOR_OPTIONS[bgColorKey] === null
-                  ? ""
-                  : "dark:!ring-background dark:text-background",
+              COLOR_OPTIONS[bgColor] === null
+                ? ""
+                : "dark:!ring-background dark:text-background",
             )}
             mdClassName={cn(
-              hasCustomColor
-                ? getTextColorClass()
-                : COLOR_OPTIONS[bgColorKey] === null
-                  ? "dark:prose-invert"
-                  : "dark:!text-background",
+              COLOR_OPTIONS[bgColor] === null
+                ? "dark:prose-invert"
+                : "dark:!text-background",
               "min-w-full",
             )}
             style={{ backgroundColor: resolvedBgColor }}
@@ -211,17 +219,11 @@ function NoteNode({
             description={data.node?.description}
             emptyPlaceholder="Double-click to start typing or enter Markdown..."
             placeholderClassName={cn(
-              hasCustomColor
-                ? textColorMode === "light"
-                  ? "!text-white/70"
-                  : "!text-black/70"
-                : COLOR_OPTIONS[bgColorKey] === null
-                  ? ""
-                  : "dark:!text-background",
+              COLOR_OPTIONS[bgColor] === null ? "" : "dark:!text-background",
               "px-2",
             )}
-            editNameDescription={isEditingDescription}
-            setEditNameDescription={setIsEditingDescription}
+            editNameDescription={editNameDescription}
+            setEditNameDescription={set}
             stickyNote
           />
         </div>

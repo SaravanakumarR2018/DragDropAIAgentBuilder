@@ -1,7 +1,6 @@
 import contextlib
 import json
 from io import BytesIO
-from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from lfx.base.agents.utils import safe_cache_get, safe_cache_set
@@ -19,8 +18,6 @@ from langflow.api.v2.files import (
 )
 from langflow.logging import logger
 from langflow.services.deps import get_settings_service, get_shared_component_cache_service, get_storage_service
-from langflow.services.settings.service import SettingsService
-from langflow.services.storage.service import StorageService
 
 router = APIRouter(tags=["MCP"], prefix="/mcp")
 
@@ -29,8 +26,8 @@ async def upload_server_config(
     server_config: dict,
     current_user: CurrentActiveUser,
     session: DbSession,
-    storage_service: Annotated[StorageService, Depends(get_storage_service)],
-    settings_service: Annotated[SettingsService, Depends(get_settings_service)],
+    storage_service=Depends(get_storage_service),
+    settings_service=Depends(get_settings_service),
 ):
     content_str = json.dumps(server_config)
     content_bytes = content_str.encode("utf-8")  # Convert to bytes
@@ -51,8 +48,8 @@ async def upload_server_config(
 async def get_server_list(
     current_user: CurrentActiveUser,
     session: DbSession,
-    storage_service: Annotated[StorageService, Depends(get_storage_service)],
-    settings_service: Annotated[SettingsService, Depends(get_settings_service)],
+    storage_service=Depends(get_storage_service),
+    settings_service=Depends(get_settings_service),
 ):
     # Backwards compatibilty with old format file name
     mcp_file = await get_mcp_file(current_user)
@@ -114,8 +111,8 @@ async def get_server(
     server_name: str,
     current_user: CurrentActiveUser,
     session: DbSession,
-    storage_service: Annotated[StorageService, Depends(get_storage_service)],
-    settings_service: Annotated[SettingsService, Depends(get_settings_service)],
+    storage_service=Depends(get_storage_service),
+    settings_service=Depends(get_settings_service),
     server_list: dict | None = None,
 ):
     """Get a specific server configuration."""
@@ -133,15 +130,13 @@ async def get_server(
 async def get_servers(
     current_user: CurrentActiveUser,
     session: DbSession,
-    storage_service: Annotated[StorageService, Depends(get_storage_service)],
-    settings_service: Annotated[SettingsService, Depends(get_settings_service)],
+    storage_service=Depends(get_storage_service),
+    settings_service=Depends(get_settings_service),
     *,
     action_count: bool | None = None,
 ):
     """Get the list of available servers."""
     import asyncio
-
-    from lfx.base.mcp.util import MCPStdioClient, MCPStreamableHttpClient
 
     server_list = await get_server_list(current_user, session, storage_service, settings_service)
 
@@ -152,15 +147,10 @@ async def get_servers(
     # Check all of the tool counts for each server concurrently
     async def check_server(server_name: str) -> dict:
         server_info: dict[str, str | int | None] = {"name": server_name, "mode": None, "toolsCount": None}
-        # Create clients that we control so we can clean them up after
-        mcp_stdio_client = MCPStdioClient()
-        mcp_streamable_http_client = MCPStreamableHttpClient()
         try:
             mode, tool_list, _ = await update_tools(
                 server_name=server_name,
                 server_config=server_list["mcpServers"][server_name],
-                mcp_stdio_client=mcp_stdio_client,
-                mcp_streamable_http_client=mcp_streamable_http_client,
             )
             server_info["mode"] = mode.lower()
             server_info["toolsCount"] = len(tool_list)
@@ -206,11 +196,6 @@ async def get_servers(
             else:
                 await logger.aexception(f"Error checking server {server_name}: {e}")
                 server_info["error"] = f"Error loading server: {e}"
-        finally:
-            # Always disconnect clients to prevent mcp-proxy process leaks
-            # These clients spawn subprocesses that need to be explicitly terminated
-            await mcp_stdio_client.disconnect()
-            await mcp_streamable_http_client.disconnect()
         return server_info
 
     # Run all server checks concurrently
@@ -223,8 +208,8 @@ async def get_server_endpoint(
     server_name: str,
     current_user: CurrentActiveUser,
     session: DbSession,
-    storage_service: Annotated[StorageService, Depends(get_storage_service)],
-    settings_service: Annotated[SettingsService, Depends(get_settings_service)],
+    storage_service=Depends(get_storage_service),
+    settings_service=Depends(get_settings_service),
 ):
     """Get a specific server."""
     return await get_server(server_name, current_user, session, storage_service, settings_service)
@@ -235,8 +220,8 @@ async def update_server(
     server_config: dict,
     current_user: CurrentActiveUser,
     session: DbSession,
-    storage_service: Annotated[StorageService, Depends(get_storage_service)],
-    settings_service: Annotated[SettingsService, Depends(get_settings_service)],
+    storage_service=Depends(get_storage_service),
+    settings_service=Depends(get_settings_service),
     *,
     check_existing: bool = False,
     delete: bool = False,
@@ -293,8 +278,8 @@ async def add_server(
     server_config: dict,
     current_user: CurrentActiveUser,
     session: DbSession,
-    storage_service: Annotated[StorageService, Depends(get_storage_service)],
-    settings_service: Annotated[SettingsService, Depends(get_settings_service)],
+    storage_service=Depends(get_storage_service),
+    settings_service=Depends(get_settings_service),
 ):
     return await update_server(
         server_name,
@@ -313,8 +298,8 @@ async def update_server_endpoint(
     server_config: dict,
     current_user: CurrentActiveUser,
     session: DbSession,
-    storage_service: Annotated[StorageService, Depends(get_storage_service)],
-    settings_service: Annotated[SettingsService, Depends(get_settings_service)],
+    storage_service=Depends(get_storage_service),
+    settings_service=Depends(get_settings_service),
 ):
     return await update_server(
         server_name,
@@ -331,8 +316,8 @@ async def delete_server(
     server_name: str,
     current_user: CurrentActiveUser,
     session: DbSession,
-    storage_service: Annotated[StorageService, Depends(get_storage_service)],
-    settings_service: Annotated[SettingsService, Depends(get_settings_service)],
+    storage_service=Depends(get_storage_service),
+    settings_service=Depends(get_settings_service),
 ):
     return await update_server(
         server_name,

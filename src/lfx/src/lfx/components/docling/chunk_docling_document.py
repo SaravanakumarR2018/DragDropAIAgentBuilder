@@ -115,9 +115,7 @@ class ChunkDoclingDocumentComponent(Component):
         return [Data(text=doc.page_content, data=doc.metadata) for doc in docs]
 
     def chunk_documents(self) -> DataFrame:
-        documents, warning = extract_docling_documents(self.data_inputs, self.doc_key)
-        if warning:
-            self.status = warning
+        documents = extract_docling_documents(self.data_inputs, self.doc_key)
 
         chunker: BaseChunker
         if self.chunker == "HybridChunker":

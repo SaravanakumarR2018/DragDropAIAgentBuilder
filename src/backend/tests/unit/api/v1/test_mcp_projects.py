@@ -241,6 +241,45 @@ async def test_handle_project_streamable_messages_success(
     mock_streamable_http_manager.handle_request.assert_called_once()
 
 
+@pytest.fixture(autouse=True)
+def disable_mcp_composer_by_default():
+    """Auto-fixture to disable MCP Composer for all tests by default."""
+    with patch("langflow.api.v1.mcp_projects.get_settings_service") as mock_get_settings:
+        from langflow.services.deps import get_settings_service
+
+        real_service = get_settings_service()
+
+        # Create a mock that returns False for mcp_composer_enabled but delegates everything else
+        mock_service = MagicMock()
+        mock_service.settings = MagicMock()
+        mock_service.settings.mcp_composer_enabled = False
+
+        # Copy any other settings that might be needed
+        mock_service.auth_settings = real_service.auth_settings
+
+        mock_get_settings.return_value = mock_service
+        yield
+
+
+@pytest.fixture
+def enable_mcp_composer():
+    """Fixture to explicitly enable MCP Composer for specific tests."""
+    with patch("langflow.api.v1.mcp_projects.get_settings_service") as mock_get_settings:
+        from langflow.services.deps import get_settings_service
+
+        real_service = get_settings_service()
+
+        mock_service = MagicMock()
+        mock_service.settings = MagicMock()
+        mock_service.settings.mcp_composer_enabled = True
+
+        # Copy any other settings that might be needed
+        mock_service.auth_settings = real_service.auth_settings
+
+        mock_get_settings.return_value = mock_service
+        yield True
+
+
 async def test_handle_project_messages_success(
     client: AsyncClient, user_test_project, mock_sse_transport, logged_in_headers
 ):

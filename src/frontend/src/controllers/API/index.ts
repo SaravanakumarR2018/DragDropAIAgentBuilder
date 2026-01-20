@@ -4,7 +4,7 @@ import {
   customGetAppVersions,
   customGetLatestVersion,
 } from "@/customization/utils/custom-get-app-latest-version";
-import { getBaseUrl } from "@/customization/utils/urls";
+import { BASE_URL_API } from "../../constants/constants";
 import { api } from "../../controllers/API/api";
 import type {
   VertexBuildTypeAPI,

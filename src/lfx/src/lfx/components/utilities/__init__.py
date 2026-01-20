@@ -9,12 +9,14 @@ if TYPE_CHECKING:
     from lfx.components.utilities.current_date import CurrentDateComponent
     from lfx.components.utilities.id_generator import IDGeneratorComponent
     from lfx.components.utilities.python_repl_core import PythonREPLComponent
+    from lfx.components.utilities.sql_executor import SQLComponent
 
 _dynamic_imports = {
     "CalculatorComponent": "calculator_core",
     "CurrentDateComponent": "current_date",
     "IDGeneratorComponent": "id_generator",
     "PythonREPLComponent": "python_repl_core",
+    "SQLComponent": "sql_executor",
 }
 
 __all__ = [
@@ -22,6 +24,7 @@ __all__ = [
     "CurrentDateComponent",
     "IDGeneratorComponent",
     "PythonREPLComponent",
+    "SQLComponent",
 ]
 
 

@@ -46,10 +46,6 @@ export default function ToolsTable({
   const [sidebarDescription, setSidebarDescription] = useState<string>("");
 
   const editedSelection = useRef<boolean>(false);
-  const applyingSelection = useRef<boolean>(false);
-  const previousRowsCount = useRef<number>(0);
-  const skipSelectionReapply = useRef<number>(0);
-  const [isGridReady, setIsGridReady] = useState(false);
 
   const { setOpen: setSidebarOpen } = useSidebar();
 
@@ -75,52 +71,31 @@ export default function ToolsTable({
     editedSelection.current = false;
   }, [open]);
 
-  useEffect(() => {
-    if (!open || !selectedRows) return;
-    if (previousRowsCount.current === rows.length) return;
+  const applyInitialSelection = () => {
+    if (!agGrid.current?.api || editedSelection.current) return;
 
-    previousRowsCount.current = rows.length;
-    const updatedData = cloneDeep(rows).map((row, index) => ({
-      ...row,
-      _uniqueId: `${row.name}_${row.display_name}_${index}`,
-    }));
+    const initialData = cloneDeep(rows);
+    const filter = initialData.filter((row) => row.status === true);
 
-    // Increment skip counter to prevent re-applying selection
-    skipSelectionReapply.current++;
-
-    setData(updatedData);
-
-    const updatedSelection = updatedData.filter((row) =>
-      selectedRows.some((selected) => selected.name === row.name),
-    );
-    setSelectedRows(updatedSelection);
-  }, [rows]);
-
-  useEffect(() => {
-    if (!agGrid.current?.api || !selectedRows || !open || !isGridReady) return;
-
-    // Don't re-apply selection if we're just editing data fields (slug/description)
-    if (skipSelectionReapply.current > 0) {
-      skipSelectionReapply.current--;
-      return;
-    }
-
-    applyingSelection.current = true;
-    agGrid.current.api.setGridOption("suppressRowClickSelection", true);
-
-    const selectedIds = new Set(selectedRows.map((row) => row.name));
     agGrid.current.api.forEachNode((node) => {
-      const shouldSelect = selectedIds.has(node.data.name);
-      if (node.isSelected() !== shouldSelect) {
-        node.setSelected(shouldSelect, false);
+      if (
+        filter.some(
+          (row) =>
+            (row.display_name ?? row.name) ===
+            (node.data.display_name ?? node.data.name),
+        )
+      ) {
+        node.setSelected(true);
+      } else {
+        node.setSelected(false);
       }
     });
+  };
 
-    agGrid.current.api.setGridOption("suppressRowClickSelection", false);
-    setTimeout(() => {
-      applyingSelection.current = false;
-    }, 50);
-  }, [selectedRows, open, isGridReady]);
+  // Apply initial selection when data changes and grid is ready
+  useEffect(() => {
+    applyInitialSelection();
+  }, [rows, data]);
 
   useEffect(() => {
     if (!open) {
@@ -229,11 +204,11 @@ export default function ToolsTable({
     },
   ];
   const handleSelectionChanged = (event) => {
-    if (!open || applyingSelection.current) return;
-
-    const selectedData = event.api.getSelectedRows();
-    editedSelection.current = true;
-    setSelectedRows(selectedData);
+    if (open) {
+      const selectedData = event.api.getSelectedRows();
+      editedSelection.current = true;
+      setSelectedRows(selectedData);
+    }
   };
 
   const handleSidebarInputChange = (
@@ -309,6 +284,11 @@ export default function ToolsTable({
     setSidebarOpen(true);
   };
 
+  const handleGridReady = () => {
+    // Apply initial selection when grid is ready
+    applyInitialSelection();
+  };
+
   const rowName = useMemo(() => {
     return parseString(focusedRow?.display_name || focusedRow?.name || "", [
       "space_case",
@@ -317,10 +297,6 @@ export default function ToolsTable({
 
   const handleClose = () => {
     setSidebarOpen(false);
-  };
-
-  const handleGridReady = () => {
-    setIsGridReady(true);
   };
 
   return (
@@ -350,8 +326,6 @@ export default function ToolsTable({
             tableOptions={tableOptions}
             onRowClicked={handleRowClicked}
             getRowId={getRowId}
-            pagination={true}
-            paginationPageSize={50}
             onGridReady={handleGridReady}
           />
         </div>
