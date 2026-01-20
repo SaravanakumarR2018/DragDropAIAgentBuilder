@@ -63,6 +63,10 @@ jobs:
       - name: Prepare env file with website domain
         env:
           ENVIRONMENT: ${{ github.event.inputs.environment }}
+          STAGING_PADDLE_API_KEY: ${{ secrets.STAGING_PADDLE_API_KEY }}
+          STAGING_PADDLE_CLIENT_KEY: ${{ secrets.STAGING_PADDLE_CLIENT_KEY }}
+          PROD_PADDLE_API_KEY: ${{ secrets.PROD_PADDLE_API_KEY }}
+          PROD_PADDLE_CLIENT_KEY: ${{ secrets.PROD_PADDLE_CLIENT_KEY }}
         run: |
           set -euo pipefail
           ENV_FILE=".env-file"
@@ -100,6 +104,33 @@ jobs:
             echo "STAGING_HOST=${STAGING_HOST}"
             echo "PROD_HOST=${PROD_HOST}"
           } >> "$GITHUB_ENV"
+          
+          if [ "$ENVIRONMENT" = "staging" ]; then
+            PADDLE_API_KEY="$STAGING_PADDLE_API_KEY"
+            PADDLE_CLIENT_KEY="$STAGING_PADDLE_CLIENT_KEY"
+          else
+            PADDLE_API_KEY="$PROD_PADDLE_API_KEY"
+            PADDLE_CLIENT_KEY="$PROD_PADDLE_CLIENT_KEY"
+          fi
+
+          if [ -z "$PADDLE_API_KEY" ] || [ -z "$PADDLE_CLIENT_KEY" ]; then
+            echo "❌ Missing Paddle secrets for ${ENVIRONMENT} environment"
+            exit 1
+          fi
+
+          echo "🔧 Injecting Paddle keys into ${ENV_FILE}"
+          echo "" >> "$ENV_FILE"
+          if grep -q '^PADDLE_API_KEY=' "$ENV_FILE"; then
+            sed -i "s|^PADDLE_API_KEY=.*|PADDLE_API_KEY=${PADDLE_API_KEY}|" "$ENV_FILE"
+          else
+            echo "PADDLE_API_KEY=${PADDLE_API_KEY}" >> "$ENV_FILE"
+          fi
+
+          if grep -q '^PADDLE_CLIENT_KEY=' "$ENV_FILE"; then
+            sed -i "s|^PADDLE_CLIENT_KEY=.*|PADDLE_CLIENT_KEY=${PADDLE_CLIENT_KEY}|" "$ENV_FILE"
+          else
+            echo "PADDLE_CLIENT_KEY=${PADDLE_CLIENT_KEY}" >> "$ENV_FILE"
+          fi
 
       - name: Ensure admin user exists in Clerk
         env:
