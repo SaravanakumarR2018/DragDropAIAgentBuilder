@@ -330,8 +330,10 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_paddle_keys(self):
-        if not self.paddle_api_key or not self.paddle_client_key:
-            msg = "PADDLE_API_KEY and PADDLE_CLIENT_KEY must be set to enable Paddle integrations."
+        if (self.paddle_api_key and not self.paddle_client_key) or (
+            self.paddle_client_key and not self.paddle_api_key
+        ):
+            msg = "PADDLE_API_KEY and PADDLE_CLIENT_KEY must both be set to enable Paddle integrations."
             raise ValueError(msg)
         return self
     
