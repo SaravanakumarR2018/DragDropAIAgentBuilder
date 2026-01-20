@@ -1,0 +1,32 @@
+"""Paddle Billing client setup."""
+
+from __future__ import annotations
+
+from os import getenv
+
+from paddle_billing import Client
+
+from lfx.log.logger import logger
+
+_paddle_client: Client | None = None
+
+
+def initialize_paddle_client() -> Client:
+    """Initialize and return the Paddle Billing client."""
+    global _paddle_client
+    if _paddle_client is not None:
+        return _paddle_client
+
+    api_key = getenv("PADDLE_API_KEY")
+    if not api_key:
+        msg = "PADDLE_API_KEY must be set to initialize the Paddle Billing client."
+        raise ValueError(msg)
+
+    _paddle_client = Client(api_key)
+    logger.info("Paddle Billing client initialized.")
+    return _paddle_client
+
+
+def get_paddle_client() -> Client:
+    """Return the initialized Paddle Billing client."""
+    return initialize_paddle_client()

@@ -290,6 +290,9 @@ async def initialize_services(*, fix_migration: bool = False) -> None:
     async with session_scope(use_organisation=False) as session:
         settings_service = get_service(ServiceType.SETTINGS_SERVICE)
         await setup_superuser(settings_service, session)
+        from langflow.services.paddle.client import initialize_paddle_client
+
+        initialize_paddle_client()
     try:
         await get_db_service(use_organisation=False).assign_orphaned_flows_to_superuser()
     except sqlalchemy_exc.IntegrityError as exc:

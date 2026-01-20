@@ -72,6 +72,7 @@ dependencies = [
     "lark==1.2.2",
     "jq==1.8.0",
     "pydantic-settings>=2.2.0,<3.0.0",
+    'paddle-python-sdk>=1.0.0,<2.0.0; python_version >= "3.11"',
     "duckduckgo_search==7.2.1",
     "opensearch-py==2.8.0",
     "langchain-google-genai==2.0.6",
