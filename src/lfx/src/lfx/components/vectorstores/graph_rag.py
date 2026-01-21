@@ -44,7 +44,7 @@ class GraphRAGComponent(LCVectorStoreComponent):
 
     display_name: str = "Graph RAG"
     description: str = "Graph RAG traversal for vector store."
-    name = "GraphRAG"
+    name = "Graph RAG"
     icon: str = "AstraDB"
 
     inputs = [

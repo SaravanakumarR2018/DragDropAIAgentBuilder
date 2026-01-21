@@ -9,7 +9,6 @@ import {
 import { useGetUserData } from "@/controllers/API/queries/auth";
 import { useGetGlobalVariablesMutation } from "@/controllers/API/queries/variables/use-get-mutation-global-variables";
 import useAuthStore from "@/stores/authStore";
-import { cookieManager } from "@/utils/cookie-manager";
 import { setLocalStorage } from "@/utils/local-storage-util";
 import { getAuthCookie, setAuthCookie } from "@/utils/utils";
 import { useStoreStore } from "../stores/storeStore";
@@ -26,12 +25,12 @@ const initialValue: AuthContextType = {
   apiKey: null,
   storeApiKey: () => {},
   getUser: () => {},
-  clearAuthSession: () => {},
 };
 
 export const AuthContext = createContext<AuthContextType>(initialValue);
 
 export function AuthProvider({ children }): React.ReactElement {
+  const cookies = new Cookies();
   const [accessToken, setAccessToken] = useState<string | null>(
     getAuthCookie(cookies, LANGFLOW_ACCESS_TOKEN) ?? null,
   );
@@ -92,81 +91,17 @@ export function AuthProvider({ children }): React.ReactElement {
       setAuthCookie(cookies, LANGFLOW_REFRESH_TOKEN, refreshToken);
     }
     setAccessToken(newAccessToken);
-
-    let userLoaded = false;
-    let variablesLoaded = false;
-    let retryCount = 0;
-    const MAX_RETRIES = 20;
-
-    const checkAndSetAuthenticated = () => {
-      if (userLoaded && variablesLoaded) {
-        setIsAuthenticated(true);
-      }
-    };
-
-    const executeAuthRequests = () => {
-      mutateLoggedUser(
-        {},
-        {
-          onSuccess: async (user) => {
-            setUserData(user);
-            const isSuperUser = user!.is_superuser;
-            useAuthStore.getState().setIsAdmin(isSuperUser);
-            checkHasStore();
-            fetchApiData();
-            userLoaded = true;
-            checkAndSetAuthenticated();
-          },
-          onError: () => {
-            setUserData(null);
-            userLoaded = true;
-            checkAndSetAuthenticated();
-          },
-        },
-      );
-
-      mutateGetGlobalVariables(
-        {},
-        {
-          onSettled: () => {
-            variablesLoaded = true;
-            checkAndSetAuthenticated();
-          },
-        },
-      );
-    };
-
-    // Verify token is available in browser cookies before proceeding
-    // This prevents race condition where browser hasn't processed cookies yet
-    const verifyAndProceed = () => {
-      const storedToken = cookieManager.get(LANGFLOW_ACCESS_TOKEN);
-      if (storedToken) {
-        executeAuthRequests();
-      } else if (retryCount < MAX_RETRIES) {
-        retryCount++;
-        setTimeout(verifyAndProceed, 50);
-      } else {
-        // Proceed anyway after timeout to avoid blocking login
-        executeAuthRequests();
-      }
-    };
-
-    setTimeout(verifyAndProceed, 50);
+    setIsAuthenticated(true);
+    getUser();
+    getGlobalVariables();
   }
 
   function storeApiKey(apikey: string) {
     setApiKey(apikey);
   }
 
-  function clearAuthSession() {
-    cookieManager.clearAuthCookies();
-    localStorage.removeItem(LANGFLOW_ACCESS_TOKEN);
-    localStorage.removeItem(LANGFLOW_API_TOKEN);
-    localStorage.removeItem(LANGFLOW_REFRESH_TOKEN);
-    setAccessToken(null);
-    setApiKey(null);
-    setUserData(null);
-    setIsAuthenticated(false);
+  function getGlobalVariables() {
+    mutateGetGlobalVariables({});
   }
 
   return (
@@ -182,7 +117,6 @@ export function AuthProvider({ children }): React.ReactElement {
         apiKey,
         storeApiKey,
         getUser,
-        clearAuthSession,
       }}
     >
       {children}

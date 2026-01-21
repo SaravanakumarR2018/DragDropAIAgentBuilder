@@ -85,7 +85,6 @@ const SortableListComponent = ({
   options = [],
   searchCategory = [],
   limit,
-  id,
   ...baseInputProps
 }: InputProps<any, SortableListComponentProps>) => {
   const { placeholder, handleOnNewValue, value } = baseInputProps;

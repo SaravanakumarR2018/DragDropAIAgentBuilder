@@ -14,9 +14,7 @@ export default function TemplateGetStartedCardComponent({
   icon,
   category,
   flow,
-  loading,
-  onFlowCreating,
-}: TemplateGetStartedCardComponentProps) {
+}: CardData) {
   const addFlow = useAddFlow();
   const navigate = useCustomNavigate();
   const { folderId } = useParams();
@@ -25,19 +23,11 @@ export default function TemplateGetStartedCardComponent({
   const folderIdUrl = folderId ?? myCollectionId;
 
   const handleClick = () => {
-    if (loading) return;
-
     if (flow) {
-      onFlowCreating(true);
       updateIds(flow.data!);
-      addFlow({ flow })
-        .then((id) => {
-          navigate(`/flow/${id}/folder/${folderIdUrl}`);
-        })
-        .finally(() => {
-          onFlowCreating(false);
-        });
-
+      addFlow({ flow }).then((id) => {
+        navigate(`/flow/${id}/folder/${folderIdUrl}`);
+      });
       track("New Flow Created", { template: `${flow.name} Template` });
     } else {
       console.error(`Flow template not found`);

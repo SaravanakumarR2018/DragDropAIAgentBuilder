@@ -55,7 +55,6 @@ import { traditionalSearchMetadata } from "./helpers/traditional-search-metadata
 
 const CATEGORIES = SIDEBAR_CATEGORIES;
 const BUNDLES = SIDEBAR_BUNDLES;
-const MCP_COMPONENT_CATEGORY = "models_and_agents";
 
 // Search context for the sidebar
 export type SearchContextType = {
@@ -147,7 +146,7 @@ interface FlowSidebarComponentProps {
 }
 
 export function FlowSidebarComponent({ isLoading }: FlowSidebarComponentProps) {
-  const rawData = useTypesStore((state) => state.data);
+  const data = useTypesStore((state) => state.data);
 
   const {
     getFilterEdge,

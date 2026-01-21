@@ -16,7 +16,6 @@ import { useTypesStore } from "@/stores/typesStore";
 import type { ResponseErrorDetailAPI } from "@/types/api";
 import type { GlobalVariable } from "@/types/global_variables";
 import InputComponent from "../parameterRenderComponent/components/inputComponent";
-import { assignTab } from "./utils/assign-tab";
 import sortByName from "./utils/sort-by-name";
 
 //TODO IMPLEMENT FORM LOGIC
@@ -40,9 +39,7 @@ export default function GlobalVariableModal({
 }): JSX.Element {
   const [key, setKey] = useState(initialData?.name ?? "");
   const [value, setValue] = useState(initialData?.value ?? "");
-  const [type, setType] = useState<TAB_TYPES>(
-    initialData?.type ?? "Credential",
-  );
+  const [type, setType] = useState(initialData?.type ?? "Credential");
   const [fields, setFields] = useState<string[]>(
     initialData?.default_fields ?? [],
   );
@@ -57,15 +54,6 @@ export default function GlobalVariableModal({
   const { data: globalVariables } = useGetGlobalVariables();
   const [availableFields, setAvailableFields] = useState<string[]>([]);
   useGetTypes({ checkCache: true, enabled: !!globalVariables });
-
-  useEffect(() => {
-    if (initialData) {
-      setKey(initialData.name ?? "");
-      setValue(initialData.value ?? "");
-      setType(initialData.type ?? "Credential");
-      setFields(initialData.default_fields ?? []);
-    }
-  }, [initialData]);
 
   useEffect(() => {
     if (globalVariables && componentFields.size > 0) {
@@ -86,15 +74,11 @@ export default function GlobalVariableModal({
 
   const setSuccessData = useAlertStore((state) => state.setSuccessData);
 
-  const handleOnValueCHange = (value: string) => {
-    setType(assignTab(value));
-  };
-
   function handleSaveVariable() {
     const data: {
       name: string;
       value: string;
-      type?: TAB_TYPES;
+      type?: string;
       default_fields?: string[];
     } = {
       name: key,
@@ -108,7 +92,7 @@ export default function GlobalVariableModal({
         const { name } = res;
         setKey("");
         setValue("");
-        setType("Credential");
+        setType("");
         setFields([]);
         setOpen(false);
 
@@ -137,47 +121,13 @@ export default function GlobalVariableModal({
     if (!initialData || !initialData.id) {
       handleSaveVariable();
     } else {
-      // Check if this is a model provider variable based on the original variable name
-      // The backend validates based on the existing variable name, not the new name
-      const isModelProviderVariable = Object.values(
-        PROVIDER_VARIABLE_MAPPING,
-      ).includes(initialData.name);
-
-      updateVariable(
-        {
-          id: initialData.id,
-          name: key,
-          value: value,
-          default_fields: fields,
-        },
-        {
-          onSuccess: (res) => {
-            const { name } = res;
-            setKey("");
-            setValue("");
-            setType("Credential");
-            setFields([]);
-            setOpen(false);
-
-            setSuccessData({
-              title: `Variable ${name} updated successfully`,
-            });
-          },
-          onError: (error) => {
-            const responseError = error as ResponseErrorDetailAPI;
-            const errorMessage =
-              responseError?.response?.data?.detail ??
-              "An unexpected error occurred while updating the variable. Please try again.";
-
-            setErrorData({
-              title: isModelProviderVariable
-                ? "Invalid API Key"
-                : "Error updating variable",
-              list: [errorMessage],
-            });
-          },
-        },
-      );
+      updateVariable({
+        id: initialData.id,
+        name: key,
+        value: value,
+        default_fields: fields,
+      });
+      setOpen(false);
     }
   }
 
@@ -206,7 +156,7 @@ export default function GlobalVariableModal({
             <Label>Type*</Label>
             <Tabs
               defaultValue={type}
-              onValueChange={handleOnValueCHange}
+              onValueChange={setType}
               className="w-full"
             >
               <TabsList className="grid w-full grid-cols-2">

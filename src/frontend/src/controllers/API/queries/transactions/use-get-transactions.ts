@@ -7,7 +7,7 @@ import { getURL } from "../../helpers/constants";
 import { UseRequestProcessor } from "../../services/request-processor";
 
 interface TransactionsQueryParams {
-  id: string | null;
+  id: string;
   params?: Record<string, unknown>;
   mode: "union" | "intersection";
   excludedColumns?: string[];
@@ -21,12 +21,12 @@ interface PaginationType {
 }
 
 interface TransactionsPagination extends PaginationType {
-  items?: TransactionLogsRow[];
+  items?: Array<object>;
 }
 
 interface TransactionsResponse {
   pagination: PaginationType;
-  rows: TransactionLogsRow[];
+  rows: Array<object>;
   columns: Array<ColDef | ColGroupDef>;
 }
 

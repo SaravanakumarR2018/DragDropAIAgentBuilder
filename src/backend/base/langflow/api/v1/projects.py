@@ -75,7 +75,6 @@ async def create_project(
             )
             if project_results:
                 project_names = [project.name for project in project_results]
-                # TODO: this throws an error if the name contains non-numeric content in parentheses
                 project_numbers = [int(name.split("(")[-1].split(")")[0]) for name in project_names if "(" in name]
                 if project_numbers:
                     new_project.name = f"{new_project.name} ({max(project_numbers) + 1})"
@@ -95,7 +94,7 @@ async def create_project(
             )
 
         session.add(new_project)
-        await session.flush()
+        await session.commit()
         await session.refresh(new_project)
 
         # Auto-register MCP server for this project with configured default auth
@@ -185,6 +184,7 @@ async def create_project(
                 update(Flow).where(Flow.id.in_(project.components_list)).values(folder_id=new_project.id)  # type: ignore[attr-defined]
             )
             await session.exec(update_statement_components)
+            await session.commit()
 
         if project.flows_list:
             update_statement_flows = (
@@ -198,7 +198,7 @@ async def create_project(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
-    return folder_read
+    return new_project
 
 
 @router.get("/", response_model=list[FolderRead], status_code=200)
@@ -216,10 +216,7 @@ async def read_projects(
             )
         ).all()
         projects = [project for project in projects if project.name != STARTER_FOLDER_NAME]
-        sorted_projects = sorted(projects, key=lambda x: x.name != DEFAULT_FOLDER_NAME)
-
-        # Convert to FolderRead while session is still active to avoid detached instance errors
-        return [FolderRead.model_validate(project, from_attributes=True) for project in sorted_projects]
+        return sorted(projects, key=lambda x: x.name != DEFAULT_FOLDER_NAME)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
@@ -418,7 +415,7 @@ async def update_project(
             existing_project.parent_id = project.parent_id
 
         session.add(existing_project)
-        await session.flush()
+        await session.commit()
         await session.refresh(existing_project)
 
         # Start MCP Composer if auth changed to OAuth
@@ -456,12 +453,14 @@ async def update_project(
                 update(Flow).where(Flow.id.in_(excluded_flows)).values(folder_id=my_collection_project.id)  # type: ignore[attr-defined]
             )
             await session.exec(update_statement_my_collection)
+            await session.commit()
 
         if concat_project_components:
             update_statement_components = (
                 update(Flow).where(Flow.id.in_(concat_project_components)).values(folder_id=existing_project.id)  # type: ignore[attr-defined]
             )
             await session.exec(update_statement_components)
+            await session.commit()
 
     except HTTPException:
         # Re-raise HTTP exceptions (like 409 conflicts) without modification
@@ -469,7 +468,7 @@ async def update_project(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
 
-    return folder_read
+    return existing_project
 
 
 @router.delete("/{project_id}", status_code=204)
@@ -554,6 +553,7 @@ async def delete_project(
 
     try:
         await session.delete(project)
+        await session.commit()
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e

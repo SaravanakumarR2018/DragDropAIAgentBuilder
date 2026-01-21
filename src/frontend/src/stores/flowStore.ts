@@ -250,7 +250,6 @@ const useFlowStore = create<FlowStoreType>((set, get) => ({
       flowPool: {},
       currentFlow: flow,
       positionDictionary: {},
-      rightClickedNodeId: null,
     });
   },
   setIsBuilding: (isBuilding) => {
@@ -337,7 +336,7 @@ const useFlowStore = create<FlowStoreType>((set, get) => ({
       return node;
     });
 
-    const { edges: newEdges } = cleanEdges(newNodes, get().edges);
+    const newEdges = cleanEdges(newNodes, get().edges);
 
     set((state) => {
       if (callback) {
@@ -381,19 +380,6 @@ const useFlowStore = create<FlowStoreType>((set, get) => ({
     );
 
     get().setNodes(filteredNodes);
-
-    // Clear rightClickedNodeId if the deleted node was right-clicked
-    const rightClickedNodeId = get().rightClickedNodeId;
-    if (rightClickedNodeId && deletedNode) {
-      const isRightClickedNodeDeleted =
-        typeof nodeId === "string"
-          ? nodeId === rightClickedNodeId
-          : nodeId.includes(rightClickedNodeId);
-
-      if (isRightClickedNodeDeleted) {
-        set({ rightClickedNodeId: null });
-      }
-    }
 
     if (deletedNode) {
       track("Component Deleted", { componentType: deletedNode.data.type });
@@ -1077,7 +1063,6 @@ const useFlowStore = create<FlowStoreType>((set, get) => ({
       isPending: true,
       positionDictionary: {},
       componentsToUpdate: [],
-      rightClickedNodeId: null,
     });
   },
   dismissedNodes: [],

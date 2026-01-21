@@ -31,7 +31,6 @@ export const usePostUploadFileV2: useMutationFunctionType<
       progress: 0,
     };
     queryClient.setQueryData(["useGetFilesV2"], (old: FileType[]) => {
-      if (!Array.isArray(old)) return [newFile];
       return [...old.filter((file) => file.id !== "temp"), newFile];
     });
 
@@ -43,7 +42,6 @@ export const usePostUploadFileV2: useMutationFunctionType<
           onUploadProgress: (progressEvent) => {
             if (progressEvent.progress) {
               queryClient.setQueryData(["useGetFilesV2"], (old: any) => {
-                if (!Array.isArray(old)) return [];
                 return old.map((file: any) => {
                   if (file?.id === "temp") {
                     return { ...file, progress: progressEvent.progress };
@@ -58,7 +56,6 @@ export const usePostUploadFileV2: useMutationFunctionType<
       return response.data;
     } catch (e) {
       queryClient.setQueryData(["useGetFilesV2"], (old: FileType[]) => {
-        if (!Array.isArray(old)) return [];
         return old.map((file: any) => {
           if (file?.id === "temp") {
             return { ...file, progress: -1 };

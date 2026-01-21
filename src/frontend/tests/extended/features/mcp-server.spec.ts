@@ -532,12 +532,20 @@ test(
 
     // Add first header
     await page.getByTestId("http-headers-key-0").fill(testHeaderKey1);
-    await page.getByTestId("http-headers-value-0").fill(testHeaderValue1);
+    // The value field uses InputComponent with global variables, so we need to find it by placeholder
+    await page
+      .getByPlaceholder("Type a value...")
+      .first()
+      .fill(testHeaderValue1);
 
     // Add second header
     await page.getByTestId("http-headers-plus-btn-0").click();
     await page.getByTestId("http-headers-key-1").fill(testHeaderKey2);
-    await page.getByTestId("http-headers-value-1").fill(testHeaderValue2);
+    // Use nth(1) to get the second value field
+    await page
+      .getByPlaceholder("Type a value...")
+      .nth(1)
+      .fill(testHeaderValue2);
 
     // Add first environment variable
     await page.getByTestId("http-env-key-0").fill(testEnvKey1);
@@ -591,15 +599,16 @@ test(
     expect(await page.getByTestId("http-headers-key-0").inputValue()).toBe(
       testHeaderKey1,
     );
-    expect(await page.getByTestId("http-headers-value-0").inputValue()).toBe(
-      testHeaderValue1,
-    );
+    // Header values use InputComponent with global variables, so we verify by placeholder
+    expect(
+      await page.getByPlaceholder("Type a value...").first().inputValue(),
+    ).toBe(testHeaderValue1);
     expect(await page.getByTestId("http-headers-key-1").inputValue()).toBe(
       testHeaderKey2,
     );
-    expect(await page.getByTestId("http-headers-value-1").inputValue()).toBe(
-      testHeaderValue2,
-    );
+    expect(
+      await page.getByPlaceholder("Type a value...").nth(1).inputValue(),
+    ).toBe(testHeaderValue2);
     expect(await page.getByTestId("http-env-key-0").inputValue()).toBe(
       testEnvKey1,
     );
@@ -666,7 +675,7 @@ test(
 
     await page.getByTestId("canvas_controls_dropdown").click();
 
-    // See if the color matches
+    await page.getByTestId("fit_view").click();
 
     await zoomOut(page, 3);
     await page.getByTestId("canvas_controls_dropdown").click({ force: true });
@@ -691,53 +700,6 @@ test(
     await page.getByTestId("add-mcp-server-button").click();
 
     await page.waitForTimeout(500);
-
-    await page.waitForSelector(
-      '[data-testid="dropdown_str_tool"]:not([disabled])',
-      {
-        timeout: 10000,
-        state: "visible",
-      },
-    );
-
-    await adjustScreenView(page, { numberOfZoomOut: 3 });
-
-    await expect(page.getByTestId("dropdown_str_tool")).toBeHidden();
-
-    try {
-      await page.getByText("Add MCP Server", { exact: true }).click({
-        timeout: 5000,
-      });
-    } catch (_error) {
-      await page.getByTestId("mcp-server-dropdown").click({ timeout: 3000 });
-      await page.getByText("Add MCP Server", { exact: true }).click({
-        timeout: 5000,
-      });
-    }
-
-    await page.waitForSelector('[data-testid="add-mcp-server-button"]', {
-      state: "visible",
-      timeout: 30000,
-    });
-
-    await page.getByTestId("stdio-tab").click();
-
-    await page.waitForSelector('[data-testid="stdio-name-input"]', {
-      state: "visible",
-      timeout: 30000,
-    });
-
-    const randomSuffix = Math.floor(Math.random() * 90000) + 10000; // 5-digit random number
-    const testName = `test_server_${randomSuffix}`;
-    await page.getByTestId("stdio-name-input").fill(testName);
-
-    await page.getByTestId("stdio-command-input").fill("uvx mcp-server-fetch");
-
-    await page.getByTestId("add-mcp-server-button").click();
-
-    await expect(page.getByTestId("dropdown_str_tool")).toBeVisible({
-      timeout: 30000,
-    });
 
     await page.waitForSelector(
       '[data-testid="dropdown_str_tool"]:not([disabled])',

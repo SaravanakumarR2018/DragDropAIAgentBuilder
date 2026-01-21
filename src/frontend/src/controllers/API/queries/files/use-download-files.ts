@@ -19,7 +19,6 @@ export const useGetDownloadFileMutation: useMutationFunctionType<
       headers: {
         Accept: "*/*",
       },
-      credentials: getFetchCredentials(),
     });
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);

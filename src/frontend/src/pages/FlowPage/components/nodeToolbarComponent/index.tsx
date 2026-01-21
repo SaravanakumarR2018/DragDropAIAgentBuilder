@@ -56,10 +56,7 @@ const NodeToolbarComponent = memo(
     isUserEdited,
     hasBreakingChange,
     setOpenShowMoreOptions,
-    openDropdownOnRightClick = false,
-  }: nodeToolbarPropsType & {
-    openDropdownOnRightClick?: boolean;
-  }): JSX.Element => {
+  }: nodeToolbarPropsType): JSX.Element => {
     const version = useDarkStore((state) => state.version);
     const [showModalAdvanced, setShowModalAdvanced] = useState(false);
     const [showconfirmShare, setShowconfirmShare] = useState(false);
@@ -78,7 +75,6 @@ const NodeToolbarComponent = memo(
     const shortcuts = useShortcutsStore((state) => state.shortcuts);
     const currentFlowId = useFlowsManagerStore((state) => state.currentFlowId);
     const [openModal, setOpenModal] = useState(false);
-    const [dropdownOpen, setDropdownOpen] = useState(false);
     const frozen = data.node?.frozen ?? false;
     const updateNodeInternals = useUpdateNodeInternals();
 
@@ -259,22 +255,6 @@ const NodeToolbarComponent = memo(
       });
     }, [data.id, data.node?.documentation]);
 
-    const handleDownloadNode = useCallback(async () => {
-      try {
-        await downloadNode(flowComponent!);
-        setSuccessData({
-          title: `${flowComponent?.name || "Node"} downloaded successfully`,
-        });
-      } catch (error) {
-        console.error("Error downloading node:", error);
-        const nodeName = flowComponent?.name || "Node";
-        setErrorData({
-          title: `Failed to download ${nodeName}`,
-          list: [error instanceof Error ? error.message : "Unknown error"],
-        });
-      }
-    }, [flowComponent]);
-
     useShortcuts({
       showOverrideModal,
       showModalAdvanced,
@@ -300,15 +280,6 @@ const NodeToolbarComponent = memo(
         onCloseAdvancedModal!(false);
       }
     }, [showModalAdvanced]);
-
-    // Open dropdown when right-clicked
-    useEffect(() => {
-      if (openDropdownOnRightClick) {
-        setDropdownOpen(true);
-      } else {
-        setDropdownOpen(false);
-      }
-    }, [openDropdownOnRightClick]);
 
     const setLastCopiedSelection = useFlowStore(
       (state) => state.setLastCopiedSelection,
@@ -337,13 +308,6 @@ const NodeToolbarComponent = memo(
         let nodes;
         setSelectedValue(event);
 
-        // Clear right-clicked state when user selects an option
-        if (openDropdownOnRightClick) {
-          const setRightClickedNodeId =
-            useFlowStore.getState().setRightClickedNodeId;
-          setRightClickedNodeId(null);
-        }
-
         switch (event) {
           case "save":
             saveComponent();
@@ -366,7 +330,7 @@ const NodeToolbarComponent = memo(
             shareComponent();
             break;
           case "Download":
-            handleDownloadNode();
+            downloadNode(flowComponent!);
             break;
           case "SaveAll":
             addFlow({
@@ -458,14 +422,6 @@ const NodeToolbarComponent = memo(
 
     const handleOpenChange = (open: boolean) => {
       setOpenShowMoreOptions && setOpenShowMoreOptions(open);
-      setDropdownOpen(open);
-
-      // Clear right-clicked state when dropdown closes without selection
-      if (!open && openDropdownOnRightClick) {
-        const setRightClickedNodeId =
-          useFlowStore.getState().setRightClickedNodeId;
-        setRightClickedNodeId(null);
-      }
     };
 
     const isCustomComponent = useMemo(() => {
@@ -594,7 +550,6 @@ const NodeToolbarComponent = memo(
               onValueChange={handleSelectChange}
               value={selectedValue!}
               onOpenChange={handleOpenChange}
-              open={dropdownOpen}
             >
               <SelectTrigger className="w-62">
                 <ShadTooltip content="Show More" side="top">

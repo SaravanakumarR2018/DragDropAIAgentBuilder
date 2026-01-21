@@ -16,52 +16,8 @@ import NodeDescription from "../GenericNode/components/NodeDescription";
 import NoteToolbarComponent from "./NoteToolbarComponent";
 
 const CHAR_LIMIT = 2500;
-const TRANSPARENT_COLOR = "#00000000";
-
-/**
- * Calculates relative luminance and returns whether text should be light or dark.
- * Uses WCAG luminance formula: L = 0.299*R + 0.587*G + 0.114*B
- * Supports hex (#RRGGBB), rgb(), and hsl() color formats.
- */
-function getContrastTextColor(bgColor: string): "light" | "dark" {
-  if (!bgColor || bgColor === TRANSPARENT_COLOR) {
-    return "dark";
-  }
-
-  let r = 0,
-    g = 0,
-    b = 0;
-
-  if (bgColor.startsWith("#")) {
-    const hex = bgColor.replace("#", "");
-    r = parseInt(hex.substring(0, 2), 16);
-    g = parseInt(hex.substring(2, 4), 16);
-    b = parseInt(hex.substring(4, 6), 16);
-  } else if (bgColor.startsWith("hsl")) {
-    // For HSL, extract lightness value directly (simpler than full conversion)
-    const match = bgColor.match(/hsl\(.*?,.*?,\s*(\d+(?:\.\d+)?)%?\)/);
-    if (match) {
-      const lightness = parseFloat(match[1]);
-      return lightness > 50 ? "dark" : "light";
-    }
-    return "dark";
-  } else if (bgColor.startsWith("rgb")) {
-    const match = bgColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-    if (match) {
-      r = parseInt(match[1]);
-      g = parseInt(match[2]);
-      b = parseInt(match[3]);
-    }
-  }
-
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.5 ? "dark" : "light";
-}
-
-/** Checks if a color is custom (not a preset from COLOR_OPTIONS) */
-function isCustomColor(color: string | undefined): boolean {
-  return Boolean(color && !Object.keys(COLOR_OPTIONS).includes(color));
-}
+const DEFAULT_WIDTH = 324;
+const DEFAULT_HEIGHT = 324;
 
 function NoteNode({
   data,
@@ -78,36 +34,12 @@ function NoteNode({
   const [_resizedNote, setResizedNote] = useState(false);
   const currentFlow = useFlowStore((state) => state.currentFlow);
   const setNode = useFlowStore((state) => state.setNode);
+  const [isResizing, setIsResizing] = useState(false);
 
-  // Resolve background color: either a custom hex or a preset key from COLOR_OPTIONS
-  const templateBgColor = data.node?.template.backgroundColor;
-  const hasCustomColor = isCustomColor(templateBgColor);
-  const bgColorKey = hasCustomColor
-    ? templateBgColor!
-    : (templateBgColor ?? Object.keys(COLOR_OPTIONS)[0]);
-
-  // Resolved CSS background color value
-  const resolvedBgColor = useMemo(
-    () =>
-      hasCustomColor
-        ? bgColorKey
-        : (COLOR_OPTIONS[bgColorKey] ?? TRANSPARENT_COLOR),
-    [hasCustomColor, bgColorKey],
-  );
-
-  // Determine text color mode based on background luminance
-  const textColorMode = useMemo(
-    () => getContrastTextColor(resolvedBgColor),
-    [resolvedBgColor],
-  );
-
-  // Get current node dimensions from flow state
   const nodeData = useMemo(
     () => currentFlow?.data?.nodes.find((node) => node.id === data.id),
     [currentFlow, data.id],
   );
-  const nodeWidth = nodeData?.width ?? DEFAULT_NOTE_SIZE;
-  const nodeHeight = nodeData?.height ?? DEFAULT_NOTE_SIZE;
 
   const nodeDataWidth = useMemo(
     () => nodeData?.measured?.width ?? DEFAULT_WIDTH,
@@ -135,7 +67,7 @@ function NoteNode({
           };
         });
       }, 5),
-    [setNode, data.id],
+    [],
   );
 
   const [editNameDescription, set] = useAlternate(false);
@@ -143,11 +75,13 @@ function NoteNode({
   const MemoNoteToolbarComponent = useMemo(
     () =>
       selected ? (
-        <div className="absolute -top-12 left-1/2 z-50 -translate-x-1/2">
-          <NoteToolbarComponent data={data} bgColor={bgColorKey} />
+        <div className={cn("absolute -top-12 left-1/2 z-50 -translate-x-1/2")}>
+          <NoteToolbarComponent data={data} bgColor={bgColor} />
         </div>
-      ) : null,
-    [data, bgColorKey, selected],
+      ) : (
+        <></>
+      ),
+    [data, bgColor, selected],
   );
 
   return (
@@ -163,30 +97,32 @@ function NoteNode({
         }}
         isVisible={selected}
         lineClassName="!border !border-muted-foreground"
-        onResizeStart={() => setIsResizing(true)}
+        onResizeStart={() => {
+          setResizedNote(true);
+          setIsResizing(true);
+        }}
         onResizeEnd={() => {
           setIsResizing(false);
           debouncedResize.flush();
         }}
       />
-
       <div
-        ref={nodeRef}
         data-testid="note_node"
         style={{
           minWidth: nodeDataWidth,
           minHeight: nodeDataHeight,
           backgroundColor: COLOR_OPTIONS[bgColor] ?? "#00000000",
         }}
+        ref={nodeDiv}
         className={cn(
           "relative flex h-full w-full flex-col gap-3 rounded-xl p-3",
           "duration-200 ease-in-out",
           !isResizing && "transition-transform",
-          hasVisibleBg && `border ${!selected && "-z-50 shadow-sm"}`,
+          COLOR_OPTIONS[bgColor] !== null &&
+            `border ${!selected && "-z-50 shadow-sm"}`,
         )}
       >
-        {toolbar}
-
+        {MemoNoteToolbarComponent}
         <div
           style={{
             width: "100%",
@@ -212,11 +148,11 @@ function NoteNode({
                 : "dark:!text-background",
               "min-w-full",
             )}
-            style={{ backgroundColor: resolvedBgColor }}
+            style={{ backgroundColor: COLOR_OPTIONS[bgColor] ?? "#00000000" }}
             charLimit={CHAR_LIMIT}
-            nodeId={data.id}
+            nodeId={dataId}
             selected={selected}
-            description={data.node?.description}
+            description={dataDescription}
             emptyPlaceholder="Double-click to start typing or enter Markdown..."
             placeholderClassName={cn(
               COLOR_OPTIONS[bgColor] === null ? "" : "dark:!text-background",

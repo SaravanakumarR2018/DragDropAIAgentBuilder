@@ -96,11 +96,12 @@ export const ErrorView = ({
                             {content.reason && (
                               <span className="">
                                 <Markdown
+                                  linkTarget="_blank"
                                   remarkPlugins={[remarkGfm]}
                                   components={{
                                     a: ({ node, ...props }) => (
                                       <a
-                                        {...props}
+                                        href={props.href}
                                         target="_blank"
                                         className="underline"
                                         rel="noopener noreferrer"
@@ -117,6 +118,7 @@ export const ErrorView = ({
                                     },
                                     code: ({
                                       node,
+                                      inline,
                                       className,
                                       children,
                                       ...props
@@ -138,23 +140,19 @@ export const ErrorView = ({
                                           }
                                         }
 
-                                        if (
-                                          isCodeBlock(className, props, content)
-                                        ) {
-                                          return (
-                                            <CodeTabsComponent
-                                              language={extractLanguage(
-                                                className,
-                                              )}
-                                              code={String(content).replace(
-                                                /\n$/,
-                                                "",
-                                              )}
-                                            />
-                                          );
-                                        }
+                                        const match = /language-(\w+)/.exec(
+                                          className || "",
+                                        );
 
-                                        return (
+                                        return !inline ? (
+                                          <CodeTabsComponent
+                                            language={(match && match[1]) || ""}
+                                            code={String(content).replace(
+                                              /\n$/,
+                                              "",
+                                            )}
+                                          />
+                                        ) : (
                                           <code
                                             className={className}
                                             {...props}

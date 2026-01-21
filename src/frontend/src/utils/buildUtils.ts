@@ -12,8 +12,6 @@ import {
   customCancelBuildUrl,
   customEventsUrl,
 } from "@/customization/utils/custom-buildUtils";
-import { customPollBuildEvents } from "@/customization/utils/custom-poll-build-events";
-import { getFetchCredentials } from "@/customization/utils/get-fetch-credentials";
 import { useMessagesStore } from "@/stores/messagesStore";
 import { BuildStatus, EventDeliveryType } from "../constants/enums";
 import { getVerticesOrder, postBuildVertex } from "../controllers/API";
@@ -182,14 +180,74 @@ async function pollBuildEvents(
   },
   abortController: AbortController,
 ): Promise<void> {
-  return customPollBuildEvents(
-    url,
-    buildResults,
-    verticesStartTimeMs,
-    callbacks,
-    abortController,
-    onEvent,
-  );
+  let isDone = false;
+  while (!isDone) {
+    const response = await fetch(
+      `${url}?event_delivery=${EventDeliveryType.POLLING}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/x-ndjson",
+        },
+        signal: abortController.signal, // Add abort signal to fetch
+      },
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        errorData.detail ||
+          "Langflow was not able to connect to the server. Please make sure your connection is working properly.",
+      );
+    }
+
+    // Get the response text - will be NDJSON format (one JSON per line)
+    const responseText = await response.text();
+
+    // Skip if empty response
+    if (!responseText.trim()) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      continue;
+    }
+
+    // Split by newlines to get individual JSON objects
+    const eventLines = responseText.split("\n").filter((line) => line.trim());
+
+    // If no events, continue polling
+    if (eventLines.length === 0) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      continue;
+    }
+
+    // Process all events in the NDJSON response
+    for (const eventStr of eventLines) {
+      // Process the event
+      const event = JSON.parse(eventStr);
+      const result = await onEvent(
+        event.event,
+        event.data,
+        buildResults,
+        verticesStartTimeMs,
+        callbacks,
+      );
+
+      if (!result) {
+        isDone = true;
+        abortController.abort();
+        break;
+      }
+
+      // Check if this was the end event
+      if (event.event === "end") {
+        isDone = true;
+        break;
+      }
+    }
+
+    // Add a small delay between polls
+    await new Promise((resolve) => setTimeout(resolve, BUILD_POLLING_INTERVAL));
+  }
 }
 
 export async function buildFlowVertices({
@@ -253,8 +311,6 @@ export async function buildFlowVertices({
   if (session) {
     inputs["session"] = session;
   }
-  // Add client timestamp for accurate duration tracking
-  inputs["client_request_time"] = Date.now();
   if (Object.keys(inputs).length > 0) {
     postData["inputs"] = inputs;
   }
@@ -318,7 +374,6 @@ export async function buildFlowVertices({
         "Content-Type": "application/json",
       },
       body: JSON.stringify(postData),
-      credentials: getFetchCredentials(),
     });
 
     if (!buildResponse.ok) {
@@ -341,7 +396,6 @@ export async function buildFlowVertices({
           headers: {
             "Content-Type": "application/json",
           },
-          credentials: getFetchCredentials(),
         });
       } catch (error) {
         console.error("Error canceling build:", error);

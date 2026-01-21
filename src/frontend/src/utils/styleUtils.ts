@@ -239,6 +239,7 @@ export const SIDEBAR_CATEGORIES = [
   { display_name: "Loaders", name: "documentloaders", icon: "Paperclip" },
   { display_name: "Link Extractors", name: "link_extractors", icon: "Link2" },
   { display_name: "Output Parsers", name: "output_parsers", icon: "Compass" },
+  { display_name: "Prototypes", name: "prototypes", icon: "FlaskConical" },
   { display_name: "Retrievers", name: "retrievers", icon: "FileSearch" },
   { display_name: "Text Splitters", name: "textsplitters", icon: "Scissors" },
   { display_name: "Toolkits", name: "toolkits", icon: "Package2" },

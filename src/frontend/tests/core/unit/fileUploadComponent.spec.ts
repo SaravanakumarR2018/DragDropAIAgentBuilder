@@ -727,20 +727,12 @@ test(
     await page.getByTestId("sidebar-search-input").click();
     await page.getByTestId("sidebar-search-input").fill("file");
 
-<<<<<<< HEAD
     await page.waitForSelector('[data-testid="files_and_knowledgeRead File"]', {
-=======
-    await page.waitForSelector('[data-testid="dataRead File"]', {
->>>>>>> upstream/main
       timeout: 10000,
     });
 
     await page
-<<<<<<< HEAD
       .getByTestId("files_and_knowledgeRead File")
-=======
-      .getByTestId("dataRead File")
->>>>>>> upstream/main
       .first()
       .dragTo(page.locator('//*[@id="react-flow-id"]'));
     await page.mouse.up();

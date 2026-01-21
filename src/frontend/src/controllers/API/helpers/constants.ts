@@ -1,5 +1,4 @@
-import { getBaseUrl } from "@/customization/utils/urls";
-import { BASE_URL_API_V2 } from "../../../constants/constants";
+import { BASE_URL_API, BASE_URL_API_V2 } from "../../../constants/constants";
 
 export const URLs = {
   TRANSACTIONS: `monitor/transactions`,

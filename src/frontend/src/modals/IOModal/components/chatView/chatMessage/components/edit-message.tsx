@@ -29,6 +29,7 @@ export const MarkdownField = ({
     <div className="w-full items-baseline gap-2">
       <Markdown
         remarkPlugins={[remarkGfm as any]}
+        linkTarget="_blank"
         rehypePlugins={[rehypeMathjax, rehypeRaw]}
         className={cn(
           "markdown prose flex w-full max-w-full flex-col items-baseline text-sm font-normal word-break-break-word dark:prose-invert",
@@ -66,7 +67,7 @@ export const MarkdownField = ({
               </div>
             );
           },
-          code: ({ node, className, children, ...props }) => {
+          code: ({ node, inline, className, children, ...props }) => {
             let content = children as string;
             if (
               Array.isArray(children) &&
@@ -87,16 +88,14 @@ export const MarkdownField = ({
                 }
               }
 
-              if (isCodeBlock(className, props, content)) {
-                return (
-                  <CodeTabsComponent
-                    language={extractLanguage(className)}
-                    code={String(content).replace(/\n$/, "")}
-                  />
-                );
-              }
+              const match = /language-(\w+)/.exec(className || "");
 
-              return (
+              return !inline ? (
+                <CodeTabsComponent
+                  language={(match && match[1]) || ""}
+                  code={String(content).replace(/\n$/, "")}
+                />
+              ) : (
                 <code className={className} {...props}>
                   {content}
                 </code>

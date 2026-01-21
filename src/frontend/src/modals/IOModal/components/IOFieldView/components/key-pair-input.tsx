@@ -5,8 +5,8 @@ import { Input } from "../../../../../components/ui/input";
 import { classNames } from "../../../../../utils/utils";
 
 export type IOKeyPairInputProps = {
-  value: KeyPairRow[];
-  onChange: (value: KeyPairRow[]) => void;
+  value: any;
+  onChange: (value: any) => void;
   duplicateKey: boolean;
   isList: boolean;
   isInputField?: boolean;

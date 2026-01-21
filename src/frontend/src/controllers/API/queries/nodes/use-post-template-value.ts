@@ -8,18 +8,10 @@ import type {
 import { api } from "../../api";
 import { getURL } from "../../helpers/constants";
 import { UseRequestProcessor } from "../../services/request-processor";
-import useFlowsManagerStore from "@/stores/flowsManagerStore";
+
 interface IPostTemplateValue {
   value: any;
   tool_mode?: boolean;
-  // the dropdown input re-gathers all
-  // dropdown items each time a single
-  // single item is selected,
-  // which is computationally expensive for the backend.
-  // to avoid this, we add an explicit flag
-  // to indicate whether the refresh button was pressed.
-  // TODO: this is a hack and should be removed when we have a better solution.
-  is_refresh?: boolean;
 }
 
 interface IPostTemplateValueParams {
@@ -48,7 +40,7 @@ export const usePostTemplateValue: useMutationFunctionType<
       getURL("CUSTOM_COMPONENT", { update: "update" }),
       {
         code: template.code.value,
-        template: preparedTemplate,
+        template: template,
         field: parameterId,
         field_value: payload.value,
         tool_mode: payload.tool_mode,

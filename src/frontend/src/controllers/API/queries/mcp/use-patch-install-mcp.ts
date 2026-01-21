@@ -12,11 +12,8 @@ interface PatchInstallMCPResponse {
   message: string;
 }
 
-export type MCPTransport = "sse" | "streamablehttp";
-
 interface PatchInstallMCPBody {
   client: string;
-  transport?: MCPTransport;
 }
 
 export const usePatchInstallMCP: useMutationFunctionType<
@@ -50,7 +47,7 @@ export const usePatchInstallMCP: useMutationFunctionType<
     PatchInstallMCPResponse,
     any,
     PatchInstallMCPBody
-  > = mutate(["usePatchInstallMCP", params.project_id], patchInstallMCP, {
+  > = mutate(["usePatchInstallMCP"], patchInstallMCP, {
     ...options,
     retry: 0,
 

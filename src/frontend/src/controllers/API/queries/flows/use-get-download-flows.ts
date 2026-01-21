@@ -37,7 +37,6 @@ export const useGetDownloadFlows: useMutationFunctionType<
           "Content-Type": "application/json",
           Accept: "application/x-zip-compressed",
         },
-        credentials: getFetchCredentials(),
       });
       if (!response.ok) {
         throw new Error(`Failed to download flows: ${response.statusText}`);

@@ -18,41 +18,15 @@ export const OutputParameter = ({
   hidden,
   handleSelectOutput,
 }) => {
-  // ID for the right handle (normal output) - only the actual output type
-  const id = useMemo(() => {
-    const selectedType = output.selected ?? output.types[0];
-
-    return {
-      output_types: [selectedType],
+  const id = useMemo(
+    () => ({
+      output_types: [output.selected ?? output.types[0]],
       id: data.id,
       dataType: data.type,
       name: output.name,
-    };
-  }, [output.selected, output.types, data.id, data.type, output.name]);
-
-  // ID for the left handle (loop input) - includes loop_types for validation
-  const loopInputId = useMemo(() => {
-    const selectedType = output.selected ?? output.types[0];
-    const outputTypes =
-      output.allows_loop && output.loop_types
-        ? [selectedType, ...output.loop_types]
-        : [selectedType];
-
-    return {
-      output_types: outputTypes,
-      id: data.id,
-      dataType: data.type,
-      name: output.name,
-    };
-  }, [
-    output.selected,
-    output.types,
-    output.allows_loop,
-    output.loop_types,
-    data.id,
-    data.type,
-    output.name,
-  ]);
+    }),
+    [output.selected, output.types, data.id, data.type, output.name],
+  );
 
   const colors = useMemo(
     () => getNodeOutputColors(output, data, types),
@@ -75,13 +49,8 @@ export const OutputParameter = ({
       colors={colors}
       outputProxy={output.proxy}
       title={output.display_name ?? output.name}
-      tooltipTitle={
-        output.allows_loop && output.loop_types
-          ? `${output.selected ?? output.types[0]}\n${output.loop_types.join("\n")}`
-          : (output.selected ?? output.types[0])
-      }
+      tooltipTitle={output.selected ?? output.types[0]}
       id={id}
-      loopInputId={loopInputId}
       type={output.types.join("|")}
       showNode={showNode}
       outputName={output.name}

@@ -42,7 +42,7 @@ export const getLatestVersion = customGetLatestVersion;
 
 export async function createApiKey(name: string) {
   try {
-    const res = await api.post(`${getBaseUrl()}api_key/`, { name });
+    const res = await api.post(`${BASE_URL_API}api_key/`, { name });
     if (res.status === 200) {
       return res.data;
     }
@@ -72,7 +72,7 @@ export async function saveFlowStore(
   publicFlow = false,
 ): Promise<FlowType> {
   try {
-    const response = await api.post(`${getBaseUrl()}store/components/`, {
+    const response = await api.post(`${BASE_URL_API}store/components/`, {
       name: newFlow.name,
       data: newFlow.data,
       description: newFlow.description,
@@ -120,7 +120,7 @@ export async function getStoreComponents({
   fields?: Array<string> | null;
 }): Promise<StoreComponentResponse | undefined> {
   try {
-    let url = `${getBaseUrl()}store/components/`;
+    let url = `${BASE_URL_API}store/components/`;
     const queryParams: any = [];
     if (component_id !== undefined && component_id !== null) {
       queryParams.push(`component_id=${component_id}`);
@@ -178,7 +178,7 @@ export async function getStoreComponents({
 export async function getComponent(component_id: string) {
   try {
     const res = await api.get(
-      `${getBaseUrl()}store/components/${component_id}`,
+      `${BASE_URL_API}store/components/${component_id}`,
     );
     if (res.status === 200) {
       return res.data;
@@ -190,7 +190,7 @@ export async function getComponent(component_id: string) {
 
 export async function checkHasApiKey() {
   try {
-    const res = await api.get(`${getBaseUrl()}store/check/api_key`);
+    const res = await api.get(`${BASE_URL_API}store/check/api_key`);
     if (res?.status === 200) {
       return res.data;
     }
@@ -201,7 +201,7 @@ export async function checkHasApiKey() {
 
 export async function checkHasStore() {
   try {
-    const res = await api.get(`${getBaseUrl()}store/check/`);
+    const res = await api.get(`${BASE_URL_API}store/check/`);
     if (res?.status === 200) {
       return res.data;
     }
@@ -232,7 +232,7 @@ export async function updateFlowStore(
   id: string,
 ): Promise<FlowType> {
   try {
-    const response = await api.patch(`${getBaseUrl()}store/components/${id}`, {
+    const response = await api.patch(`${BASE_URL_API}store/components/${id}`, {
       name: newFlow.name,
       data: newFlow.data,
       description: newFlow.description,
@@ -276,7 +276,7 @@ export async function getVerticesOrder(
     data["data"]["edges"] = Edges;
   }
   return await api.post(
-    `${getBaseUrl()}build/${flowId}/vertices`,
+    `${BASE_URL_API}build/${flowId}/vertices`,
     data,
     config,
   );
@@ -300,7 +300,7 @@ export async function postBuildVertex(
     data["files"] = files;
   }
   return await api.post(
-    `${getBaseUrl()}build/${flowId}/vertices/${vertexId}`,
+    `${BASE_URL_API}build/${flowId}/vertices/${vertexId}`,
     data,
   );
 }

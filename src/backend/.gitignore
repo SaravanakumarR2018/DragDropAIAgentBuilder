@@ -135,6 +135,3 @@ dmypy.json
 
 # Generated pytest-cov config
 .coveragerc
-
-# LFX cache
-**/.cache/

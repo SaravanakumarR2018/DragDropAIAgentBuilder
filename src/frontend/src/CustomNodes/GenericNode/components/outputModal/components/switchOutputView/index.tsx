@@ -27,7 +27,6 @@ const SwitchOutputView: React.FC<SwitchOutputViewProps> = ({
   type,
 }) => {
   const flowPool = useFlowStore((state) => state.flowPool);
-  const nodes = useFlowStore((state) => state.nodes);
 
   const flowPoolNode = (flowPool[nodeId] ?? [])[
     (flowPool[nodeId]?.length ?? 1) - 1
@@ -74,82 +73,22 @@ const SwitchOutputView: React.FC<SwitchOutputViewProps> = ({
     return resultMessage;
   }, [resultMessage]);
 
-  // Custom component for Tool output display
-  const ToolOutputDisplay = ({ tools }) => {
-    if (!Array.isArray(tools) || tools.length === 0) {
-      return <div>No tools available</div>;
-    }
-
-    return (
-      <div className="space-y-4">
-        {tools?.map((tool, index) => (
-          <div key={index} className="border rounded-lg p-4 bg-muted/20">
-            <div
-              data-testid="tool_name"
-              className={
-                "font-medium text-lg" + (tool?.description ? " mb-2" : "")
-              }
-            >
-              {tool.name || `Tool ${index + 1}`}
-            </div>
-            {tool?.description && (
-              <div
-                data-testid="tool_description"
-                className="text-sm text-muted-foreground mb-3"
-              >
-                {tool.description}
-              </div>
-            )}
-            {tool?.tags && tool?.tags?.length > 0 && (
-              <div data-testid="tool_tags" className="flex flex-wrap gap-2">
-                {tool.tags.map((tag, tagIndex) => (
-                  <span
-                    key={tagIndex}
-                    className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-primary/10 text-primary"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    );
-  };
-
   return type === "Outputs" ? (
     <>
-      <Case condition={isToolOutput && resultMessageMemoized}>
-        <ToolOutputDisplay
-          tools={
-            Array.isArray(resultMessageMemoized)
-              ? resultMessageMemoized
-              : [resultMessageMemoized]
-          }
-        />
-      </Case>
-      <Case
-        condition={(!resultType || resultType === "unknown") && !isToolOutput}
-      >
+      <Case condition={!resultType || resultType === "unknown"}>
         <div>NO OUTPUT</div>
       </Case>
-      <Case
-        condition={
-          (resultType === "error" || resultType === "ValueError") &&
-          !isToolOutput
-        }
-      >
+      <Case condition={resultType === "error" || resultType === "ValueError"}>
         <ErrorOutput
           value={`${resultMessageMemoized?.errorMessage}\n\n${resultMessageMemoized?.stackTrace}`}
         />
       </Case>
 
-      <Case condition={resultType === "text" && !isToolOutput}>
+      <Case condition={resultType === "text"}>
         <TextOutputView left={false} value={resultMessageMemoized} />
       </Case>
 
-      <Case condition={RECORD_TYPES.includes(resultType) && !isToolOutput}>
+      <Case condition={RECORD_TYPES.includes(resultType)}>
         <DataOutputComponent
           rows={
             Array.isArray(resultMessageMemoized)
@@ -168,7 +107,7 @@ const SwitchOutputView: React.FC<SwitchOutputViewProps> = ({
           columnMode="union"
         />
       </Case>
-      <Case condition={JSON_TYPES.includes(resultType) && !isToolOutput}>
+      <Case condition={JSON_TYPES.includes(resultType)}>
         <JsonOutputViewComponent
           nodeId={nodeId}
           outputName={outputName}
@@ -176,7 +115,7 @@ const SwitchOutputView: React.FC<SwitchOutputViewProps> = ({
         />
       </Case>
 
-      <Case condition={resultType === "stream" && !isToolOutput}>
+      <Case condition={resultType === "stream"}>
         <div className="flex h-full w-full items-center justify-center align-middle">
           <Alert variant={"default"} className="w-fit">
             <ForwardedIconComponent

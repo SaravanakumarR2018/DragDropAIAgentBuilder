@@ -13,6 +13,7 @@ export const ChatViewWrapper = ({
   sidebarOpen,
   currentFlowId,
   setSidebarOpen,
+  isPlayground,
   setvisibleSession,
   setSelectedViewField,
   messagesFetched,
@@ -20,6 +21,7 @@ export const ChatViewWrapper = ({
   sendMessage,
   canvasOpen,
   setOpen,
+  playgroundTitle,
   playgroundPage,
 }: ChatViewWrapperProps) => {
   return (

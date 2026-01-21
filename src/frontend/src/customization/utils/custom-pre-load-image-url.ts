@@ -1,5 +1,5 @@
-import { getBaseUrl } from "@/customization/utils/urls";
+import { BASE_URL_API } from "@/constants/constants";
 
 export const customPreLoadImageUrl = (imageUrl: string) => {
-  return `${getBaseUrl()}files/profile_pictures/${imageUrl}`;
+  return `${BASE_URL_API}files/profile_pictures/${imageUrl}`;
 };

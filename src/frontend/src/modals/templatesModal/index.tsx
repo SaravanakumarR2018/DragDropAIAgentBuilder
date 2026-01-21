@@ -18,29 +18,9 @@ export default function TemplatesModal({
   setOpen,
 }: newFlowModalPropsType): JSX.Element {
   const [currentTab, setCurrentTab] = useState("get-started");
-  const [loading, setLoading] = useState(false);
   const addFlow = useAddFlow();
   const navigate = useCustomNavigate();
   const { folderId } = useParams();
-
-  const handleFlowCreating = (isCreating: boolean) => {
-    setLoading(isCreating);
-  };
-
-  const handleCreateBlankFlow = () => {
-    if (loading) return;
-
-    handleFlowCreating(true);
-    track("New Flow Created", { template: "Blank Flow" });
-
-    addFlow()
-      .then((id) => {
-        navigate(`/flow/${id}${folderId ? `/folder/${folderId}` : ""}`);
-      })
-      .finally(() => {
-        handleFlowCreating(false);
-      });
-  };
 
   // Define categories and their items
   const categories: Category[] = [
@@ -89,16 +69,11 @@ export default function TemplatesModal({
             />
             <main className="flex flex-1 flex-col gap-4 overflow-auto p-6 md:gap-8">
               {currentTab === "get-started" ? (
-                <GetStartedComponent
-                  loading={loading}
-                  onFlowCreating={handleFlowCreating}
-                />
+                <GetStartedComponent />
               ) : (
                 <TemplateContentComponent
                   currentTab={currentTab}
                   categories={categories.flatMap((category) => category.items)}
-                  loading={loading}
-                  onFlowCreating={handleFlowCreating}
                 />
               )}
               <BaseModal.Footer>
@@ -110,13 +85,17 @@ export default function TemplatesModal({
                     </div>
                   </div>
                   <Button
-                    onClick={handleCreateBlankFlow}
+                    onClick={() => {
+                      addFlow().then((id) => {
+                        navigate(
+                          `/flow/${id}${folderId ? `/folder/${folderId}` : ""}`,
+                        );
+                      });
+                      track("New Flow Created", { template: "Blank Flow" });
+                    }}
                     size="sm"
                     data-testid="blank-flow"
-                    className={cn(
-                      "shrink-0",
-                      loading ? "cursor-default opacity-80" : "cursor-pointer",
-                    )}
+                    className="shrink-0"
                   >
                     <ForwardedIconComponent
                       name="Plus"

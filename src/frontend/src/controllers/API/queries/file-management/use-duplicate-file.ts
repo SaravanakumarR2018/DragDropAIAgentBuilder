@@ -24,7 +24,6 @@ export const useDuplicateFileV2: useMutationFunctionType<
         headers: {
           Accept: "*/*",
         },
-        credentials: getFetchCredentials(),
       },
     );
     const blob = await response.blob();

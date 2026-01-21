@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 
 import { usePostUploadFile } from "@/controllers/API/queries/files/use-post-upload-file";
-import { getBaseUrl } from "@/customization/utils/urls";
 import { createFileUpload } from "@/helpers/create-file-upload";
 import useFileSizeValidator from "@/shared/hooks/use-file-size-validator";
 import useAlertStore from "@/stores/alertStore";
@@ -34,7 +33,7 @@ export default function IOFileInput({ field, updateValue }: IOFileInputProps) {
     if (field) {
       const fileName = field.split("/")[1];
       const flowFileId = currentFlowId.toString();
-      setImage(`${getBaseUrl()}files/images/${flowFileId}/${fileName}`);
+      setImage(`${BASE_URL_API}files/images/${flowFileId}/${fileName}`);
     }
   }, []);
 

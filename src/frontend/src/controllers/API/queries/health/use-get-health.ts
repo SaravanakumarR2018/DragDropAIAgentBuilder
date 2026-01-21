@@ -48,7 +48,9 @@ export const useGetHealthQuery: useQueryFunctionType<
         setTimeout(() => reject(createNewError503()), SERVER_HEALTH_INTERVAL),
       );
 
-      const apiPromise = api.get<getHealthResponse>(getHealthCheckUrl());
+      const apiPromise = api.get<getHealthResponse>(
+        HEALTH_CHECK_URL || "/health",
+      );
       const response = await Promise.race([apiPromise, timeoutPromise]);
       setHealthCheckTimeout(
         Object.values(response.data).some((value) => value !== "ok")

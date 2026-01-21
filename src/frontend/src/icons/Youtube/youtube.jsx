@@ -5940,4 +5940,5 @@ C 637.00 907.00 636.96 908.00 637.00 908.00 Z"
     </g>
   </svg>
 );
-export default Icon;
+
+export default YouTubeIcon;

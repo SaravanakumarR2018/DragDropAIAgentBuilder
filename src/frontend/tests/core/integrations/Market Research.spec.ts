@@ -77,12 +77,6 @@ withEventDeliveryModes(
 
     await page.getByTestId("tab_1_stringify").click();
 
-    await page
-      .getByTestId("handle-parsercomponent-shownode-data or dataframe-left")
-      .click();
-
-    await page.getByTestId("tab_1_stringify").click();
-
     await page.getByTestId("button_run_chat output").click();
     await page.waitForSelector("text=built successfully", {
       timeout: 60000 * 3,

@@ -29,7 +29,7 @@ export default function FileCard({
 
   const fileWrapperClasses = getClasses(isHovered);
 
-  const imgSrc = `${getBaseUrl()}files/images/${path}`;
+  const imgSrc = `${BASE_URL_API}files/images/${path}`;
 
   if (showFile) {
     if (imgTypes.has(fileType)) {

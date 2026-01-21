@@ -93,12 +93,7 @@ export default function PromptAreaComponent({
     );
 
   return (
-    <div
-      className={cn(
-        "w-full !max-h-[7.5rem]",
-        disabled && "pointer-events-none",
-      )}
-    >
+    <div className={cn("w-full", disabled && "pointer-events-none")}>
       <PromptModal
         id={id}
         field_name={field_name}

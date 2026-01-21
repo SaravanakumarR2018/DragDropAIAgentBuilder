@@ -77,7 +77,6 @@ export const MenuBar = memo((): JSX.Element => {
   );
 
   const handleSave = () => {
-    if (!onFlowPage) return;
     saveFlow().then(() => {
       setSuccessData({ title: "Saved successfully" });
     });

@@ -100,20 +100,11 @@ export default function NodeInputField({
     }
   }, [optionalHandle]);
 
-  // For ModelInput (type === "model"), only show handle if input_types is not empty
-  const isModelInput = type === "model";
-  const hasInputTypes =
-    optionalHandle &&
-    Array.isArray(optionalHandle) &&
-    optionalHandle.length > 0;
-
-  // Allow refresh buttons and connection handles to coexist for ModelInput
   const displayHandle =
     (!LANGFLOW_SUPPORTED_TYPES.has(type ?? "") ||
       (optionalHandle && optionalHandle.length > 0)) &&
     !isToolMode &&
-    (!hasRefreshButton || isModelInput) &&
-    (!isModelInput || hasInputTypes); // Hide handle for ModelInput when input_types is empty
+    !hasRefreshButton;
 
   const isFlexView = FLEX_VIEW_TYPES.includes(type ?? "");
 
@@ -206,15 +197,6 @@ export default function NodeInputField({
                 </ShadTooltip>
               )}
             </div>
-            {LANGFLOW_AGENTIC_EXPERIENCE &&
-              data.node?.template[name]?.ai_enabled && (
-                <AssistantButton
-                  compData={id}
-                  handleOnNewValue={handleOnNewValue}
-                  inputValue={data.node?.template[name]?.value}
-                  type="field"
-                />
-              )}
           </div>
           <CustomParameterLabel
             name={name}

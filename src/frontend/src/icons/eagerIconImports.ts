@@ -111,7 +111,7 @@ import { WeaviateIcon } from "@/icons/Weaviate";
 import { WikipediaIcon } from "@/icons/Wikipedia";
 import { WolframIcon } from "@/icons/Wolfram";
 import { XAIIcon } from "@/icons/xAI";
-import { YoutubeIcon as YouTubeIcon } from "@/icons/Youtube";
+import { YouTubeSvgIcon as YouTubeIcon } from "@/icons/Youtube";
 import { ZepMemoryIcon } from "@/icons/ZepMemory";
 import { JigsawStackIcon } from "./JigsawStack";
 import { WindsurfIcon } from "./Windsurf";
@@ -171,7 +171,6 @@ export const eagerIconsMapping = {
   HCD: HCDIcon,
   HomeAssistant: HomeAssistantIcon,
   HuggingFace: HuggingFaceIcon,
-  IBM: IBMIcon,
   Icosa: IcosaIcon,
   IFixIt: IFixIcon,
   javascript: JSIcon,
@@ -228,7 +227,6 @@ export const eagerIconsMapping = {
   Upstash: UpstashSvgIcon,
   Vectara: VectaraIcon,
   VertexAI: VertexAIIcon,
-  vLLM: VllmIcon,
   WatsonxAI: WatsonxAiIcon,
   Weaviate: WeaviateIcon,
   Wikipedia: WikipediaIcon,

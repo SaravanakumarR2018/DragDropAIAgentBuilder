@@ -90,16 +90,12 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     if (typeof children === "string") {
       newChildren = ignoreTitleCase ? children : toTitleCase(children);
     }
-    const shouldScale = props["aria-haspopup"] !== "dialog";
     return (
       <>
         <Comp
           className={
             !unstyled
-              ? cn(
-                  buttonVariants({ variant, size, className }),
-                  shouldScale && "active:scale-[0.97]",
-                )
+              ? buttonVariants({ variant, size, className })
               : cn(className)
           }
           disabled={loading || disabled}

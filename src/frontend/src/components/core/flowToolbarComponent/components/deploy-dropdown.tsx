@@ -210,7 +210,7 @@ export default function PublishDropdown({
         </DropdownMenuContent>
       </DropdownMenu>
       <ApiModal open={openApiModal} setOpen={setOpenApiModal}>
-        <>{children}</>
+        <></>
       </ApiModal>
       <EmbedModal
         open={openEmbedModal}
