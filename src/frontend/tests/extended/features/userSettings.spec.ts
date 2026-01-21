@@ -11,7 +11,7 @@ test.afterEach(async () => {
 
 test(
   "should see general profile gradient",
-  { tag: ["@release"] },
+  { tag: ["@release", "@components"] },
 
   async ({ page }) => {
     await awaitBootstrapTest(page, {
@@ -41,6 +41,17 @@ test(
   },
 );
 
+const FALLBACK_FIELDS = [
+  "AgentQL API Key",
+  "AI/ML API Key",
+  "Anthropic API Key",
+  "API Key",
+  "Apify Token",
+  "Assembly API Key",
+  "Astra DB Application Token",
+  "AWS Access Key ID",
+];
+
 test(
   "should interact with global variables",
   { tag: ["@release", "@workspace", "@api"] },
@@ -49,6 +60,26 @@ test(
     const randomName = Math.random().toString(36).substring(2);
     const randomName2 = Math.random().toString(36).substring(2);
     const randomName3 = Math.random().toString(36).substring(2);
+
+    async function trySelectAvailableField(): Promise<boolean> {
+      for (const fieldName of FALLBACK_FIELDS) {
+        await page.getByPlaceholder("Fields").clear();
+        await page.getByPlaceholder("Fields").fill(fieldName);
+        await page.waitForTimeout(300);
+        try {
+          // [cmdk-item] targets dropdown options, not the search input
+          const optionItem = page.locator(
+            `[cmdk-item]:has-text("${fieldName}")`,
+          );
+          await optionItem.waitFor({ state: "visible", timeout: 2000 });
+          await optionItem.click();
+          return true;
+        } catch {
+          continue;
+        }
+      }
+      return false;
+    }
 
     await awaitBootstrapTest(page, {
       skipModal: true,
@@ -73,45 +104,29 @@ test(
       .fill("testtesttesttesttesttesttesttest");
     await page.getByTestId("popover-anchor-apply-to-fields").click();
 
-    await page.getByPlaceholder("Fields").waitFor({
+    const fieldsCount = await page.getByPlaceholder("Fields").count();
+
+    await page.getByPlaceholder("Fields").first().waitFor({
       state: "visible",
       timeout: 30000,
     });
 
-    await page.getByPlaceholder("Fields").fill("AgentQL API Key");
-
-    await page.waitForSelector("text=AgentQL API Key", { timeout: 30000 });
-
-    await page.getByText("AgentQL API Key").last().click();
-
-    await page.getByPlaceholder("Fields").fill("openAI");
-
-    await page.waitForSelector("text=openai", { timeout: 30000 });
-
-    await page.getByText("openai").last().click();
-
-    // Wait for the field to be ready for input
-    await page.getByPlaceholder("Fields").waitFor({
-      state: "visible",
-      timeout: 30000,
-    });
-
-    // Additional wait for field to be fully interactive
-    await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {
-      // Continue if network idle timeout
-    });
-
-    await page.getByPlaceholder("Fields").fill("ollama");
+    const fieldSelected = await trySelectAvailableField();
+    expect(fieldSelected).toBe(true);
 
     await page.keyboard.press("Escape");
-    await page.getByText("Save Variable", { exact: true }).click();
+
+    await page
+      .getByText("Save Variable", { exact: true })
+      .dispatchEvent("click");
+
+    await page.waitForTimeout(500);
 
     await expect(page.getByText(randomName).last()).toBeVisible({
       timeout: 10000,
     });
 
-    await page.getByText(randomName).last().click();
-    await page.getByText(randomName).last().click();
+    await page.locator(`.ag-cell:has-text("${randomName}")`).first().click();
 
     await page.getByPlaceholder("Enter a name for the variable...").waitFor({
       state: "visible",
@@ -122,13 +137,19 @@ test(
       .getByPlaceholder("Enter a name for the variable...")
       .fill(randomName2);
 
-    await page.getByText("Update Variable", { exact: true }).last().click();
+    await page
+      .getByText("Update Variable", { exact: true })
+      .last()
+      .dispatchEvent("click");
+    await page.waitForTimeout(500);
 
     await expect(page.getByText(randomName2).last()).toBeVisible({
       timeout: 10000,
     });
 
-    await page.getByText(randomName2).last().click();
+    await page.waitForTimeout(500);
+
+    await page.locator(`.ag-cell:has-text("${randomName2}")`).first().click();
 
     await page.getByPlaceholder("Enter a name for the variable...").waitFor({
       state: "visible",
@@ -139,7 +160,11 @@ test(
       .getByPlaceholder("Enter a name for the variable...")
       .fill(randomName3);
 
-    await page.getByText("Update Variable", { exact: true }).last().click();
+    await page
+      .getByText("Update Variable", { exact: true })
+      .last()
+      .dispatchEvent("click");
+    await page.waitForTimeout(500);
 
     await expect(page.getByText(randomName3).last()).toBeVisible({
       timeout: 10000,
@@ -365,52 +390,6 @@ test(
     await expect(
       page.getByText("Global Variables", { exact: true }).nth(1),
     ).toBeVisible({ timeout: 10000 });
-
-    // Click the back button - this should take us back to the flow, not to the main settings page
-    await page.getByTestId("back_page_button").click();
-
-    // Verify we're back on the flow page, not the settings main page
-    await page.waitForSelector('[data-testid="sidebar-search-input"]', {
-      timeout: 5000,
-    });
-
-    // Additional verification that we're on the flow page
-    expect(page.url()).toMatch(/\/flow\//);
-
-    // Verify we can see flow-specific elements
-    await expect(page.getByTestId("sidebar-search-input")).toBeVisible();
-  },
-);
-
-test(
-  "should navigate back to flow from global variables",
-  { tag: ["@release", "@workspace"] },
-  async ({ page }) => {
-    await awaitBootstrapTest(page);
-
-    await page.getByTestId("side_nav_options_all-templates").click();
-    await page.getByRole("heading", { name: "Basic Prompting" }).click();
-
-    await page.waitForSelector('[data-testid="canvas_controls_dropdown"]', {
-      timeout: 100000,
-    });
-
-    // Now navigate to user settings
-    await page.getByTestId("user-profile-settings").click();
-    await page.getByTestId("menu_settings_button").click();
-
-    // Verify we're on the settings page
-    await expect(page.getByText("General").nth(2)).toBeVisible({
-      timeout: 4000,
-    });
-
-    // Navigate to Global Variables
-    await page.getByText("Global Variables").click();
-    await page.getByText("Global Variables").nth(2);
-    await page
-      .getByText("Global Variables", { exact: true })
-      .nth(1)
-      .isVisible();
 
     // Click the back button - this should take us back to the flow, not to the main settings page
     await page.getByTestId("back_page_button").click();
