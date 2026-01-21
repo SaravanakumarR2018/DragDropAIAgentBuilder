@@ -21,6 +21,8 @@ def initialize_paddle_client() -> Client:
     if not api_key:
         msg = "PADDLE_API_KEY must be set to initialize the Paddle Billing client."
         raise ValueError(msg)
+    masked_key = f"{api_key[:4]}...{api_key[-4:]}" if len(api_key) > 8 else "***"
+    logger.info("Loaded PADDLE_API_KEY from environment: %s", masked_key)
 
     _paddle_client = Client(api_key)
     logger.info("Paddle Billing client initialized.")

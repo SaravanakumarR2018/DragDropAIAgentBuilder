@@ -205,9 +205,11 @@ class Settings(BaseSettings):
     """If set to True, Langflow will not serve the frontend."""
 
     paddle_api_key: str | None = Field(default=None, repr=False)
-    """Paddle API key used for billing-related integrations."""
+    """Paddle API key used for billing-related integrations.
+        Can be provided via LANGFLOW_PADDLE_API_KEY or PADDLE_API_KEY."""
     paddle_client_key: str | None = Field(default=None, repr=False)
-    """Paddle client key used for billing-related integrations."""
+    """Paddle client key used for billing-related integrations.
+        Can be provided via LANGFLOW_PADDLE_CLIENT_KEY or PADDLE_CLIENT_KEY."""
     
     # CORS Settings
     cors_origins: list[str] | str = "*"
@@ -330,6 +332,12 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_paddle_keys(self):
+        env_api_key = os.getenv("PADDLE_API_KEY")
+        env_client_key = os.getenv("PADDLE_CLIENT_KEY")
+        if not self.paddle_api_key and env_api_key:
+            self.paddle_api_key = env_api_key
+        if not self.paddle_client_key and env_client_key:
+            self.paddle_client_key = env_client_key
         if (self.paddle_api_key and not self.paddle_client_key) or (
             self.paddle_client_key and not self.paddle_api_key
         ):
