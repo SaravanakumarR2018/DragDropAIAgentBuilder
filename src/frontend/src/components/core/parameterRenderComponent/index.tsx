@@ -1,6 +1,5 @@
 import type { handleOnNewValueType } from "@/CustomNodes/hooks/use-handle-new-value";
 import CodeAreaComponent from "@/components/core/parameterRenderComponent/components/codeAreaComponent";
-import ModelInputComponent from "@/components/core/parameterRenderComponent/components/modelInputComponent";
 import SliderComponent from "@/components/core/parameterRenderComponent/components/sliderComponent";
 import TableNodeComponent from "@/components/core/parameterRenderComponent/components/TableNodeComponent";
 import TabComponent from "@/components/core/parameterRenderComponent/components/tabComponent";
@@ -17,7 +16,6 @@ import IntComponent from "./components/intComponent";
 import KeypairListComponent from "./components/keypairListComponent";
 import McpComponent from "./components/mcpComponent";
 import MultiselectComponent from "./components/multiselectComponent";
-import MustachePromptAreaComponent from "./components/mustachePromptComponent";
 import PromptAreaComponent from "./components/promptComponent";
 import QueryComponent from "./components/queryComponent";
 import SortableListComponent from "./components/sortableListComponent";
@@ -55,7 +53,6 @@ export function ParameterRenderComponent({
   isToolMode?: boolean;
   nodeInformationMetadata?: NodeInfoType;
 }) {
-  // no-op
   const id = (
     templateData.type +
     "_" +
@@ -75,7 +72,7 @@ export function ParameterRenderComponent({
       nodeId,
       helperText: templateData?.helper_text,
       readonly: templateData.readonly,
-      placeholder: placeholder || templateData?.placeholder,
+      placeholder,
       isToolMode,
       nodeInformationMetadata,
       hasRefreshButton: templateData.refresh_button,
@@ -191,15 +188,6 @@ export function ParameterRenderComponent({
             id={`promptarea_${id}`}
           />
         );
-      case "mustache":
-        return (
-          <MustachePromptAreaComponent
-            {...baseInputProps}
-            readonly={!!nodeClass.flow}
-            field_name={name}
-            id={`mustachepromptarea_${id}`}
-          />
-        );
       case "code":
         return <CodeAreaComponent {...baseInputProps} id={`codearea_${id}`} />;
       case "table":
@@ -252,7 +240,6 @@ export function ParameterRenderComponent({
             options={templateData?.options}
             searchCategory={templateData?.search_category}
             limit={templateData?.limit}
-            id={`sortablelist_${id}`}
           />
         );
       case "connect": {

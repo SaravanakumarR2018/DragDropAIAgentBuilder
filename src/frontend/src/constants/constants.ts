@@ -158,9 +158,6 @@ export const CODE_DICT_DIALOG_SUBTITLE =
 export const PROMPT_DIALOG_SUBTITLE =
   "Create your prompt. Prompts can help guide the behavior of a Language Model. Use curly brackets {} to introduce variables.";
 
-export const MUSTACHE_PROMPT_DIALOG_SUBTITLE =
-  "Create your prompt. Prompts can help guide the behavior of a Language Model. Use double curly brackets {{}} to introduce variables.";
-
 export const CHAT_CANNOT_OPEN_TITLE = "Chat Cannot Open";
 
 export const CHAT_CANNOT_OPEN_DESCRIPTION = "This is not a chat flow.";
@@ -583,9 +580,9 @@ export const ADMIN_HEADER_TITLE = "Admin Page";
 export const ADMIN_HEADER_DESCRIPTION =
   "Navigate through this section to efficiently oversee all application users. From here, you can seamlessly manage user accounts.";
 
-export const BASE_URL_API = CUSTOM_BASE_URL_API || "/api/v1/";
+export const BASE_URL_API = custom.BASE_URL_API || "/api/v1/";
 
-export const BASE_URL_API_V2 = CUSTOM_BASE_URL_API_V2 || "/api/v2/";
+export const BASE_URL_API_V2 = custom.BASE_URL_API_V2 || "/api/v2/";
 
 /**
  * URLs excluded from error retries.
@@ -670,7 +667,6 @@ export const LANGFLOW_SUPPORTED_TYPES = new Set([
   "float",
   "code",
   "prompt",
-  "mustache",
   "file",
   "int",
   "dict",
@@ -865,8 +861,8 @@ export const LANGFLOW_REFRESH_TOKEN = "refresh_token_lf";
 
 export const LANGFLOW_ACCESS_TOKEN_EXPIRE_SECONDS = 60 * 60 - 60 * 60 * 0.1;
 export const LANGFLOW_ACCESS_TOKEN_EXPIRE_SECONDS_ENV =
-  Number(getEnvVar("ACCESS_TOKEN_EXPIRE_SECONDS", 60)) -
-  Number(getEnvVar("ACCESS_TOKEN_EXPIRE_SECONDS", 60)) * 0.1;
+  Number(process.env?.ACCESS_TOKEN_EXPIRE_SECONDS ?? 60) -
+  Number(process.env?.ACCESS_TOKEN_EXPIRE_SECONDS ?? 60) * 0.1;
 export const TEXT_FIELD_TYPES: string[] = ["str", "SecretStr"];
 export const NODE_WIDTH = 384;
 export const NODE_HEIGHT = NODE_WIDTH * 3;
@@ -988,13 +984,3 @@ export const DESKTOP_URL = "https://www.langflow.org/desktop";
 export const BUG_REPORT_URL = "https://github.com/langflow-ai/langflow/issues";
 
 export const UUID_PARSING_ERROR = "uuid_parsing";
-
-// Variable categories
-export const CATEGORY_GLOBAL = "Global";
-export const CATEGORY_LLM = "LLM";
-export const CATEGORY_SETTINGS = "Settings";
-export const VALID_CATEGORIES = [
-  CATEGORY_GLOBAL,
-  CATEGORY_LLM,
-  CATEGORY_SETTINGS,
-] as const;
