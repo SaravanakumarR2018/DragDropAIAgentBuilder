@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any
+from typing import Any, Iterable
 
 from paddle_billing.Entities.Shared.CatalogType import CatalogType
 from paddle_billing.Entities.Shared.CurrencyCode import CurrencyCode
@@ -14,37 +14,31 @@ from paddle_billing.Entities.Shared.TaxMode import TaxMode
 from paddle_billing.Resources.Prices.Operations import CreatePrice
 from paddle_billing.Resources.Products.Operations import CreateProduct
 
-from lfx.log.logger import logger
+    logger.info("Loading existing Paddle products and prices for provisioning.")
+    logger.info("Loaded %d existing products.", len(existing_products))
+    existing_prices = _load_prices(client)
+        product_id = _ensure_product(plan, existing_products, client)
+        existing_products = _refresh_products_if_missing(product_id, existing_products, client)
+            logger.info("Paddle plan %s already exists; skipping price creation.", plan.key)
+        existing_prices = _load_prices(client)
+    return _fetch_all(client.prices.list)
+    return _fetch_all(client.products.list)
+def _fetch_all(list_call: Any) -> list[dict[str, Any]]:
+    params: dict[str, Any] = {"per_page": 200}
+        response = list_call(**params)
+        items.extend(_extract_items(response))
+        next_cursor = _extract_next_cursor(response)
+        custom_data = _get_field(price, "custom_data", {}) or {}
+        if _get_field(custom_data, "plan_key") == plan.key:
+            return _normalize_payload(price)
+        if _get_field(price, "description") == f"{plan.name} Monthly":
 
-from langflow.services.paddle.client import get_paddle_client
+        custom_data = _get_field(product, "custom_data", {}) or {}
+        if _get_field(custom_data, "plan_key") == plan.key:
+            return _get_field(product, "id")
+        if _get_field(product, "name") == plan.name:
+            return _get_field(product, "id")
 
-
-@dataclass(frozen=True)
-class PlanDefinition:
-    key: str
-    name: str
-    monthly_price_usd: Decimal
-    trial_days: int | None = None
-
-
-PLANS: tuple[PlanDefinition, ...] = (
-    PlanDefinition(key="starter_pack_monthly", name="Starter", monthly_price_usd=Decimal("20.00"), trial_days=7),
-    PlanDefinition(key="pro_pack_monthly", name="Pro", monthly_price_usd=Decimal("50.00")),
-    PlanDefinition(key="enterprise_pack_monthly", name="Enterprise", monthly_price_usd=Decimal("0.00")),
-)
-
-
-def provision_paddle_plans() -> None:
-    """Create Paddle Billing plans."""
-    client = get_paddle_client()
-
-    for plan in PLANS:
-        product_id = _create_product(plan, client)
-        _create_price(plan, product_id, client)
-        logger.info("Paddle plan %s provisioned.", plan.key)
-
-
-def _create_product(plan: PlanDefinition, client: Any) -> str:
     logger.info("Creating Paddle product for plan %s.", plan.key)
     product = client.products.create(
         CreateProduct(
@@ -53,8 +47,70 @@ def _create_product(plan: PlanDefinition, client: Any) -> str:
             custom_data={"plan_key": plan.key},
         )
     )
-    return product.id
+    return _get_field(product, "id")
 
+
+    logger.info("Creating Paddle price for plan %s.", plan.key)
+    client.prices.create(
+        CreatePrice(
+            product_id=product_id,
+            description=f"{plan.name} Monthly",
+            type=CatalogType.Standard,
+            tax_mode=TaxMode.External,
+            unit_price=Money(amount=str(amount_cents), currency_code=CurrencyCode.USD),
+            custom_data={"plan_key": plan.key},
+        )
+    )
+
+
+def _get_field(item: Any, key: str, default: Any = None) -> Any:
+    if isinstance(item, dict):
+        return item.get(key, default)
+    return getattr(item, key, default)
+
+
+def _extract_items(response: Any) -> Iterable[Any]:
+    if response is None:
+        return []
+    if isinstance(response, list):
+        return response
+    if isinstance(response, dict):
+        return response.get("data", [])
+    if hasattr(response, "data"):
+        return getattr(response, "data") or []
+    if hasattr(response, "items"):
+        return getattr(response, "items") or []
+    if hasattr(response, "__iter__"):
+        return list(response)
+    return []
+
+
+def _extract_next_cursor(response: Any) -> str | None:
+    if response is None:
+        return None
+    if isinstance(response, dict):
+        return response.get("meta", {}).get("pagination", {}).get("next")
+    if hasattr(response, "pagination"):
+        pagination = getattr(response, "pagination")
+        return _get_field(pagination, "next")
+    if hasattr(response, "next"):
+        return getattr(response, "next")
+    return None
+
+
+def _normalize_payload(item: Any) -> dict[str, Any]:
+    if isinstance(item, dict):
+        return item
+    if hasattr(item, "to_dict"):
+        return item.to_dict()
+    return {"id": _get_field(item, "id")}
+
+
+def _refresh_products_if_missing(product_id: str, products: list[dict[str, Any]], client: Any) -> list[dict[str, Any]]:
+    if product_id:
+        return products
+    logger.warning("Paddle product id missing after creation; reloading products.")
+    return _load_products(client)
 
 def _create_price(plan: PlanDefinition, product_id: str, client: Any) -> None:
     amount_cents = int((plan.monthly_price_usd * 100).quantize(Decimal("1")))
