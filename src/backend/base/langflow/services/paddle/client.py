@@ -6,6 +6,8 @@ from os import getenv
 
 from paddle_billing import Client
 
+from langflow.services.deps import get_settings_service
+
 from lfx.log.logger import logger
 
 _paddle_client: Client | None = None
@@ -33,4 +35,5 @@ def initialize_paddle_client(api_key: str) -> Client:
 
 def get_paddle_client() -> Client:
     """Return the initialized Paddle Billing client."""
-    return initialize_paddle_client()
+    settings_service = get_settings_service()
+    return initialize_paddle_client(settings_service.settings.paddle_api_key)
