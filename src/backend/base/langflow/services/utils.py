@@ -238,6 +238,7 @@ def register_all_service_factories() -> None:
     from lfx.services.settings import factory as settings_factory
 
     from langflow.services.auth import factory as auth_factory
+    from langflow.services.billing.paddle_client import initialize_paddle_client
     from langflow.services.cache import factory as cache_factory
     from langflow.services.chat import factory as chat_factory
     from langflow.services.database import factory as database_factory
@@ -290,6 +291,10 @@ async def initialize_services(*, fix_migration: bool = False) -> None:
     async with session_scope(use_organisation=False) as session:
         settings_service = get_service(ServiceType.SETTINGS_SERVICE)
         await setup_superuser(settings_service, session)
+    initialize_paddle_client(
+        settings_service.settings.paddle_api_key,
+        settings_service.settings.paddle_client_key,
+    )
     try:
         await get_db_service(use_organisation=False).assign_orphaned_flows_to_superuser()
     except sqlalchemy_exc.IntegrityError as exc:

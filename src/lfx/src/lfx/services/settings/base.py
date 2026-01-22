@@ -9,7 +9,7 @@ from typing import Any, Literal
 import orjson
 import yaml
 from aiofile import async_open
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic.fields import FieldInfo
 from pydantic_settings import BaseSettings, EnvSettingsSource, PydanticBaseSettingsSource, SettingsConfigDict
 from typing_extensions import override
@@ -203,6 +203,11 @@ class Settings(BaseSettings):
     """User agent for the API calls."""
     backend_only: bool = False
     """If set to True, Langflow will not serve the frontend."""
+
+    paddle_api_key: SecretStr | None = Field(default=None, validation_alias="PADDLE_API_KEY")
+    """Paddle API key used by the backend billing client."""
+    paddle_client_key: SecretStr | None = Field(default=None, validation_alias="PADDLE_CLIENT_KEY")
+    """Paddle client key used by the frontend billing integration."""
 
     # CORS Settings
     cors_origins: list[str] | str = "*"
