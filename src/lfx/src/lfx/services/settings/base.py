@@ -332,12 +332,6 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_paddle_keys(self):
-        env_api_key = os.getenv("PADDLE_API_KEY")
-        env_client_key = os.getenv("PADDLE_CLIENT_KEY")
-        if not self.paddle_api_key and env_api_key:
-            self.paddle_api_key = env_api_key
-        if not self.paddle_client_key and env_client_key:
-            self.paddle_client_key = env_client_key
         if (self.paddle_api_key and not self.paddle_client_key) or (
             self.paddle_client_key and not self.paddle_api_key
         ):
