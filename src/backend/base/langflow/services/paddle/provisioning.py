@@ -66,11 +66,11 @@ def provision_paddle_plans() -> None:
     prices = list(client.prices.list())
 
     for plan in PLANS:
-        if _find_existing_price(plan, prices):
+        product = _find_existing_product(plan, products)
+        if _find_existing_price(plan, prices, product):
             logger.info("Paddle plan %s already provisioned; skipping.", plan.key)
             continue
 
-        product = _find_existing_product(plan, products)
         if product:
             product_id = product.id
         else:
@@ -88,15 +88,44 @@ def _find_existing_product(plan: PlanDefinition, products: list[Any]) -> Any | N
     for product in products:
         if _custom_data_value(product.custom_data, "plan_key") == plan.key:
             return product
+        if getattr(product, "name", None) == plan.name:
+            return product
     return None
 
 
-def _find_existing_price(plan: PlanDefinition, prices: list[Any]) -> Any | None:
+def _find_existing_price(plan: PlanDefinition, prices: list[Any], product: Any | None) -> Any | None:
     for price in prices:
         if _custom_data_value(price.custom_data, "plan_key") == plan.key:
             return price
+        if product and _price_matches_plan(plan, price, product.id):
+            return price
     return None
 
+def _price_matches_plan(plan: PlanDefinition, price: Any, product_id: str) -> bool:
+    if getattr(price, "product_id", None) != product_id:
+        return False
+    if getattr(price, "description", None) != f"{plan.name} Monthly":
+        return False
+    if not _duration_matches(price.billing_cycle, Interval.Month, 1):
+        return False
+    if plan.trial_days:
+        if not _duration_matches(price.trial_period, Interval.Day, plan.trial_days):
+            return False
+    elif price.trial_period is not None:
+        return False
+    unit_price = getattr(price, "unit_price", None)
+    amount = getattr(unit_price, "amount", None)
+    currency = getattr(unit_price, "currency_code", None)
+    return str(amount) == plan.monthly_price_usd and currency == CurrencyCode.USD
+
+
+def _duration_matches(duration: Any, interval: Interval, frequency: int) -> bool:
+    if duration is None:
+        return False
+    return (
+        getattr(duration, "interval", None) == interval
+        and getattr(duration, "frequency", None) == frequency
+    )
 
 def _custom_data_value(custom_data: Any, key: str) -> Any | None:
     """

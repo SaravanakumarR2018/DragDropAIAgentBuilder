@@ -296,7 +296,7 @@ async def initialize_services(*, fix_migration: bool = False) -> None:
             try:
                 from langflow.services.paddle.client import initialize_paddle_client
                 from langflow.services.paddle.provisioning import provision_paddle_plans
-                logger.info(f"Initializing Paddle client.{settings_service.settings.paddle_api_key}")
+ 
                 initialize_paddle_client(settings_service.settings.paddle_api_key)
                 provision_paddle_plans()
                 logger.info("Paddle billing setup completed successfully.")
