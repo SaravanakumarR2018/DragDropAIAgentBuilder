@@ -291,24 +291,9 @@ async def initialize_services(*, fix_migration: bool = False) -> None:
         settings_service = get_service(ServiceType.SETTINGS_SERVICE)
         await setup_superuser(settings_service, session)
         
-        if settings_service.settings.paddle_api_key and settings_service.settings.paddle_client_key:
-            logger.info("Paddle billing configured; initializing client and provisioning plans.")
-            try:
-                from langflow.services.paddle.client import initialize_paddle_client
-                from langflow.services.paddle.provisioning import provision_paddle_plans
- 
-                initialize_paddle_client(settings_service.settings.paddle_api_key)
-                provision_paddle_plans()
-                logger.info("Paddle billing setup completed successfully.")
-            except Exception as e:
-                logger.error(f"Failed to initialize Paddle billing: {e}")
-                raise
-        else:
-            msg = (
-                "Paddle billing env vars missing; set PADDLE_API_KEY and PADDLE_CLIENT_KEY "
-                "to enable billing."
-            )
-            raise RuntimeError(msg)
+        from langflow.services.paddle.client import setup_paddle_billing
+
+        setup_paddle_billing()
     try:
         await get_db_service(use_organisation=False).assign_orphaned_flows_to_superuser()
     except sqlalchemy_exc.IntegrityError as exc:

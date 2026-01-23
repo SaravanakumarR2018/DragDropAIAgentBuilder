@@ -15,7 +15,6 @@ from paddle_billing.Resources.Prices.Operations import CreatePrice
 from paddle_billing.Resources.Products.Operations import CreateProduct
 
 from lfx.log.logger import logger
-from langflow.services.paddle.client import get_paddle_client
 
 
 # -------------------------------------------------------------------
@@ -60,6 +59,7 @@ def provision_paddle_plans() -> None:
     - Starter has a trial; Pro does not
     - SDK-only (no raw HTTP)
     """
+    from langflow.services.paddle.client import get_paddle_client
     client = get_paddle_client()
 
     products = list(client.products.list())

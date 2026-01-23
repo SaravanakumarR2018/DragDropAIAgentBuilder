@@ -41,3 +41,23 @@ def initialize_paddle_client(api_key: str) -> Client:
 def get_paddle_client() -> Client:
     """Return the initialized Paddle Billing client."""
     return initialize_paddle_client(settings_service.settings.paddle_api_key)
+
+def setup_paddle_billing() -> None:
+    """Initialize Paddle billing client and provision plans."""
+    if settings_service.settings.paddle_api_key and settings_service.settings.paddle_client_key:
+        logger.info("Paddle billing configured; initializing client and provisioning plans.")
+        try:
+            from langflow.services.paddle.provisioning import provision_paddle_plans
+
+            initialize_paddle_client(settings_service.settings.paddle_api_key)
+            provision_paddle_plans()
+            logger.info("Paddle billing setup completed successfully.")
+        except Exception as exc:
+            logger.error(f"Failed to initialize Paddle billing: {exc}")
+            raise
+    else:
+        msg = (
+            "Paddle billing env vars missing; set PADDLE_API_KEY and PADDLE_CLIENT_KEY "
+            "to enable billing."
+        )
+        raise RuntimeError(msg)
