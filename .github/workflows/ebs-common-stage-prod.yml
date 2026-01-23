@@ -108,9 +108,11 @@ jobs:
           if [ "$ENVIRONMENT" = "staging" ]; then
             PADDLE_API_KEY="$STAGING_PADDLE_API_KEY"
             PADDLE_CLIENT_KEY="$STAGING_PADDLE_CLIENT_KEY"
+            PADDLE_ENVIRONMENT="staging"
           else
             PADDLE_API_KEY="$PROD_PADDLE_API_KEY"
             PADDLE_CLIENT_KEY="$PROD_PADDLE_CLIENT_KEY"
+            PADDLE_ENVIRONMENT="prod"
           fi
 
           if [ -z "$PADDLE_API_KEY" ] || [ -z "$PADDLE_CLIENT_KEY" ]; then
@@ -130,6 +132,12 @@ jobs:
             sed -i "s|^PADDLE_CLIENT_KEY=.*|PADDLE_CLIENT_KEY=${PADDLE_CLIENT_KEY}|" "$ENV_FILE"
           else
             echo "PADDLE_CLIENT_KEY=${PADDLE_CLIENT_KEY}" >> "$ENV_FILE"
+          fi
+
+          if grep -q '^PADDLE_ENVIRONMENT=' "$ENV_FILE"; then
+            sed -i "s|^PADDLE_ENVIRONMENT=.*|PADDLE_ENVIRONMENT=${PADDLE_ENVIRONMENT}|" "$ENV_FILE"
+          else
+            echo "PADDLE_ENVIRONMENT=${PADDLE_ENVIRONMENT}" >> "$ENV_FILE"
           fi
 
       - name: Ensure admin user exists in Clerk

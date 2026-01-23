@@ -210,6 +210,9 @@ class Settings(BaseSettings):
     paddle_client_key: str | None = Field(default=None, repr=False)
     """Paddle client key used for billing-related integrations.
         Can be provided via LANGFLOW_PADDLE_CLIENT_KEY or PADDLE_CLIENT_KEY."""
+    paddle_environment: str | None = None
+    """Paddle environment used for billing-related integrations.
+        Can be provided via LANGFLOW_PADDLE_ENVIRONMENT or PADDLE_ENVIRONMENT."""
     
     # CORS Settings
     cors_origins: list[str] | str = "*"
@@ -334,11 +337,14 @@ class Settings(BaseSettings):
     def validate_paddle_keys(self):
         env_api_key = os.getenv("PADDLE_API_KEY")
         env_client_key = os.getenv("PADDLE_CLIENT_KEY")
+        env_paddle_environment = os.getenv("PADDLE_ENVIRONMENT")
 
         if not self.paddle_api_key and env_api_key:
             self.paddle_api_key = env_api_key
         if not self.paddle_client_key and env_client_key:
             self.paddle_client_key = env_client_key
+        if not self.paddle_environment and env_paddle_environment:
+            self.paddle_environment = env_paddle_environment
         if (self.paddle_api_key and not self.paddle_client_key) or (
             self.paddle_client_key and not self.paddle_api_key
         ):
