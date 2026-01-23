@@ -5,17 +5,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from lfx.log.logger import logger
 from paddle_billing.Entities.Shared.CurrencyCode import CurrencyCode
+from paddle_billing.Entities.Shared.Duration import Duration
+from paddle_billing.Entities.Shared.Interval import Interval
 from paddle_billing.Entities.Shared.Money import Money
 from paddle_billing.Entities.Shared.TaxCategory import TaxCategory
 from paddle_billing.Entities.Shared.TaxMode import TaxMode
-from paddle_billing.Entities.Shared.Duration import Duration
-from paddle_billing.Entities.Shared.Interval import Interval
 from paddle_billing.Resources.Prices.Operations import CreatePrice
 from paddle_billing.Resources.Products.Operations import CreateProduct
-
-from lfx.log.logger import logger
-
 
 # -------------------------------------------------------------------
 # Plan definitions
@@ -50,8 +48,7 @@ PLANS: tuple[PlanDefinition, ...] = (
 # -------------------------------------------------------------------
 
 def provision_paddle_plans() -> None:
-    """
-    Idempotently provision Paddle products (plans) and monthly subscription prices.
+    """Idempotently provision Paddle products (plans) and monthly subscription prices.
 
     Rules:
     - One Product per plan (Starter, Pro)
@@ -71,10 +68,7 @@ def provision_paddle_plans() -> None:
             logger.info("Paddle plan %s already provisioned; skipping.", plan.key)
             continue
 
-        if product:
-            product_id = product.id
-        else:
-            product_id = _create_product(plan, client)
+        product_id = product.id if product else _create_product(plan, client)
 
         _create_monthly_price(plan, product_id, client)
         logger.info("Paddle plan %s provisioned.", plan.key)
@@ -128,15 +122,15 @@ def _duration_matches(duration: Any, interval: Interval, frequency: int) -> bool
     )
 
 def _custom_data_value(custom_data: Any, key: str) -> Any | None:
-    """
-    Paddle CustomData is NOT a dict.
+    """Paddle CustomData is NOT a dict.
+
     Safe accessor that works across SDK versions.
     """
     if not custom_data:
         return None
     try:
         return custom_data[key]
-    except Exception:
+    except Exception: #noqa: BLE001
         return None
 
 

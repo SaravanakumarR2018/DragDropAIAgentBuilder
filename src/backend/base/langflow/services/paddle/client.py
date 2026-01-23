@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
+from lfx.log.logger import logger
 from paddle_billing import Client, Environment, Options
 
 from langflow.services.deps import get_settings_service
-
-from lfx.log.logger import logger
 
 _paddle_client: Client | None = None
 
@@ -15,6 +14,7 @@ settings_service = get_settings_service()
 
 def initialize_paddle_client(api_key: str) -> Client:
     """Initialize and return the Paddle Billing client."""
+    # ruff: noqa: PLW0603
     global _paddle_client
     if _paddle_client is not None:
         logger.info("Paddle client already initialized, returning existing client.")
@@ -31,9 +31,9 @@ def initialize_paddle_client(api_key: str) -> Client:
 
     if normalized_environment == "staging":
         _paddle_client = Client(api_key, options=Options(Environment.SANDBOX))
-    else:
+    elif normalized_environment == "prod":
         _paddle_client = Client(api_key)
-    
+
     logger.info("Paddle Billing client initialized successfully.")
     return _paddle_client
 
