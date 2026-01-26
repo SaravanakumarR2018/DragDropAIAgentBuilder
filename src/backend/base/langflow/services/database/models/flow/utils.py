@@ -40,3 +40,37 @@ def get_outdated_components(flow: Flow):
         if value != lf_version:
             outdated_components.append(key)
     return outdated_components
+
+
+def get_configurable_webhook_response(flow_data: dict | None) -> dict | None:
+    """Get configurable webhook response settings from flow data.
+
+    Supports two modes:
+      1) Conditional mode:
+         - response_rules (JSON list)
+         - default_response (JSON object)
+      2) Legacy static mode:
+         - response_status_code
+         - response_body
+
+    If use_default_response is True => returns None (meaning: use default 202 response).
+    """
+    if not flow_data:
+        return None
+    for node in flow_data.get("nodes", []):
+        data = node.get("data", {})
+        if data.get("type") != "ConfigurableWebhook":
+            continue
+        template = data.get("node", {}).get("template", {})
+        use_default_response = template.get("use_default_response", {}).get("value", True)
+        if use_default_response:
+            return None
+        return {
+            # Conditional mode (new)
+            "response_rules": template.get("response_rules", {}).get("value"),
+            "default_response": template.get("default_response", {}).get("value"),
+            # Legacy static mode (backward compatible)
+            "status_code": template.get("response_status_code", {}).get("value"),
+            "response_body": template.get("response_body", {}).get("value"),
+        }
+    return None
