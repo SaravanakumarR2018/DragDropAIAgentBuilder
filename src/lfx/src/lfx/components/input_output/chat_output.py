@@ -111,7 +111,14 @@ class ChatOutput(ChatComponent):
 
     async def message_response(self) -> Message:
         # First convert the input to string if needed
-        text = self.convert_to_string()
+        text_or_generator = self.convert_to_string()
+    
+        # ✅ Handle Generator case properly
+        if isinstance(text_or_generator, Generator):
+            # For streaming responses, consume the generator
+            text = "".join(str(chunk) for chunk in text_or_generator)
+        else:
+            text = text_or_generator
 
         # Get source properties
         source, _, display_name, source_id = self.get_properties_from_source_component()
@@ -132,7 +139,8 @@ class ChatOutput(ChatComponent):
         message.sender_name = self.sender_name
         # Preserve session_id from incoming message, or use component/graph session_id
         message.session_id = (
-            self.session_id or existing_session_id or (self.graph.session_id if hasattr(self, "graph") else None) or ""
+            self.session_id or existing_session_id or 
+            (self.graph.session_id if hasattr(self, "graph") else None) or ""
         )
         message.context_id = self.context_id
         message.flow_id = self.graph.flow_id if hasattr(self, "graph") else None
@@ -140,9 +148,17 @@ class ChatOutput(ChatComponent):
 
         # Store message if needed
         if message.session_id and self.should_store_message:
-            stored_message = await self.send_message(message)
-            self.message.value = stored_message
-            message = stored_message
+            try:
+                stored_message = await self.send_message(message)
+                # ✅ Check if self.message exists before accessing it
+                if hasattr(self, "message") and self.message is not None:
+                    self.message.value = stored_message
+                message = stored_message
+            except Exception as e:
+                # Log the error but don't fail the entire component
+                if hasattr(self, "log"):
+                    self.log(f"Failed to store message: {e}")
+                # Continue with the original message
 
         self.status = message
         return message
