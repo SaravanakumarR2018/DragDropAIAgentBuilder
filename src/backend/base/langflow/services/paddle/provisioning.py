@@ -15,15 +15,12 @@ from paddle_billing.Entities.Shared.TaxMode import TaxMode
 from paddle_billing.Resources.Prices.Operations import CreatePrice
 from paddle_billing.Resources.Products.Operations import CreateProduct
 
-# -------------------------------------------------------------------
-# Plan definitions
-# -------------------------------------------------------------------
 
 @dataclass(frozen=True)
 class PlanDefinition:
     key: str
     name: str
-    monthly_price_usd: str  # MUST be string for Paddle Money.amount
+    monthly_price_usd: str
     trial_days: int | None = None
 
 
@@ -43,21 +40,15 @@ PLANS: tuple[PlanDefinition, ...] = (
 )
 
 
-# -------------------------------------------------------------------
-# Public entrypoint
-# -------------------------------------------------------------------
-
 def provision_paddle_plans() -> None:
-    """Idempotently provision Paddle products (plans) and monthly subscription prices.
-
-    Rules:
-    - One Product per plan (Starter, Pro)
-    - One monthly subscription Price per Product
-    - Starter has a trial; Pro does not
-    - SDK-only (no raw HTTP)
-    """
+    """Idempotently provision Paddle products (plans) and monthly subscription prices."""
     from langflow.services.paddle.client import get_paddle_client
+
     client = get_paddle_client()
+
+    if not _acquire_provisioning_lock(client):
+        logger.info("Paddle provisioning already in progress or completed; skipping.")
+        return
 
     products = list(client.products.list())
     prices = list(client.prices.list())
@@ -74,10 +65,6 @@ def provision_paddle_plans() -> None:
         logger.info("Paddle plan %s provisioned.", plan.key)
 
 
-# -------------------------------------------------------------------
-# Find helpers
-# -------------------------------------------------------------------
-
 def _find_existing_product(plan: PlanDefinition, products: list[Any]) -> Any | None:
     for product in products:
         if _custom_data_value(product.custom_data, "plan_key") == plan.key:
@@ -87,13 +74,16 @@ def _find_existing_product(plan: PlanDefinition, products: list[Any]) -> Any | N
     return None
 
 
-def _find_existing_price(plan: PlanDefinition, prices: list[Any], product: Any | None) -> Any | None:
+def _find_existing_price(
+    plan: PlanDefinition, prices: list[Any], product: Any | None
+) -> Any | None:
     for price in prices:
         if _custom_data_value(price.custom_data, "plan_key") == plan.key:
             return price
         if product and _price_matches_plan(plan, price, product.id):
             return price
     return None
+
 
 def _price_matches_plan(plan: PlanDefinition, price: Any, product_id: str) -> bool:
     if getattr(price, "product_id", None) != product_id:
@@ -121,22 +111,35 @@ def _duration_matches(duration: Any, interval: Interval, frequency: int) -> bool
         and getattr(duration, "frequency", None) == frequency
     )
 
-def _custom_data_value(custom_data: Any, key: str) -> Any | None:
-    """Paddle CustomData is NOT a dict.
 
-    Safe accessor that works across SDK versions.
-    """
+def _custom_data_value(custom_data: Any, key: str) -> Any | None:
     if not custom_data:
         return None
     try:
         return custom_data[key]
-    except Exception: #noqa: BLE001
+    except Exception:  # noqa: BLE001
         return None
 
 
-# -------------------------------------------------------------------
-# Create helpers
-# -------------------------------------------------------------------
+def _acquire_provisioning_lock(client: Any) -> bool:
+    LOCK_KEY = "paddle_provisioning_lock"
+
+    for product in client.products.list():
+        if _custom_data_value(product.custom_data, "lock") == LOCK_KEY:
+            return False
+
+    try:
+        client.products.create(
+            CreateProduct(
+                name="Paddle Provisioning Lock",
+                tax_category=TaxCategory.Standard,
+                custom_data={"lock": LOCK_KEY},
+            )
+        )
+        return True
+    except Exception:
+        return False
+
 
 def _create_product(plan: PlanDefinition, client: Any) -> str:
     logger.info("Creating Paddle product for plan %s.", plan.key)
@@ -166,11 +169,11 @@ def _create_monthly_price(plan: PlanDefinition, product_id: str, client: Any) ->
         CreatePrice(
             product_id=product_id,
             description=f"{plan.name} Monthly",
-            billing_cycle=billing_cycle,        # subscription
-            trial_period=trial_period,          # Starter only
+            billing_cycle=billing_cycle,
+            trial_period=trial_period,
             tax_mode=TaxMode.External,
             unit_price=Money(
-                amount=plan.monthly_price_usd,  # MUST be string
+                amount=plan.monthly_price_usd,
                 currency_code=CurrencyCode.USD,
             ),
             custom_data={
