@@ -122,7 +122,7 @@ def _custom_data_value(custom_data: Any, key: str) -> Any | None:
 
 
 def _acquire_provisioning_lock(client: Any) -> bool:
-    LOCK_KEY = "paddle_provisioning_lock"
+    LOCK_KEY = "paddle_provisioning_lock" #noqa:N806
 
     for product in client.products.list():
         if _custom_data_value(product.custom_data, "lock") == LOCK_KEY:
@@ -136,8 +136,8 @@ def _acquire_provisioning_lock(client: Any) -> bool:
                 custom_data={"lock": LOCK_KEY},
             )
         )
-        return True
-    except Exception:
+        return True #noqa:TRY300
+    except Exception: #noqa: BLE001
         return False
 
 

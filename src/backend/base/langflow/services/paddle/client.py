@@ -46,18 +46,38 @@ def setup_paddle_billing() -> None:
     """Initialize Paddle billing client and provision plans."""
     if settings_service.settings.paddle_api_key and settings_service.settings.paddle_client_key:
         logger.info("Paddle billing configured; initializing client and provisioning plans.")
-        try:
-            from langflow.services.paddle.provisioning import provision_paddle_plans
+        for attempt in range(1, 4):
+            try:
+                from langflow.services.paddle.provisioning import provision_paddle_plans
 
-            initialize_paddle_client(settings_service.settings.paddle_api_key)
-            provision_paddle_plans()
-            logger.info("Paddle billing setup completed successfully.")
-        except Exception as exc:
-            logger.error(f"Failed to initialize Paddle billing: {exc}")
-            raise
+                initialize_paddle_client(settings_service.settings.paddle_api_key)
+                break
+            except Exception as exc:#noqa: BLE001
+                logger.error(
+                    "Paddle client initialization failed (attempt %s/3): %s",
+                    attempt,
+                    exc,
+                )
+        else:
+            logger.error("Paddle client initialization failed after 3 attempts; skipping provisioning.")
+            return
+
+        for attempt in range(1, 4):
+            try:
+                provision_paddle_plans()
+                logger.info("Paddle billing setup completed successfully.")
+                return #noqa:TRY300
+            except Exception as exc:#noqa: BLE001
+                logger.error(
+                    "Paddle product/prices creation failed (attempt %s/3): %s",
+                    attempt,
+                    exc,
+                )
+
+        logger.error("Paddle product/prices creation failed after 3 attempts; continuing startup.")
     else:
         msg = (
             "Paddle billing env vars missing; set PADDLE_API_KEY and PADDLE_CLIENT_KEY "
             "to enable billing."
         )
-        raise RuntimeError(msg)
+        logger.warning(msg)
