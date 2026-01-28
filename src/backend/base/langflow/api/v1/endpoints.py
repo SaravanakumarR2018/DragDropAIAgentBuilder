@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import time
 from collections.abc import AsyncGenerator
 from http import HTTPStatus
@@ -518,8 +517,8 @@ async def webhook_run_flow(
                 response_status_code, response_payload = evaluate_configurable_webhook_response(
                     response_config, data
                 )
-            except (ValueError, TypeError, KeyError, json.JSONDecodeError) as exc:
-                logger.warning("failed to evaluate configurable webhook response, falling back to default: %s", exc)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"Failed to evaluate configurable webhook response: {exc}")
                 response_status_code = int(HTTPStatus.ACCEPTED)
                 response_payload={"message": "Task started in the background", "status": "in progress"}
     finally:
