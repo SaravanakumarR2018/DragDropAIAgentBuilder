@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import time
 from collections.abc import AsyncGenerator
 from http import HTTPStatus
@@ -47,7 +48,10 @@ from langflow.schema.graph import Tweaks
 from langflow.services.auth.utils import api_key_security, get_current_active_user, get_webhook_user
 from langflow.services.cache.utils import save_uploaded_file
 from langflow.services.database.models.flow.model import Flow, FlowRead
-from langflow.services.database.models.flow.utils import ( get_all_webhook_components_in_flow, get_configurable_webhook_response )
+from langflow.services.database.models.flow.utils import (
+    get_all_webhook_components_in_flow,
+    get_configurable_webhook_response,
+)
 from langflow.services.database.models.user.model import User, UserRead
 from langflow.services.deps import get_session_service, get_settings_service, get_telemetry_service
 from langflow.services.telemetry.schema import RunPayload
@@ -514,8 +518,8 @@ async def webhook_run_flow(
                 response_status_code, response_payload = evaluate_configurable_webhook_response(
                     response_config, data
                 )
-            except Exception as exc:
-                logger.warning(f"failed to evaluate configurable webhook response: {exc}")
+            except (ValueError, TypeError, KeyError, json.JSONDecodeError) as exc:
+                logger.warning("failed to evaluate configurable webhook response, falling back to default: %s", exc)
                 response_status_code = int(HTTPStatus.ACCEPTED)
                 response_payload={"message": "Task started in the background", "status": "in progress"}
     finally:
