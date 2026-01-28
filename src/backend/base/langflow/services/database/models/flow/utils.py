@@ -42,7 +42,7 @@ def get_outdated_components(flow: Flow):
     return outdated_components
 
 def get_configurable_webhook_response(flow_data:dict | None) -> dict | None:
-    """ Get configurable webhook response settings from flow data. """
+    """Get configurable webhook response settings from flow data."""
     if not flow_data:
         return None
     for node in flow_data.get("nodes",[]):
