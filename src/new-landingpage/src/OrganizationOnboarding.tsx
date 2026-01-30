@@ -173,6 +173,15 @@ async function ensureLangflowUser(
   throw new Error("[ensureLangflowUser] Max retries exceeded");
 }
 
+async function ensurePaddleCustomer() {
+  const {getToken} = useAuth();
+  const token = await getToken({ template: 'paddle_customer_id_injection' });
+  return requestJson("users/ensure-paddle-customer", {
+    method: "POST",
+    token,
+  });
+}
+
 async function backendLogin(username: string, token: string) {
   return requestJson("login", {
     method: "POST",
@@ -219,6 +228,15 @@ function setStoredActiveOrgId(orgId: string | null) {
   } catch (error) {
     console.warn("[activeOrgStorage] Unable to persist active org", error);
   }
+}
+
+function getPaddleCustomerIdFromClerk(user:any) {
+  const privateMetadata = user?.privateMetadata as Record<string, unknown> | undefined;
+  const customerId = privateMetadata?.paddle_customer_id;
+  if (typeof customerId === "string" && customerId.trim()) {
+    return customerId;
+  }
+  return null;
 }
 
 /**
@@ -371,6 +389,14 @@ export default function OrganizationOnboarding() {
       setStatus("Synchronizing user profile...");
       await ensureLangflowUser(orgToken, username);
       console.log("[OrganizationOnboarding] ensureLangflowUser() completed");
+
+      const paddleCustomerId = getPaddleCustomerIdFromClerk(user ?? null);
+      if (!paddleCustomerId) {
+        console.log("[OrganizationOnboarding] Calling ensurePaddleCustomer()");
+        setStatus("Finalizing billing profile...");
+        await ensurePaddleCustomer();
+        console.log("[OrganizationOnboarding] ensurePaddleCustomer() completed");
+      }
 
       console.log("[OrganizationOnboarding] Calling backendLogin()");
       setStatus("Creating backend session...");

@@ -76,6 +76,8 @@ def get_paddle_customer_id_from_clerk_payload() -> str | None:
         return None
 
     customer_id = payload.get("paddle_customer_id")
+    if not customer_id and isinstance(payload.get("private_metadata"), dict):
+        customer_id = payload["private_metadata"].get("paddle_customer_id")
     if isinstance(customer_id, str) and customer_id.strip():
         return customer_id
 

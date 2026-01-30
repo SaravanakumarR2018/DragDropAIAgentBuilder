@@ -20,6 +20,10 @@ from langflow.services.database.models.user.crud import get_user_by_id, update_u
 from langflow.services.database.models.user.model import User, UserCreate, UserRead, UserUpdate
 from langflow.services.deps import get_settings_service
 from langflow.services.paddle.subscriptions import ensure_paddle_subscription_status_for_user
+from langflow.services.auth.clerk_utils import (
+    get_paddle_customer_id_from_clerk_payload,
+    process_new_user_with_clerk,
+)
 
 router = APIRouter(tags=["Users"], prefix="/users")
 
@@ -40,7 +44,7 @@ async def add_user(
         await session.commit()
         await session.refresh(new_user)
         if get_settings_service().auth_settings.CLERK_AUTH_ENABLED:
-            await ensure_paddle_subscription_status_for_user(user=new_user, session=session)
+            await ensure_paddle_subscription_status_for_user(user=new_user)
         folder = await get_or_create_default_folder(session, new_user.id)
         if not folder:
             raise HTTPException(status_code=500, detail="Error creating default project")
@@ -57,6 +61,22 @@ async def read_current_user(
 ) -> User:
     """Retrieve the current user's data."""
     return current_user
+
+@router.post("/ensure-paddle-customer")
+async def ensure_paddle_customer(
+    current_user: CurrentActiveUser,
+) -> dict:
+    """Ensure the current user has a Paddle customer id in Clerk metadata."""
+    if not get_settings_service().auth_settings.CLERK_AUTH_ENABLED:
+        raise HTTPException(status_code=400, detail="Clerk auth not enabled")
+
+    existing_customer_id = get_paddle_customer_id_from_clerk_payload()
+    if existing_customer_id:
+        return {"paddle_customer_id": existing_customer_id, "created": False}
+
+    await ensure_paddle_subscription_status_for_user(user=current_user)
+    created_customer_id = get_paddle_customer_id_from_clerk_payload()
+    return {"paddle_customer_id": created_customer_id, "created": True}
 
 
 @router.get("/", dependencies=[Depends(get_current_active_superuser)])

@@ -11,8 +11,7 @@ from lfx.log.logger import logger
 from paddle_billing import Client
 from paddle_billing.Entities.Shared import CustomData
 from paddle_billing.Resources.Customers.Operations import CreateCustomer
-from sqlalchemy.orm.attributes import flag_modified
-from sqlmodel.ext.asyncio.session import AsyncSession
+
 
 from langflow.services.auth.clerk_utils import (
     get_org_id_from_clerk_payload,
@@ -37,14 +36,13 @@ async def get_paddle_subscription_status(
     *,
     user: User,
     org_id: str,
-    session: AsyncSession,
     client: Client | None = None,
 ) -> PaddleSubscriptionStatus:
     paddle_client = client or get_paddle_client()
-    customer_id = _get_paddle_customer_id(user)
+    customer_id = _get_paddle_customer_id()
 
     if not customer_id:
-        await _create_paddle_customer(paddle_client, user, org_id, session)
+        await _create_paddle_customer(paddle_client, user, org_id)
         return PaddleSubscriptionStatus(
             has_subscription=False,
             subscription_status=None,
@@ -60,48 +58,32 @@ async def get_paddle_subscription_status(
 async def ensure_paddle_subscription_status_for_user(
     *,
     user: User,
-    session: AsyncSession,
     client: Client | None = None,
 ) -> PaddleSubscriptionStatus:
     org_id = get_org_id_from_clerk_payload()
     return await get_paddle_subscription_status(
         user=user,
         org_id=org_id,
-        session=session,
         client=client,
     )
 
 
-def _get_paddle_customer_id(user: User) -> str | None:
-    optins = user.optins if isinstance(user.optins, dict) else {}
-    customer_id = optins.get("paddle_customer_id")
-    if isinstance(customer_id, str) and customer_id.strip():
-        return customer_id
-    return None
+def _get_paddle_customer_id() -> str | None:
+    return get_paddle_customer_id_from_clerk_payload()
 
 
 async def _create_paddle_customer(
     client: Client,
     user: User,
     org_id: str,
-    session: AsyncSession,
 ) -> str:
-    # 1️⃣ DB first
-    optins = user.optins if isinstance(user.optins, dict) else {}
-    existing = optins.get("paddle_customer_id")
-    if isinstance(existing, str) and existing.strip():
-        return existing
 
-    # 2️⃣ Clerk metadata (after JWT refresh)
+    # 1️⃣ Clerk metadata (after JWT refresh)
     clerk_customer_id = get_paddle_customer_id_from_clerk_payload()
     if clerk_customer_id:
-        user.optins = {**optins, "paddle_customer_id": clerk_customer_id}
-        flag_modified(user, "optins")
-        session.add(user)
-        await session.commit()
         return clerk_customer_id
 
-    # 3️⃣ Create Paddle customer
+    # 2️⃣ Create Paddle customer
     email = get_email_from_clerk_payload()
     clerk_user_id = get_clerk_user_id_from_payload()
 
@@ -119,11 +101,6 @@ async def _create_paddle_customer(
     )
 
     paddle_customer_id = customer.id
-
-    user.optins = {**optins, "paddle_customer_id": paddle_customer_id}
-    flag_modified(user, "optins")
-    session.add(user)
-    await session.commit()
 
     await update_clerk_private_metadata(
         clerk_user_id=clerk_user_id,

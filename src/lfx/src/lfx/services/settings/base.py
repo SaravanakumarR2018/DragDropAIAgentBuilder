@@ -342,7 +342,7 @@ class Settings(BaseSettings):
 
         if not self.clerk_api_key and env_clerk_api_key:
             self.clerk_api_key = env_clerk_api_key
-        if self.clerk_client_key and not self.clerk_api_key:
+        if not self.clerk_api_key:
             msg = "CLERK_API_KEY must be set to enable Clerk integrations."
             raise ValueError(msg)
         return self
