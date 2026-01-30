@@ -22,6 +22,64 @@ auth_header_ctx: ContextVar[dict | None] = ContextVar("auth_header_ctx", default
 
 _jwks_cache: dict[str, dict[str, Any]] = {}
 
+CLERK_API_BASE = "https://api.clerk.com/v1"
+
+async def update_clerk_private_metadata(
+    *,
+    clerk_user_id: str,
+    private_metadata: dict,
+) -> None:
+    settings = get_settings_service()
+    secret_key = settings.auth_settings.CLERK_SECRET_KEY
+
+    if not secret_key:
+        raise RuntimeError("CLERK_SECRET_KEY not configured")
+
+    url = f"{CLERK_API_BASE}/users/{clerk_user_id}"
+
+    headers = {
+        "Authorization": f"Bearer {secret_key}",
+        "Content-Type": "application/json",
+    }
+
+    async with httpx.AsyncClient() as client:
+        response = await client.patch(
+            url,
+            headers=headers,
+            json={"private_metadata": private_metadata},
+        )
+        response.raise_for_status()
+
+
+def get_clerk_user_id_from_payload() -> str:
+    payload = auth_header_ctx.get()
+    if not payload or "sub" not in payload:
+        raise HTTPException(status_code=401, detail="Missing Clerk user id")
+    return payload["sub"]
+
+
+def get_email_from_clerk_payload() -> str:
+    payload = auth_header_ctx.get()
+    if not payload:
+        raise HTTPException(status_code=401, detail="Missing Clerk payload")
+
+    email = payload.get("email")
+    if not isinstance(email, str) or not email.strip():
+        raise HTTPException(status_code=401, detail="Missing email in Clerk token")
+
+    return email
+
+
+def get_paddle_customer_id_from_clerk_payload() -> str | None:
+    payload = auth_header_ctx.get()
+    if not payload:
+        return None
+
+    customer_id = payload.get("paddle_customer_id")
+    if isinstance(customer_id, str) and customer_id.strip():
+        return customer_id
+
+    return None
 
 async def _get_jwks(issuer: str) -> dict[str, Any]:
     """Retrieve and cache JWKS for a Clerk issuer."""

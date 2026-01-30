@@ -19,6 +19,7 @@ from langflow.services.auth.utils import (
 from langflow.services.database.models.user.crud import get_user_by_id, update_user
 from langflow.services.database.models.user.model import User, UserCreate, UserRead, UserUpdate
 from langflow.services.deps import get_settings_service
+from langflow.services.paddle.subscriptions import ensure_paddle_subscription_status_for_user
 
 router = APIRouter(tags=["Users"], prefix="/users")
 
@@ -38,6 +39,8 @@ async def add_user(
         session.add(new_user)
         await session.commit()
         await session.refresh(new_user)
+        if get_settings_service().auth_settings.CLERK_AUTH_ENABLED:
+            await ensure_paddle_subscription_status_for_user(user=new_user, session=session)
         folder = await get_or_create_default_folder(session, new_user.id)
         if not folder:
             raise HTTPException(status_code=500, detail="Error creating default project")

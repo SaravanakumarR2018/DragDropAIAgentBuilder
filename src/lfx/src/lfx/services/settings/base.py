@@ -213,6 +213,9 @@ class Settings(BaseSettings):
     paddle_environment: str | None = None
     """Paddle environment used for billing-related integrations.
         Can be provided via LANGFLOW_PADDLE_ENVIRONMENT or PADDLE_ENVIRONMENT."""
+    clerk_api_key: str | None = Field(default=None, repr=False)
+    """Clerk API key used for authentication-related integrations.
+        Can be provided via LANGFLOW_CLERK_API_KEY or CLERK_API_KEY."""
     
     # CORS Settings
     cors_origins: list[str] | str = "*"
@@ -332,6 +335,17 @@ class Settings(BaseSettings):
             # Convert single origin to list for consistency
             return [value]
         return value
+    
+    @model_validator(mode="after")
+    def validate_clerk_keys(self):
+        env_clerk_api_key = os.getenv("CLERK_API_KEY")
+
+        if not self.clerk_api_key and env_clerk_api_key:
+            self.clerk_api_key = env_clerk_api_key
+        if self.clerk_client_key and not self.clerk_api_key:
+            msg = "CLERK_API_KEY must be set to enable Clerk integrations."
+            raise ValueError(msg)
+        return self
 
     @model_validator(mode="after")
     def validate_paddle_keys(self):
