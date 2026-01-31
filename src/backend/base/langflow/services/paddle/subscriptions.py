@@ -37,12 +37,13 @@ async def get_paddle_subscription_status(
     user: User,
     org_id: str,
     client: Client | None = None,
+    email_override: str | None = None,
 ) -> PaddleSubscriptionStatus:
     paddle_client = client or get_paddle_client()
     customer_id = _get_paddle_customer_id()
 
     if not customer_id:
-        await _create_paddle_customer(paddle_client, user, org_id)
+        await _create_paddle_customer(paddle_client, user, org_id, email_override)
         return PaddleSubscriptionStatus(
             has_subscription=False,
             subscription_status=None,
@@ -59,12 +60,14 @@ async def ensure_paddle_subscription_status_for_user(
     *,
     user: User,
     client: Client | None = None,
+    email_override: str | None = None,
 ) -> PaddleSubscriptionStatus:
     org_id = get_org_id_from_clerk_payload()
     return await get_paddle_subscription_status(
         user=user,
         org_id=org_id,
         client=client,
+        email_override=email_override,
     )
 
 
@@ -76,6 +79,7 @@ async def _create_paddle_customer(
     client: Client,
     user: User,
     org_id: str,
+    email_override: str | None = None,
 ) -> str:
 
     # 1️⃣ Clerk metadata (after JWT refresh)
@@ -84,7 +88,7 @@ async def _create_paddle_customer(
         return clerk_customer_id
 
     # 2️⃣ Create Paddle customer
-    email = get_email_from_clerk_payload()
+    email = email_override or get_email_from_clerk_payload()
     clerk_user_id = get_clerk_user_id_from_payload()
 
     customer = await asyncio.to_thread(

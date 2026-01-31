@@ -2,6 +2,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
@@ -28,6 +29,10 @@ from langflow.services.auth.clerk_utils import (
 router = APIRouter(tags=["Users"], prefix="/users")
 
 SENSITIVE_OPTIN_KEYS = {"skip_trial_access", "trial_access_until", "trial_access_days"}
+
+
+class EnsurePaddleCustomerRequest(BaseModel):
+    email: str | None = None
 
 @router.post("/", response_model=UserRead, status_code=201)
 async def add_user(
@@ -65,6 +70,7 @@ async def read_current_user(
 @router.post("/ensure-paddle-customer")
 async def ensure_paddle_customer(
     current_user: CurrentActiveUser,
+    payload: EnsurePaddleCustomerRequest | None = None,
 ) -> dict:
     """Ensure the current user has a Paddle customer id in Clerk metadata."""
     if not get_settings_service().auth_settings.CLERK_AUTH_ENABLED:
@@ -74,7 +80,10 @@ async def ensure_paddle_customer(
     if existing_customer_id:
         return {"paddle_customer_id": existing_customer_id, "created": False}
 
-    await ensure_paddle_subscription_status_for_user(user=current_user)
+    await ensure_paddle_subscription_status_for_user(
+        user=current_user,
+        email_override=payload.email if payload and payload.email else current_user.username,
+    )
     created_customer_id = get_paddle_customer_id_from_clerk_payload()
     return {"paddle_customer_id": created_customer_id, "created": True}
 
