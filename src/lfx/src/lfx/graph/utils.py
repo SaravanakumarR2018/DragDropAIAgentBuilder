@@ -155,6 +155,8 @@ async def log_vertex_build(
     if not settings_service or not getattr(settings_service.settings, "vertex_builds_storage_enabled", False):
         return
 
+    from langflow.services.deps import get_db_service, session_scope
+
     db_service = get_db_service()
     if db_service is None:
         logger.debug("Database service not available, skipping vertex build logging")
@@ -169,8 +171,6 @@ async def log_vertex_build(
 
     from langflow.services.database.models.vertex_builds.crud import log_vertex_build as persist_vertex_build
     from langflow.services.database.models.vertex_builds.model import VertexBuildBase
-    from lfx.services.deps import session_scope
-
     try:
         vertex_build = VertexBuildBase(
             id=vertex_id,
