@@ -151,25 +151,42 @@ async def log_vertex_build(
 
     This is a lightweight implementation that only logs if database service is available.
     """
-    try:
-        settings_service = get_settings_service()
-        if not settings_service or not getattr(settings_service.settings, "vertex_builds_storage_enabled", False):
-            return
+    settings_service = get_settings_service()
+    if not settings_service or not getattr(settings_service.settings, "vertex_builds_storage_enabled", False):
+        return
 
-        db_service = get_db_service()
-        if db_service is None:
-            logger.debug("Database service not available, skipping vertex build logging")
-            return
+    db_service = get_db_service()
+    if db_service is None:
+        logger.debug("Database service not available, skipping vertex build logging")
+        return
 
+    if isinstance(flow_id, str):
         try:
-            if isinstance(flow_id, str):
-                flow_id = UUID(flow_id)
+            flow_id = UUID(flow_id)
         except ValueError:
             logger.debug(f"Invalid flow_id passed to log_vertex_build: {flow_id!r}")
             return
 
-        # Log basic vertex build info - concrete implementation should be in langflow
-        logger.debug(f"Vertex build logged: vertex={vertex_id}, flow={flow_id}, valid={valid}")
+    from langflow.services.database.models.vertex_builds.crud import log_vertex_build as persist_vertex_build
+    from langflow.services.database.models.vertex_builds.model import VertexBuildBase
+    from lfx.services.deps import session_scope
+
+    try:
+        vertex_build = VertexBuildBase(
+            id=vertex_id,
+            flow_id=flow_id,
+            valid=valid,
+            params=params,
+            data=data,
+            artifacts=artifacts,
+        )
+    except Exception:  # noqa: BLE001
+        logger.debug("Error creating vertex build payload")
+        return
+
+    try:
+        async with session_scope() as session:
+            await persist_vertex_build(session, vertex_build)
     except Exception:  # noqa: BLE001
         logger.debug("Error logging vertex build")
 

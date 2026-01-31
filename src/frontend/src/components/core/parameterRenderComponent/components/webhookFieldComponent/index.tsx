@@ -20,6 +20,7 @@ export default function WebhookFieldComponent({
   const [userId, setUserId] = useState("");
   const { mutate: getBuildsMutation } = useGetBuildsMutation();
   const hasInitialized = useRef(false);
+  const lastFlowIdRef = useRef<string | null>(null);
   const modalProps = getModalPropsApiKey();
 
   const isBackendUrl = nodeInformationMetadata?.variableName === "endpoint";
@@ -30,17 +31,29 @@ export default function WebhookFieldComponent({
     (ENABLE_DATASTAX_LANGFLOW && !editNode);
 
   useEffect(() => {
-    const getBuilds =
-      (!editNode && isBackendUrl && !hasInitialized.current) ||
-      (ENABLE_DATASTAX_LANGFLOW && !editNode);
+    const flowId = nodeInformationMetadata?.flowId;
+    const shouldPoll =
+      (!editNode && isBackendUrl) || (ENABLE_DATASTAX_LANGFLOW && !editNode);
 
-    if (getBuilds) {
-      hasInitialized.current = true;
-      getBuildsMutation({
-        flowId: nodeInformationMetadata?.flowId!,
-      });
+    if (!shouldPoll || !flowId) {
+      return;
     }
-  }, []);
+
+    if (hasInitialized.current && lastFlowIdRef.current === flowId) {
+      return;
+    }
+
+    hasInitialized.current = true;
+    lastFlowIdRef.current = flowId;
+    getBuildsMutation({
+      flowId,
+    });
+  }, [
+    editNode,
+    getBuildsMutation,
+    isBackendUrl,
+    nodeInformationMetadata?.flowId,
+  ]);
 
   useEffect(() => {
     if (userData) {
