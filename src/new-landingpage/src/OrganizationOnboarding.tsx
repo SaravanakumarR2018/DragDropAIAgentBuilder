@@ -173,12 +173,11 @@ async function ensureLangflowUser(
   throw new Error("[ensureLangflowUser] Max retries exceeded");
 }
 
-async function ensurePaddleCustomer() {
-  const {getToken} = useAuth();
-  const token = await getToken({ template: 'paddle_customer_id_injection' });
+async function ensurePaddleCustomer(token: string, email?: string | null) {
   return requestJson("users/ensure-paddle-customer", {
     method: "POST",
     token,
+    body: email ? JSON.stringify({ email }) : undefined,
   });
 }
 
@@ -394,7 +393,8 @@ export default function OrganizationOnboarding() {
       if (!paddleCustomerId) {
         console.log("[OrganizationOnboarding] Calling ensurePaddleCustomer()");
         setStatus("Finalizing billing profile...");
-        await ensurePaddleCustomer();
+        const email = user?.primaryEmailAddress?.emailAddress ?? null;
+        await ensurePaddleCustomer(orgToken, email);
         console.log("[OrganizationOnboarding] ensurePaddleCustomer() completed");
       }
 

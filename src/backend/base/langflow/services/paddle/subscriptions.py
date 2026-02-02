@@ -40,8 +40,9 @@ async def get_paddle_subscription_status(
 ) -> PaddleSubscriptionStatus:
     paddle_client = client or get_paddle_client()
     customer_id = _get_paddle_customer_id()
-
+    logger.info(f"Paddle customer ID for user {user.id}: {customer_id}")
     if not customer_id:
+        logger.info(f"No Paddle customer ID found for user {user.id}, creating new customer")
         await _create_paddle_customer(paddle_client, user, org_id)
         return PaddleSubscriptionStatus(
             has_subscription=False,
@@ -61,6 +62,7 @@ async def ensure_paddle_subscription_status_for_user(
     client: Client | None = None,
 ) -> PaddleSubscriptionStatus:
     org_id = get_org_id_from_clerk_payload()
+    logger.info(f"Ensuring Paddle subscription status for user {user.id} in org {org_id}")
     return await get_paddle_subscription_status(
         user=user,
         org_id=org_id,
@@ -69,6 +71,7 @@ async def ensure_paddle_subscription_status_for_user(
 
 
 def _get_paddle_customer_id() -> str | None:
+    logger.info("Retrieving Paddle customer ID from Clerk payload")
     return get_paddle_customer_id_from_clerk_payload()
 
 
@@ -79,13 +82,17 @@ async def _create_paddle_customer(
 ) -> str:
 
     # 1️⃣ Clerk metadata (after JWT refresh)
+    logger.info("Checking Clerk metadata for existing Paddle customer ID")
     clerk_customer_id = get_paddle_customer_id_from_clerk_payload()
+    logger.info(f"Clerk metadata Paddle customer ID: {clerk_customer_id}")
     if clerk_customer_id:
         return clerk_customer_id
 
     # 2️⃣ Create Paddle customer
     email = get_email_from_clerk_payload()
+    logger.info(f"Creating Paddle customer for email: {email}")
     clerk_user_id = get_clerk_user_id_from_payload()
+    logger.info(f"Clerk user ID: {clerk_user_id}")
 
     customer = await asyncio.to_thread(
         client.customers.create,
@@ -99,9 +106,11 @@ async def _create_paddle_customer(
             ),
         ),
     )
+    logger.info(f"Paddle customer creation response: {customer}")
 
     paddle_customer_id = customer.id
 
+    logger.info(f"Created Paddle customer {paddle_customer_id} for user {user.id}")
     await update_clerk_private_metadata(
         clerk_user_id=clerk_user_id,
         private_metadata={"paddle_customer_id": paddle_customer_id},
