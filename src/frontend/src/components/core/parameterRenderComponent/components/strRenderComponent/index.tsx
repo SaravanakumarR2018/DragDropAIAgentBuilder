@@ -23,6 +23,15 @@ export function StrRenderComponent({
   const copyField = templateData.copy_field;
   const hasOptions = !!templateData.options;
   const isWebhook = nodeInformationMetadata?.nodeType === "webhook";
+  console.log("[Webhook][StrRenderComponent] render", {
+    nodeType: nodeInformationMetadata?.nodeType,
+    isWebhook,
+    id,
+    name,
+    isMultiline,
+    copyField,
+    hasOptions,
+  });
 
   if (noOptions) {
     if (isMultiline) {

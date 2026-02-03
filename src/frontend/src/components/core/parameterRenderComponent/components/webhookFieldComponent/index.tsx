@@ -30,11 +30,22 @@ export default function WebhookFieldComponent({
     (ENABLE_DATASTAX_LANGFLOW && !editNode);
 
   useEffect(() => {
+    console.log("[Webhook][WebhookFieldComponent] mount", {
+      flowId: nodeInformationMetadata?.flowId,
+      variableName: nodeInformationMetadata?.variableName,
+      isBackendUrl,
+      isCurlWebhook,
+      showGenerateToken,
+      editNode,
+    });
     const getBuilds =
       (!editNode && isBackendUrl && !hasInitialized.current) ||
       (ENABLE_DATASTAX_LANGFLOW && !editNode);
 
     if (getBuilds) {
+      console.log("[Webhook][WebhookFieldComponent] triggering builds polling", {
+        flowId: nodeInformationMetadata?.flowId,
+      });
       hasInitialized.current = true;
       getBuildsMutation({
         flowId: nodeInformationMetadata?.flowId!,
@@ -45,6 +56,9 @@ export default function WebhookFieldComponent({
   useEffect(() => {
     if (userData) {
       setUserId(userData.id);
+      console.log("[Webhook][WebhookFieldComponent] user set", {
+        userId: userData.id,
+      });
     }
   }, [userData]);
 

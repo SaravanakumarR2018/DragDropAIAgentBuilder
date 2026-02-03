@@ -31,6 +31,12 @@ export function getCurlWebhookCode({
     endpointName || flowId
   }`;
   const authHeader = webhookAuthEnable ? `-H 'x-api-key: <your api key>'` : "";
+  console.log("[Webhook][getCurlWebhookCode] build", {
+    baseUrl,
+    webhookAuthEnable,
+    format,
+    hasEndpointName: Boolean(endpointName),
+  });
 
   if (format === "singleline") {
     return `curl -X POST "${baseUrl}" -H 'Content-Type: application/json' ${authHeader} -d '{"any": "data"}'`.trim();

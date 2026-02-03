@@ -90,6 +90,12 @@ export default function TextAreaComponent({
 
   useEffect(() => {
     if (isWebhook && value === WEBHOOK_VALUE) {
+      console.log("[Webhook][TextAreaComponent] generating webhook cURL", {
+        flowId: nodeInformationMetadata?.flowId,
+        flowName: nodeInformationMetadata?.flowName,
+        webhookAuthEnable,
+        format: "singleline",
+      });
       const curlWebhookCode = getCurlWebhookCode({
         flowId: nodeInformationMetadata?.flowId!,
         webhookAuthEnable,
@@ -133,6 +139,12 @@ export default function TextAreaComponent({
 
   const changeWebhookFormat = (format: "multiline" | "singleline") => {
     if (isWebhook) {
+      console.log("[Webhook][TextAreaComponent] change cURL format", {
+        format,
+        flowId: nodeInformationMetadata?.flowId,
+        flowName: nodeInformationMetadata?.flowName,
+        webhookAuthEnable,
+      });
       const curlWebhookCode = getCurlWebhookCode({
         flowId: nodeInformationMetadata?.flowId!,
         webhookAuthEnable,

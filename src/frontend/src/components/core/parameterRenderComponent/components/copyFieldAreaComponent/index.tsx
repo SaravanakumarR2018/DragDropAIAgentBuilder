@@ -76,6 +76,11 @@ export default function CopyFieldAreaComponent({
     }
     return value;
   }, [value, endpointName]);
+  console.log("[Webhook][CopyFieldAreaComponent] render", {
+    value,
+    endpointName,
+    valueToRender,
+  });
 
   const getInputClassName = () => {
     return cn(
@@ -96,6 +101,9 @@ export default function CopyFieldAreaComponent({
 
     setSuccessData({
       title: "Endpoint URL copied",
+    });
+    console.log("[Webhook][CopyFieldAreaComponent] copied", {
+      valueToRender,
     });
 
     event?.stopPropagation();

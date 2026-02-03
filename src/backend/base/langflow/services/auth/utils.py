@@ -282,6 +282,11 @@ async def get_webhook_user(flow_id: str, request: Request) -> UserRead:
     from langflow.helpers.user import get_user_by_flow_id_or_endpoint_name
 
     settings_service = get_settings_service()
+    logger.info(
+        "[WebhookAuth] Resolving webhook user. flow_id_or_name=%s webhook_auth_enabled=%s",
+        flow_id,
+        settings_service.auth_settings.WEBHOOK_AUTH_ENABLE,
+    )
 
     if not settings_service.auth_settings.WEBHOOK_AUTH_ENABLE:
         # When webhook auth is disabled, run webhook as the flow owner without requiring API key
@@ -289,6 +294,7 @@ async def get_webhook_user(flow_id: str, request: Request) -> UserRead:
             flow_owner = await get_user_by_flow_id_or_endpoint_name(flow_id)
             if flow_owner is None:
                 raise HTTPException(status_code=404, detail="Flow not found")
+            logger.info("[WebhookAuth] Using flow owner for webhook. user_id=%s", flow_owner.id)
             return flow_owner  # noqa: TRY300
         except HTTPException:
             raise
@@ -298,6 +304,11 @@ async def get_webhook_user(flow_id: str, request: Request) -> UserRead:
     # When webhook auth is enabled, require API key authentication
     api_key_header_val = request.headers.get("x-api-key")
     api_key_query_val = request.query_params.get("x-api-key")
+    logger.info(
+        "[WebhookAuth] API key presence header=%s query=%s",
+        bool(api_key_header_val),
+        bool(api_key_query_val),
+    )
 
     # Check if API key is provided
     if not api_key_header_val and not api_key_query_val:
