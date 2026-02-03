@@ -463,15 +463,18 @@ async def webhook_run_flow(
     """
     telemetry_service = get_telemetry_service()
     start_time = time.perf_counter()
+    logger.info(f"Received webhook request for flow {flow_id_or_name}")
     await logger.adebug("Received webhook request")
     error_msg = ""
 
     # Get the appropriate user for webhook execution based on auth settings
     webhook_user = await get_webhook_user(flow_id_or_name, request)
+    logger.info(f"Webhook will be executed as user {webhook_user.username} (ID: {webhook_user.id})")
 
     try:
         try:
             data = await request.body()
+            logger.info(f"Webhook request body: {data.decode() if isinstance(data, bytes) else data}")
         except Exception as exc:
             error_msg = str(exc)
             raise HTTPException(status_code=500, detail=error_msg) from exc
@@ -483,10 +486,12 @@ async def webhook_run_flow(
         try:
             # get all webhook components in the flow
             webhook_components = get_all_webhook_components_in_flow(flow.data)
+            logger.info(f"Found {len(webhook_components)} webhook components in flow {flow.id}")
             tweaks = {}
 
             for component in webhook_components:
                 tweaks[component["id"]] = {"data": data.decode() if isinstance(data, bytes) else data}
+            logger.info(f"Tweaks for webhook flow execution: {tweaks}")    
             input_request = SimplifiedAPIRequest(
                 input_value="",
                 input_type="chat",
@@ -496,12 +501,14 @@ async def webhook_run_flow(
             )
 
             await logger.adebug("Starting background task")
+            logger.info("Starting background task for webhook flow execution")
             background_tasks.add_task(
                 simple_run_flow_task,
                 flow=flow,
                 input_request=input_request,
                 api_key_user=webhook_user,
             )
+            logger.info("Background task for webhook flow execution started successfully")
         except Exception as exc:
             error_msg = str(exc)
             raise HTTPException(status_code=500, detail=error_msg) from exc

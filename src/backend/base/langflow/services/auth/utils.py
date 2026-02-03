@@ -279,9 +279,11 @@ async def get_webhook_user(flow_id: str, request: Request) -> UserRead:
     Raises:
         HTTPException: If authentication fails or user doesn't have permission
     """
+    logger.info(f"Getting webhook user for flow {flow_id}")
     from langflow.helpers.user import get_user_by_flow_id_or_endpoint_name
 
     settings_service = get_settings_service()
+    logger.info(f"Webhook auth settings: WEBHOOK_AUTH_ENABLE={settings_service.auth_settings.WEBHOOK_AUTH_ENABLE}")
 
     if not settings_service.auth_settings.WEBHOOK_AUTH_ENABLE:
         # When webhook auth is disabled, run webhook as the flow owner without requiring API key
@@ -305,6 +307,25 @@ async def get_webhook_user(flow_id: str, request: Request) -> UserRead:
 
     # Use the provided API key (prefer header over query param)
     api_key = api_key_header_val or api_key_query_val
+
+    if settings_service.auth_settings.CLERK_AUTH_ENABLED:
+        from langflow.services.auth.api_key_codec import decode_api_key
+        from langflow.services.auth.clerk_utils import auth_header_ctx
+
+        decoded = decode_api_key(api_key)
+        if not decoded.organization_id:
+            raise HTTPException(
+                status_code=403,
+                detail="API key missing organization context for Clerk authentication",
+            )
+
+        context_payload = auth_header_ctx.get() or {}
+        if not isinstance(context_payload, dict):
+            context_payload = {}
+        context_payload = {**context_payload, "org_id": decoded.organization_id}
+        if decoded.user_id:
+            context_payload.setdefault("uuid", decoded.user_id)
+        auth_header_ctx.set(context_payload)
 
     try:
         # Validate API key directly without AUTO_LOGIN fallback
@@ -336,6 +357,7 @@ async def get_webhook_user(flow_id: str, request: Request) -> UserRead:
 
     if flow_owner.id != authenticated_user.id:
         raise HTTPException(status_code=403, detail="Access denied: You can only execute webhooks for flows you own")
+    logger.info(f"Webhook execution authorized for user {authenticated_user.username} on flow {flow_id}")    
 
     return authenticated_user
 
