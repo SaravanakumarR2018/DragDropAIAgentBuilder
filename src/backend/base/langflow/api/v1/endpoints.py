@@ -519,7 +519,7 @@ async def webhook_run_flow(
                             id=component["id"],
                             flow_id=flow.id,
                             valid=True,
-                            params={},
+                            params="",
                             data=result_data.model_dump(),
                             artifacts={},
                         ),
