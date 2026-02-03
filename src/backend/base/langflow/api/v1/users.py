@@ -21,9 +21,8 @@ from langflow.services.auth.utils import (
 from langflow.services.database.models.user.crud import get_user_by_id, update_user
 from langflow.services.database.models.user.model import User, UserCreate, UserRead, UserUpdate
 from langflow.services.deps import get_settings_service
-from langflow.services.paddle.subscriptions import ensure_paddle_subscription_status_for_user
+from langflow.services.paddle.subscriptions import ensure_paddle_customer_for_user
 from langflow.services.auth.clerk_utils import (
-    get_paddle_customer_id_from_clerk_payload,
     process_new_user_with_clerk,
 )
 
@@ -52,7 +51,7 @@ async def add_user(
         folder = await get_or_create_default_folder(session, new_user.id)
         if get_settings_service().auth_settings.CLERK_AUTH_ENABLED:
             logger.info(f"Ensuring Paddle customer for new user {new_user.id}")
-            await ensure_paddle_subscription_status_for_user(user=new_user)
+            await ensure_paddle_customer_for_user(user=new_user)
         if not folder:
             raise HTTPException(status_code=500, detail="Error creating default project")
     except IntegrityError as e:
@@ -68,28 +67,6 @@ async def read_current_user(
 ) -> User:
     """Retrieve the current user's data."""
     return current_user
-
-@router.post("/ensure-paddle-customer")
-async def ensure_paddle_customer(
-    current_user: CurrentActiveUser,
-    payload: EnsurePaddleCustomerRequest | None = None,
-) -> dict:
-    """Ensure the current user has a Paddle customer id in Clerk metadata."""
-    if not get_settings_service().auth_settings.CLERK_AUTH_ENABLED:
-        raise HTTPException(status_code=400, detail="Clerk auth not enabled")
-
-    logger.info(f"Ensuring Paddle customer for user {current_user.id}")
-    existing_customer_id = get_paddle_customer_id_from_clerk_payload()
-    logger.info(f"Existing Paddle customer id: {existing_customer_id}")
-    if existing_customer_id:
-        return {"paddle_customer_id": existing_customer_id, "created": False}
-
-    await ensure_paddle_subscription_status_for_user(
-        user=current_user,
-        email_override=payload.email if payload and payload.email else current_user.username,
-    )
-    created_customer_id = get_paddle_customer_id_from_clerk_payload()
-    return {"paddle_customer_id": created_customer_id, "created": True}
 
 
 @router.get("/", dependencies=[Depends(get_current_active_superuser)])

@@ -24,14 +24,14 @@ _jwks_cache: dict[str, dict[str, Any]] = {}
 
 CLERK_API_BASE = "https://api.clerk.com/v1"
 
-async def update_clerk_private_metadata(
+async def update_clerk_public_metadata(
     *,
     clerk_user_id: str,
-    private_metadata: dict,
+    public_metadata: dict,
 ) -> None:
     settings_service = get_settings_service()
     secret_key = settings_service.settings.clerk_api_key
-
+    secret_key = secret_key.strip()
     if not secret_key:
         raise RuntimeError("CLERK_API_KEY not configured")
 
@@ -46,7 +46,7 @@ async def update_clerk_private_metadata(
         response = await client.patch(
             url,
             headers=headers,
-            json={"private_metadata": private_metadata},
+            json={"public_metadata": public_metadata},
         )
         response.raise_for_status()
 
@@ -76,56 +76,27 @@ def get_email_from_clerk_payload() -> str:
 
 async def get_paddle_customer_id_from_clerk_payload() -> str | None:
     """
-    Retrieve paddle_customer_id for the current user.
+    Retrieve paddle_customer_id directly from Clerk JWT public metadata.
 
-    Order of resolution:
-    1. JWT payload (if injected via public_metadata / JWT template)
-    2. Clerk private_metadata via Clerk API (server-side)
+    Assumes the JWT template includes:
+    {
+        "paddle_customer_id": "{{user.public_metadata.paddle_customer_id}}"
+    }
     """
-
     payload = auth_header_ctx.get()
     if not payload:
         logger.warning("No Clerk payload in request context")
         return None
 
-    #Secure path: fetch from Clerk private_metadata
-    try:
-        clerk_user_id = get_clerk_user_id_from_payload()
-    except HTTPException:
-        logger.warning("Unable to resolve Clerk user id from payload")
-        return None
-
-    settings_service = get_settings_service()
-    secret_key = settings_service.settings.clerk_api_key
-
-    if not secret_key:
-        logger.error("CLERK_API_KEY not configured")
-        return None
-
-    url = f"{CLERK_API_BASE}/users/{clerk_user_id}"
-    headers = {
-        "Authorization": f"Bearer {secret_key}",
-        "Content-Type": "application/json",
-    }
-
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(url, headers=headers)
-            response.raise_for_status()
-            user_data = response.json()
-    except Exception as exc:
-        logger.error(
-            f"Failed to fetch Clerk user {clerk_user_id} from Clerk API: {exc}"
-        )
-        return None
-
-    private_metadata = user_data.get("private_metadata") or {}
-    customer_id = private_metadata.get("paddle_customer_id")
+    customer_id = payload.get("paddle_customer_id")
 
     if isinstance(customer_id, str) and customer_id.strip():
+        logger.debug(f"Resolved Paddle customer ID from JWT: {customer_id}")
         return customer_id
 
+    logger.info("No paddle_customer_id found in Clerk JWT payload")
     return None
+
 
 async def _get_jwks(issuer: str) -> dict[str, Any]:
     """Retrieve and cache JWKS for a Clerk issuer."""
@@ -169,7 +140,6 @@ async def verify_clerk_token(token: str) -> dict[str, Any]:
             issuer=issuer,
             # options={"verify_signature": False, "verify_aud": False, "verify_exp": False},
         )
-        logger.info(f"Clerk token payload before enrichment: {payload}")
         # ✅ Add deterministic UUID to the payload
         clerk_id = payload.get("sub")
         if not clerk_id:
