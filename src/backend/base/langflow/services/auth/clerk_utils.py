@@ -306,7 +306,6 @@ async def clerk_token_middleware(request: Request, call_next):
             token = auth_header[len("Bearer ") :]
             try:
                 payload = await verify_clerk_token(token)
-                logger.info(f"[ClerkMiddleware] Decoded token payload: {payload}")
                 ctx_token = auth_header_ctx.set(payload)
                 response = await call_next(request)
             except Exception as exc:  # noqa: BLE001

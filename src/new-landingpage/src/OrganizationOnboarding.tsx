@@ -174,7 +174,7 @@ async function ensureLangflowUser(
 }
 
 async function ensurePaddleCustomer(token: string, email?: string | null) {
-  return requestJson("users/ensure-paddle-customer", {
+  return requestJson("billing/ensure-paddle-customer", {
     method: "POST",
     token,
     body: email ? JSON.stringify({ email }) : undefined,
