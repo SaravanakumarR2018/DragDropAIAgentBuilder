@@ -201,7 +201,7 @@ async def log_vertex_build(
             if db_service is None:
                 return
 
-            async with db_service.with_session as session:  # noqa: SLF001
+            async with db_service.with_session() as session:  # noqa: SLF001
                 await crud_log_vertex_build(session, vertex_build)
 
             # Note: emit_vertex_build_event is NOT called here because it needs
