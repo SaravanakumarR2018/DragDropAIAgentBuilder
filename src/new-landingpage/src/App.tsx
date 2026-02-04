@@ -3,6 +3,7 @@ import type { PropsWithChildren } from "react";
 import { LANDING_BASENAME } from "./landingRoutes";
 import NewLandingPageLogin from "./NewLandingPageLogin";
 import OrganizationOnboarding from "./OrganizationOnboarding";
+import PaymentPage from "./PaymentPage";
 import "./App.css";
 import { useCookies } from "react-cookie";
 import LandingPage from "./LandingPage";
@@ -51,6 +52,14 @@ export default function App() {
           element={
             <SessionRedirect>
               <OrganizationOnboarding />
+            </SessionRedirect>
+          }
+        />
+        <Route
+          path="/payment"
+          element={
+            <SessionRedirect>
+              <PaymentPage />
             </SessionRedirect>
           }
         />

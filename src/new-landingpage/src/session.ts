@@ -1,5 +1,6 @@
 export const LANGFLOW_ACCESS_TOKEN = "access_token_lf";
 export const LANGFLOW_REFRESH_TOKEN = "refresh_token_lf";
+export const LANGFLOW_AUTO_LOGIN_OPTION = "auto_login_lf";
 export const ACTIVE_ORG_STORAGE_KEY = "lf-active-org";
 export const ORG_SELECTED_KEY = "isOrgSelected";
 

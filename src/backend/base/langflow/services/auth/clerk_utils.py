@@ -29,6 +29,7 @@ async def update_clerk_public_metadata(
     clerk_user_id: str,
     public_metadata: dict,
 ) -> None:
+    """Update a Clerk user's public_metadata."""
     settings_service = get_settings_service()
     secret_key = settings_service.settings.clerk_api_key
     secret_key = secret_key.strip()
@@ -48,6 +49,58 @@ async def update_clerk_public_metadata(
             headers=headers,
             json={"public_metadata": public_metadata},
         )
+        response.raise_for_status()
+
+
+async def get_clerk_organization(org_id: str) -> dict[str, Any]:
+    settings_service = get_settings_service()
+    secret_key = settings_service.settings.clerk_api_key
+    secret_key = secret_key.strip()
+    if not secret_key:
+        raise RuntimeError("CLERK_API_KEY not configured")
+
+    url = f"{CLERK_API_BASE}/organizations/{org_id}"
+    headers = {
+        "Authorization": f"Bearer {secret_key}",
+        "Content-Type": "application/json",
+    }
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers)
+        response.raise_for_status()
+        return response.json()
+
+
+async def update_clerk_organization(
+    *,
+    org_id: str,
+    public_metadata: dict | None = None,
+    max_allowed_members: int | None = None,
+) -> None:
+    """Update a Clerk organization's public_metadata and/or max_allowed_members."""
+    settings_service = get_settings_service()
+    secret_key = settings_service.settings.clerk_api_key
+    secret_key = secret_key.strip()
+    if not secret_key:
+        raise RuntimeError("CLERK_API_KEY not configured")
+
+    url = f"{CLERK_API_BASE}/organizations/{org_id}"
+    headers = {
+        "Authorization": f"Bearer {secret_key}",
+        "Content-Type": "application/json",
+    }
+
+    payload: dict[str, Any] = {}
+    if public_metadata is not None:
+        payload["public_metadata"] = public_metadata
+    if max_allowed_members is not None:
+        payload["max_allowed_members"] = max_allowed_members
+
+    if not payload:
+        return
+
+    async with httpx.AsyncClient() as client:
+        response = await client.patch(url, headers=headers, json=payload)
         response.raise_for_status()
 
 
@@ -95,6 +148,61 @@ async def get_paddle_customer_id_from_clerk_payload() -> str | None:
         return customer_id
 
     logger.info("No paddle_customer_id found in Clerk JWT payload")
+    return None
+
+
+def _get_org_claim_from_payload(payload: dict[str, Any]) -> dict[str, Any] | None:
+    org = payload.get("org") or payload.get("o")
+    if isinstance(org, dict):
+        return org
+    return None
+
+
+def _get_org_public_metadata(payload: dict[str, Any]) -> dict[str, Any]:
+    org = _get_org_claim_from_payload(payload)
+    if not org:
+        return {}
+    public_metadata = org.get("public_metadata") or org.get("publicMetadata")
+    if isinstance(public_metadata, dict):
+        return public_metadata
+    return {}
+
+
+async def get_paddle_subscription_id_from_clerk_payload() -> str | None:
+    payload = auth_header_ctx.get()
+    if not payload:
+        logger.warning("No Clerk payload in request context")
+        return None
+
+    subscription_id = payload.get("paddle_subscription_id")
+    if isinstance(subscription_id, str) and subscription_id.strip():
+        return subscription_id
+
+    public_metadata = _get_org_public_metadata(payload)
+    subscription_id = public_metadata.get("paddle_subscription_id") or public_metadata.get("paddleSubscriptionId")
+    if isinstance(subscription_id, str) and subscription_id.strip():
+        return subscription_id
+
+    logger.info("No paddle_subscription_id found in Clerk JWT payload")
+    return None
+
+
+async def get_organisation_created_by_from_clerk_payload() -> str | None:
+    payload = auth_header_ctx.get()
+    if not payload:
+        logger.warning("No Clerk payload in request context")
+        return None
+
+    created_by = payload.get("organisation_created_by")
+    if isinstance(created_by, str) and created_by.strip():
+        return created_by
+
+    public_metadata = _get_org_public_metadata(payload)
+    created_by = public_metadata.get("organisation_created_by") or public_metadata.get("organisationCreatedBy")
+    if isinstance(created_by, str) and created_by.strip():
+        return created_by
+
+    logger.info("No organisation_created_by found in Clerk JWT payload")
     return None
 
 
