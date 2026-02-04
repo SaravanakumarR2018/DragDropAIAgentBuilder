@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import time
 from collections.abc import AsyncGenerator
 from http import HTTPStatus
@@ -32,7 +31,6 @@ from langflow.api.v1.schemas import (
     ConfigResponse,
     CustomComponentRequest,
     CustomComponentResponse,
-    ResultDataResponse,
     RunResponse,
     SimplifiedAPIRequest,
     TaskStatusResponse,
@@ -51,9 +49,7 @@ from langflow.services.cache.utils import save_uploaded_file
 from langflow.services.database.models.flow.model import Flow, FlowRead
 from langflow.services.database.models.flow.utils import get_all_webhook_components_in_flow
 from langflow.services.database.models.user.model import User, UserRead
-from langflow.services.database.models.vertex_builds.crud import log_vertex_build
-from langflow.services.database.models.vertex_builds.model import VertexBuildBase
-from langflow.services.deps import get_session_service, get_settings_service, get_telemetry_service, session_scope
+from langflow.services.deps import get_session_service, get_settings_service, get_telemetry_service
 from langflow.services.telemetry.schema import RunPayload
 from langflow.utils.compression import compress_response
 from langflow.utils.version import get_version_info
@@ -488,34 +484,9 @@ async def webhook_run_flow(
             # get all webhook components in the flow
             webhook_components = get_all_webhook_components_in_flow(flow.data)
             tweaks = {}
-            payload_text = data.decode() if isinstance(data, bytes) else data
-            try:
-                payload_message = json.loads(payload_text) if isinstance(payload_text, str) else payload_text
-            except json.JSONDecodeError:
-                payload_message = payload_text
 
-            async with session_scope() as session:
-                for component in webhook_components:
-                    tweaks[component["id"]] = {"data": data.decode() if isinstance(data, bytes) else data}
-                    output_name = "output_data"
-                    component_outputs = component.get("data", {}).get("node", {}).get("outputs", [])
-                    if component_outputs:
-                        output_name = component_outputs[0].get("name", output_name)
-                    result_data = ResultDataResponse(
-                        outputs={output_name: {"message": payload_message, "type": "data"}},
-                        message=payload_message,
-                    )
-                    await log_vertex_build(
-                        session,
-                        VertexBuildBase(
-                            id=component["id"],
-                            flow_id=flow.id,
-                            valid=True,
-                            params="",
-                            data=result_data.model_dump(),
-                            artifacts={},
-                        ),
-                    )
+            for component in webhook_components:
+                tweaks[component["id"]] = {"data": data.decode() if isinstance(data, bytes) else data}
             input_request = SimplifiedAPIRequest(
                 input_value="",
                 input_type="chat",
