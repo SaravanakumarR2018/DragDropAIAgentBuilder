@@ -248,6 +248,7 @@ async def verify_clerk_token(token: str) -> dict[str, Any]:
             issuer=issuer,
             # options={"verify_signature": False, "verify_aud": False, "verify_exp": False},
         )
+        logger.info(f"Verified Clerk token for user {payload}")
         # ✅ Add deterministic UUID to the payload
         clerk_id = payload.get("sub")
         if not clerk_id:

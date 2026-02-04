@@ -12,7 +12,6 @@ from paddle_billing import Client
 from paddle_billing.Entities.Shared import CustomData
 from paddle_billing.Resources.Customers.Operations import CreateCustomer
 from paddle_billing.Resources.Subscriptions.Operations import (
-    CreateSubscription,
     ListSubscriptions,
 )
 
@@ -112,13 +111,14 @@ async def create_subscription_for_customer(
         msg = f"No Paddle price found for plan {plan_key}"
         raise ValueError(msg)
 
+    subscription_payload = {
+        "customer_id": customer_id,
+        "items": [{"price_id": price_id, "quantity": quantity}],
+        "custom_data": CustomData({"org_id": org_id, "plan_key": plan_key}),
+    }
     subscription = await asyncio.to_thread(
         paddle_client.subscriptions.create,
-        CreateSubscription(
-            customer_id=customer_id,
-            items=[{"price_id": price_id, "quantity": quantity}],
-            custom_data=CustomData({"org_id": org_id, "plan_key": plan_key}),
-        ),
+        subscription_payload,
     )
     return subscription
 

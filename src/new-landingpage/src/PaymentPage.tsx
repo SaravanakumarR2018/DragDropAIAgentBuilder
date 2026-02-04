@@ -124,6 +124,7 @@ export default function PaymentPage() {
         token,
       });
     },
+    [],
   );
 
   useEffect(() => {
