@@ -28,8 +28,6 @@ async def ensure_paddle_customer(
     if existing_customer_id:
         return {"created": False}
 
-    await ensure_paddle_customer_for_user(
-        user=current_user,
-    )
+    await ensure_paddle_customer_for_user()
 
     return {"created": True}

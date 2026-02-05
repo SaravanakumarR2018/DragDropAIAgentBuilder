@@ -173,11 +173,10 @@ async function ensureLangflowUser(
   throw new Error("[ensureLangflowUser] Max retries exceeded");
 }
 
-async function ensurePaddleCustomer(token: string, email?: string | null) {
+async function ensurePaddleCustomer(token: string) {
   return requestJson("billing/ensure-paddle-customer", {
     method: "POST",
     token,
-    body: email ? JSON.stringify({ email }) : undefined,
   });
 }
 
@@ -230,8 +229,8 @@ function setStoredActiveOrgId(orgId: string | null) {
 }
 
 function getPaddleCustomerIdFromClerk(user:any) {
-  const privateMetadata = user?.privateMetadata as Record<string, unknown> | undefined;
-  const customerId = privateMetadata?.paddle_customer_id;
+  const publicMetadata = user?.publicMetadata as Record<string, unknown> | undefined;
+  const customerId = publicMetadata?.paddle_customer_id;
   if (typeof customerId === "string" && customerId.trim()) {
     return customerId;
   }
@@ -393,8 +392,7 @@ export default function OrganizationOnboarding() {
       if (!paddleCustomerId) {
         console.log("[OrganizationOnboarding] Calling ensurePaddleCustomer()");
         setStatus("Finalizing billing profile...");
-        const email = user?.primaryEmailAddress?.emailAddress ?? null;
-        await ensurePaddleCustomer(orgToken, email);
+        await ensurePaddleCustomer(orgToken);
         console.log("[OrganizationOnboarding] ensurePaddleCustomer() completed");
       }
 

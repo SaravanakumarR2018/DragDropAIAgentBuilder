@@ -31,9 +31,6 @@ router = APIRouter(tags=["Users"], prefix="/users")
 SENSITIVE_OPTIN_KEYS = {"skip_trial_access", "trial_access_until", "trial_access_days"}
 
 
-class EnsurePaddleCustomerRequest(BaseModel):
-    email: str | None = None
-
 @router.post("/", response_model=UserRead, status_code=201)
 async def add_user(
     user: UserCreate,
@@ -51,7 +48,7 @@ async def add_user(
         folder = await get_or_create_default_folder(session, new_user.id)
         if get_settings_service().auth_settings.CLERK_AUTH_ENABLED:
             logger.info(f"Ensuring Paddle customer for new user {new_user.id}")
-            await ensure_paddle_customer_for_user(user=new_user)
+            await ensure_paddle_customer_for_user()
         if not folder:
             raise HTTPException(status_code=500, detail="Error creating default project")
     except IntegrityError as e:

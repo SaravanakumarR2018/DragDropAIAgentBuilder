@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 from contextvars import ContextVar, Token
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID, NAMESPACE_URL, uuid5
 
 import httpx
@@ -16,6 +16,14 @@ from langflow.services.database.constants import DUMMY_USER_NAMESPACE_TEMPLATE
 from langflow.services.database.models.user import User
 from langflow.services.database.models.user.crud import get_user_by_id
 from langflow.services.deps import get_settings_service
+from langflow.services.auth.clerk_metadata_constants import (
+    CLERK_JWT_SUB_KEY,
+    CLERK_JWT_EMAIL_KEY,
+    CLERK_JWT_ORG_KEY,
+    CLERK_JWT_UUID_KEY,
+    PADDLE_CUSTOMER_ID_KEY,
+    ORG_ID_KEY,
+)
 
 # Context variable to store decoded clerk claims per request
 auth_header_ctx: ContextVar[dict | None] = ContextVar("auth_header_ctx", default=None)
@@ -24,39 +32,91 @@ _jwks_cache: dict[str, dict[str, Any]] = {}
 
 CLERK_API_BASE = "https://api.clerk.com/v1"
 
+ClerkResourceType = Literal["user", "organization"]
+
+
+class ClerkPublicMetadataManager:
+    """Read/merge/update Clerk public metadata without dropping unrelated keys."""
+
+    def __init__(self, *, resource_type: ClerkResourceType, resource_id: str) -> None:
+        self.resource_type = resource_type
+        self.resource_id = resource_id
+
+    @classmethod
+    def for_user(cls, clerk_user_id: str) -> "ClerkPublicMetadataManager":
+        return cls(resource_type="user", resource_id=clerk_user_id)
+
+    @classmethod
+    def for_organization(cls, organization_id: str) -> "ClerkPublicMetadataManager":
+        return cls(resource_type="organization", resource_id=organization_id)
+
+    @staticmethod
+    def merge_metadata(existing: dict | None, updates: dict) -> dict:
+        base = dict(existing or {})
+        base.update(updates)
+        return base
+
+    def _get_headers(self) -> dict:
+        settings_service = get_settings_service()
+        secret_key = settings_service.settings.clerk_api_key
+        secret_key = secret_key.strip()
+        if not secret_key:
+            raise RuntimeError("CLERK_API_KEY not configured")
+        return {
+            "Authorization": f"Bearer {secret_key}",
+            "Content-Type": "application/json",
+        }
+
+    def _get_resource_url(self, *, metadata: bool = False) -> str:
+        base = f"{CLERK_API_BASE}/{self.resource_type}s/{self.resource_id}"
+        if metadata:
+            return f"{base}/metadata"
+        return base
+
+    async def get_public_metadata(self) -> dict:
+        url = self._get_resource_url()
+        headers = self._get_headers()
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+            payload = response.json()
+        public_metadata = payload.get("public_metadata")
+        if isinstance(public_metadata, dict):
+            return public_metadata
+        return {}
+
+    async def set_public_metadata(self, public_metadata: dict) -> None:
+        url = self._get_resource_url(metadata=True)
+        headers = self._get_headers()
+        async with httpx.AsyncClient() as client:
+            response = await client.patch(
+                url,
+                headers=headers,
+                json={"public_metadata": public_metadata},
+            )
+            response.raise_for_status()
+
+    async def update_public_metadata(self, updates: dict) -> dict:
+        existing = await self.get_public_metadata()
+        merged = self.merge_metadata(existing, updates)
+        await self.set_public_metadata(merged)
+        return merged
+
 async def update_clerk_public_metadata(
     *,
     clerk_user_id: str,
     public_metadata: dict,
 ) -> None:
-    settings_service = get_settings_service()
-    secret_key = settings_service.settings.clerk_api_key
-    secret_key = secret_key.strip()
-    if not secret_key:
-        raise RuntimeError("CLERK_API_KEY not configured")
-
-    url = f"{CLERK_API_BASE}/users/{clerk_user_id}/metadata"
-
-    headers = {
-        "Authorization": f"Bearer {secret_key}",
-        "Content-Type": "application/json",
-    }
-
-    async with httpx.AsyncClient() as client:
-        response = await client.patch(
-            url,
-            headers=headers,
-            json={"public_metadata": public_metadata},
-        )
-        response.raise_for_status()
+    manager = ClerkPublicMetadataManager(resource_type="user", resource_id=clerk_user_id)
+    await manager.update_public_metadata(public_metadata)
 
 
 def get_clerk_user_id_from_payload() -> str:
     payload = auth_header_ctx.get()
-    if not payload or "sub" not in payload:
+    if not payload or CLERK_JWT_SUB_KEY not in payload:
         logger.info("No Clerk user id found in payload")
         raise HTTPException(status_code=401, detail="Missing Clerk user id")
-    return payload["sub"]
+    return payload[CLERK_JWT_SUB_KEY]
 
 
 def get_email_from_clerk_payload() -> str:
@@ -65,13 +125,13 @@ def get_email_from_clerk_payload() -> str:
         logger.info("No Clerk payload found in context")
         raise HTTPException(status_code=401, detail="Missing Clerk payload")
 
-    email = payload.get("email")
+    email = payload.get(CLERK_JWT_EMAIL_KEY)
     logger.info(f"Clerk payload email: {email}")
     if not isinstance(email, str) or not email.strip():
         logger.info("No email found in Clerk payload")
-        logger.info("Missing email in Clerk token")
+        raise HTTPException(status_code=401, detail="Missing email in Clerk token")
 
-    return email
+    return email.strip()
 
 
 async def get_paddle_customer_id_from_clerk_payload() -> str | None:
@@ -88,13 +148,13 @@ async def get_paddle_customer_id_from_clerk_payload() -> str | None:
         logger.warning("No Clerk payload in request context")
         return None
 
-    customer_id = payload.get("paddle_customer_id")
+    customer_id = payload.get(PADDLE_CUSTOMER_ID_KEY)
 
     if isinstance(customer_id, str) and customer_id.strip():
         logger.debug(f"Resolved Paddle customer ID from JWT: {customer_id}")
         return customer_id
 
-    logger.info("No paddle_customer_id found in Clerk JWT payload")
+    logger.info(f"No {PADDLE_CUSTOMER_ID_KEY} found in Clerk JWT payload")
     return None
 
 
@@ -141,18 +201,18 @@ async def verify_clerk_token(token: str) -> dict[str, Any]:
             # options={"verify_signature": False, "verify_aud": False, "verify_exp": False},
         )
         # ✅ Add deterministic UUID to the payload
-        clerk_id = payload.get("sub")
+        clerk_id = payload.get(CLERK_JWT_SUB_KEY)
         if not clerk_id:
-            msg = "Missing 'sub' (Clerk ID) in token payload"
+            msg = f"Missing '{CLERK_JWT_SUB_KEY}' (Clerk ID) in token payload"
             raise JWTError(msg)
-        payload["uuid"] = str(uuid.uuid5(uuid.NAMESPACE_DNS, str(clerk_id)))
+        payload[CLERK_JWT_UUID_KEY] = str(uuid.uuid5(uuid.NAMESPACE_DNS, str(clerk_id)))
 
-        org = payload.get("o")
+        org = payload.get(CLERK_JWT_ORG_KEY)
         if isinstance(org, dict) and "id" in org:
-            payload["org_id"] = org["id"]
-        elif "org_id" in payload:
+            payload[ORG_ID_KEY] = org["id"]
+        elif ORG_ID_KEY in payload:
             # Some Clerk tokens expose the organisation id directly
-            payload["org_id"] = payload["org_id"]
+            payload[ORG_ID_KEY] = payload[ORG_ID_KEY]
         else:
             msg = "Missing organization info in Clerk token payload"
             raise JWTError(msg)
@@ -167,7 +227,7 @@ def get_user_id_from_clerk_payload() -> UUID:
     payload = auth_header_ctx.get()
     if not payload:
         raise HTTPException(status_code=401, detail="Missing Clerk payload")
-    clerk_uuid = payload.get("uuid")
+    clerk_uuid = payload.get(CLERK_JWT_UUID_KEY)
     if not clerk_uuid:
         raise HTTPException(status_code=401, detail="Missing Clerk UUID")
     try:
@@ -184,7 +244,7 @@ def get_org_id_from_clerk_payload() -> str:
     payload = auth_header_ctx.get()
     if not payload:
         raise HTTPException(status_code=401, detail="Missing Clerk payload")
-    org_id = payload.get("org_id") if isinstance(payload, dict) else None
+    org_id = payload.get(ORG_ID_KEY) if isinstance(payload, dict) else None
     if not org_id:
         raise HTTPException(status_code=401, detail="Missing organization in Clerk payload")
     if not isinstance(org_id, str):
@@ -330,8 +390,8 @@ async def clerk_token_middleware(request: Request, call_next):
                 )
             else:
                 context_payload = {
-                    "org_id": decoded.organization_id,
-                    "uuid": decoded.user_id,
+                    ORG_ID_KEY: decoded.organization_id,
+                    CLERK_JWT_UUID_KEY: decoded.user_id,
                 }
                 ctx_token = auth_header_ctx.set(context_payload)
                 response = await call_next(request)
