@@ -10,7 +10,7 @@ from typing import Any, Literal
 from lfx.log.logger import logger
 from paddle_billing import Client
 from paddle_billing.Entities.Shared import CustomData
-from paddle_billing.Resources.Customers.Operations import CreateCustomer
+from paddle_billing.Resources.Customers.Operations import CreateCustomer, UpdateCustomer
 from paddle_billing.Resources.Subscriptions.Operations import ListSubscriptions
 
 
@@ -66,18 +66,45 @@ async def _create_paddle_customer_and_update_clerk_metadata(
     logger.info(f"Creating Paddle customer for email: {email}")
     logger.info(f"Clerk user ID: {clerk_user_id}")
 
-    customer = await asyncio.to_thread(
-        client.customers.create,
-        CreateCustomer(
+    try:
+        customer = await asyncio.to_thread(
+            client.customers.create,
+            CreateCustomer(
+                email=email,
+                custom_data=CustomData(
+                    {
+                        PADDLE_CUSTOM_DATA_USER_ID_KEY: str(clerk_user_id),
+                    }
+                ),
+        )
+     )
+        logger.info(f"Paddle customer creation response: {customer}")
+    except Exception as exc:  # noqa: BLE001
+        if not _is_customer_already_exists_error(exc):
+            raise
+        logger.info(
+            "Paddle customer already exists for email %s; resolving existing customer.",
+            email,
+        )
+        existing_customer = await _find_existing_paddle_customer(
+            client=client,
             email=email,
-            custom_data=CustomData(
-                {
-                    PADDLE_CUSTOM_DATA_USER_ID_KEY: str(clerk_user_id),
-                }
-            ),
-        ),
-    )
-    logger.info(f"Paddle customer creation response: {customer}")
+            clerk_user_id=clerk_user_id,
+        )
+        if existing_customer is None:
+            logger.exception("Unable to resolve existing Paddle customer for email %s.", email)
+            raise
+        await _sync_paddle_customer_metadata(
+            client=client,
+            customer=existing_customer,
+            clerk_user_id=clerk_user_id,
+        )
+        paddle_customer_id = existing_customer.id
+        await update_clerk_public_metadata(
+            clerk_user_id=clerk_user_id,
+            public_metadata={PADDLE_CUSTOMER_ID_KEY: paddle_customer_id},
+        )
+        return paddle_customer_id
 
     paddle_customer_id = customer.id
 
@@ -88,3 +115,52 @@ async def _create_paddle_customer_and_update_clerk_metadata(
     )
 
     return paddle_customer_id
+
+
+def _is_customer_already_exists_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    return "customer already exists" in message or ("already exists" in message and "customer" in message)
+
+
+async def _find_existing_paddle_customer(
+    *,
+    client: Client,
+    email: str,
+    clerk_user_id: str,
+) -> Any | None:
+    def _list_customers() -> list[Any]:
+        return list(client.customers.list())
+
+    customers = await asyncio.to_thread(_list_customers)
+    email_normalized = email.lower().strip()
+
+    for customer in customers:
+        custom_data = getattr(customer, "custom_data", None) or {}
+        if str(custom_data.get(PADDLE_CUSTOM_DATA_USER_ID_KEY, "")).strip() == str(clerk_user_id):
+            return customer
+
+    for customer in customers:
+        customer_email = getattr(customer, "email", "")
+        if isinstance(customer_email, str) and customer_email.lower().strip() == email_normalized:
+            return customer
+
+    return None
+
+
+async def _sync_paddle_customer_metadata(
+    *,
+    client: Client,
+    customer: Any,
+    clerk_user_id: str,
+) -> None:
+    existing_custom_data = dict(getattr(customer, "custom_data", None) or {})
+    if str(existing_custom_data.get(PADDLE_CUSTOM_DATA_USER_ID_KEY, "")).strip() == str(clerk_user_id):
+        return
+
+    updated_custom_data = dict(existing_custom_data)
+    updated_custom_data[PADDLE_CUSTOM_DATA_USER_ID_KEY] = str(clerk_user_id)
+    await asyncio.to_thread(
+        client.customers.update,
+        customer.id,
+        UpdateCustomer(custom_data=CustomData(updated_custom_data)),
+    )
