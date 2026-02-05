@@ -1,3 +1,4 @@
+import "@xyflow/react/dist/style.css";
 import { Suspense, useEffect } from "react";
 import { RouterProvider } from "react-router-dom";
 import { LoadingPage } from "./pages/LoadingPage";
@@ -12,7 +13,6 @@ export default function App() {
     } else {
       document.getElementById("body")!.classList.add("dark");
     }
-    import("@xyflow/react/dist/style.css").catch(console.error);
   }, [dark]);
   return (
     <Suspense fallback={<LoadingPage />}>
