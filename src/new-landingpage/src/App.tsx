@@ -13,11 +13,14 @@ import {
   LANGFLOW_REFRESH_TOKEN,
 } from "./session";
 
-function SessionRedirect({ children }: PropsWithChildren) {
+function SessionRedirect({
+  children,
+  skipWorkspaceRedirect = false,
+}: PropsWithChildren<{ skipWorkspaceRedirect?: boolean }>) {
   const [cookies] = useCookies([LANGFLOW_ACCESS_TOKEN, LANGFLOW_REFRESH_TOKEN]);
   const workspaceReady = hasWorkspaceSession(cookies);
 
-  if (workspaceReady) {
+  if (workspaceReady && !skipWorkspaceRedirect) {
     console.log("[App] SessionRedirect detected workspace; sending to /flows");
     window.location.assign("/flows");
     return null;
@@ -55,14 +58,7 @@ export default function App() {
             </SessionRedirect>
           }
         />
-        <Route
-          path="/payment"
-          element={
-            <SessionRedirect>
-              <PaymentPage />
-            </SessionRedirect>
-          }
-        />
+        <Route path="/payment" element={<PaymentPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

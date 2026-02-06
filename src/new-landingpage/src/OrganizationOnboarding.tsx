@@ -22,11 +22,9 @@ import { useCookies } from "react-cookie";
 import { LANDING_BASENAME } from "./landingRoutes";
 import logoicon from "./new-assets/visualailogo.png";
 import ProgressBar from "./ProgressBar";
-import { HttpError, requestJson } from "./apiClient";
 import {
   ACTIVE_ORG_STORAGE_KEY,
   LANGFLOW_ACCESS_TOKEN,
-  LANGFLOW_AUTO_LOGIN_OPTION,
   LANGFLOW_REFRESH_TOKEN,
   ORG_SELECTED_KEY,
 } from "./session";
@@ -36,6 +34,91 @@ import {
  * ==========
  */
 const CLERK_DUMMY_PASSWORD = "clerk_dummy_password";
+const LANGFLOW_AUTO_LOGIN_OPTION = "auto_login_lf";
+
+const API_BASE = (import.meta.env.VITE_LANGFLOW_API_BASE ?? "/api/v1/")
+  .replace(/\/?$/, "/");
+
+/**
+ * ==========
+ * HTTP helper
+ * ==========
+ */
+class HttpError extends Error {
+  status: number;
+  data: Record<string, any> | null;
+
+  constructor(status: number, message: string, data: Record<string, any> | null) {
+    super(message);
+    this.status = status;
+    this.data = data;
+  }
+}
+
+function apiUrl(path: string) {
+  return `${API_BASE}${path.replace(/^\/+/, "")}`;
+}
+
+async function requestJson(
+  path: string,
+  {
+    method = "GET",
+    headers = {},
+    body,
+    token,
+    expectJson = true,
+  }: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: BodyInit | null;
+    token?: string;
+    expectJson?: boolean;
+  } = {},
+) {
+  const finalHeaders: Record<string, string> = {
+    Accept: "application/json",
+    ...headers,
+  };
+
+  if (body && !(body instanceof FormData) && !headers["Content-Type"]) {
+    finalHeaders["Content-Type"] =
+      body instanceof URLSearchParams
+        ? "application/x-www-form-urlencoded"
+        : "application/json";
+  }
+
+  if (token) {
+    finalHeaders["Authorization"] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(apiUrl(path), {
+    method,
+    headers: finalHeaders,
+    body: body ?? undefined,
+  });
+
+  const text = expectJson ? await response.text() : null;
+  let data: Record<string, any> | null = null;
+
+  if (text) {
+    try {
+      data = JSON.parse(text) as Record<string, any>;
+    } catch {
+      // Non-JSON response (e.g., HTML error page); keep text for fallback messaging
+      data = null;
+    }
+  }
+
+  if (!response.ok) {
+    const detail =
+      (data?.detail as string) ??
+      (text ? text.slice(0, 200) : null) ??
+      response.statusText;
+    throw new HttpError(response.status, detail || "Request failed", data);
+  }
+
+  return data;
+}
 
 /**
  * ==========
@@ -90,11 +173,10 @@ async function ensureLangflowUser(
   throw new Error("[ensureLangflowUser] Max retries exceeded");
 }
 
-async function ensurePaddleCustomer(token: string, email?: string | null) {
+async function ensurePaddleCustomer(token: string) {
   return requestJson("billing/ensure-paddle-customer", {
     method: "POST",
     token,
-    body: email ? JSON.stringify({ email }) : undefined,
   });
 }
 
@@ -127,13 +209,6 @@ async function createOrganisation(token: string) {
   }
 }
 
-async function fetchSubscriptionStatus(token: string) {
-  return requestJson("billing/subscription-status", {
-    method: "GET",
-    token,
-  });
-}
-
 /**
  * ==========
  * Active org storage (local clone)
@@ -154,8 +229,8 @@ function setStoredActiveOrgId(orgId: string | null) {
 }
 
 function getPaddleCustomerIdFromClerk(user:any) {
-  const privateMetadata = user?.privateMetadata as Record<string, unknown> | undefined;
-  const customerId = privateMetadata?.paddle_customer_id;
+  const publicMetadata = user?.publicMetadata as Record<string, unknown> | undefined;
+  const customerId = publicMetadata?.paddle_customer_id;
   if (typeof customerId === "string" && customerId.trim()) {
     return customerId;
   }
@@ -267,31 +342,18 @@ export default function OrganizationOnboarding() {
     }
   }, [removeCookie, signOut]);
 
-  const clearWorkspaceSession = useCallback(() => {
-    removeCookie(LANGFLOW_ACCESS_TOKEN, { path: "/" });
-    removeCookie(LANGFLOW_REFRESH_TOKEN, { path: "/" });
-    removeCookie(LANGFLOW_AUTO_LOGIN_OPTION, { path: "/" });
-    localStorage.removeItem(ORG_SELECTED_KEY);
-    setStoredActiveOrgId(null);
-  }, [removeCookie]);
-
   const goToFlows = useCallback(() => {
     console.log("[OrganizationOnboarding] Redirecting to /flows");
     window.location.assign("/flows");
-  }, []);
-
-  const goToPayment = useCallback(() => {
-    console.log("[OrganizationOnboarding] Redirecting to /payment");
-    window.location.assign("/payment");
   }, []);
 
   /**
    * Core bootstrap flow:
    * - createOrganisation
    * - ensureLangflowUser
-   * - ensurePaddleCustomer
-   * - check subscription access
-   * - redirect to payment or /flows
+   * - backendLogin
+   * - persist cookies + storage
+   * - redirect to /flows
    */
   const bootstrapSession = useCallback(async () => {
     if (!isSignedIn || !organization?.id || bootstrappedRef.current) return;
@@ -330,43 +392,23 @@ export default function OrganizationOnboarding() {
       if (!paddleCustomerId) {
         console.log("[OrganizationOnboarding] Calling ensurePaddleCustomer()");
         setStatus("Finalizing billing profile...");
-        const email = user?.primaryEmailAddress?.emailAddress ?? null;
-        await ensurePaddleCustomer(orgToken, email);
+        await ensurePaddleCustomer(orgToken);
         console.log("[OrganizationOnboarding] ensurePaddleCustomer() completed");
       }
 
-      setStatus("Checking subscription status...");
-      const subscriptionStatus = await fetchSubscriptionStatus(orgToken);
+      console.log("[OrganizationOnboarding] Calling backendLogin()");
+      setStatus("Creating backend session...");
+      const tokens = await backendLogin(username, orgToken);
+      console.log("[OrganizationOnboarding] backendLogin() succeeded");
 
-      if (subscriptionStatus?.has_access) {
-        console.log("[OrganizationOnboarding] Calling backendLogin()");
-        setStatus("Creating backend session...");
-        const tokens = await backendLogin(username, orgToken);
-        console.log("[OrganizationOnboarding] backendLogin() succeeded");
+      persistSession(orgToken, (tokens as any)?.refresh_token ?? null, activeOrgId);
 
-        persistSession(orgToken, (tokens as any)?.refresh_token ?? null, activeOrgId);
-
-        setStatus("Redirecting to workspace...");
-        console.log(
-          "[OrganizationOnboarding] Redirecting to workspace with org",
-          activeOrgId,
-        );
-        goToFlows();
-        return;
-      }
-
-      const createdBy = subscriptionStatus?.organisation_created_by;
-      if (createdBy && user?.id && createdBy !== user.id) {
-        setError(
-          `Access is inactive. Please contact the admin who created this organization (user id: ${createdBy}).`,
-        );
-        clearWorkspaceSession();
-        return;
-      }
-
-      setStatus("Redirecting to payment...");
-      clearWorkspaceSession();
-      goToPayment();
+      setStatus("Redirecting to workspace...");
+      console.log(
+        "[OrganizationOnboarding] Redirecting to workspace with org",
+        activeOrgId,
+      );
+      goToFlows();
     } catch (err: any) {
       console.error("[OrganizationOnboarding] Failed to bootstrap", err);
       const msg =
@@ -382,14 +424,12 @@ export default function OrganizationOnboarding() {
     }
   }, [
     clearSession,
-    clearWorkspaceSession,
     getToken,
     isSignedIn,
     organization?.id,
     persistSession,
     user,
     goToFlows,
-    goToPayment,
   ]);
 
   useEffect(() => {
@@ -416,38 +456,13 @@ export default function OrganizationOnboarding() {
     const activeOrgId = localStorage.getItem(ACTIVE_ORG_STORAGE_KEY);
     const hasAccessToken = Boolean(cookies[LANGFLOW_ACCESS_TOKEN]);
 
-    if (!orgSelected || !activeOrgId || !hasAccessToken) return;
-
-    (async () => {
-      try {
-        const orgToken = await getToken({ skipCache: true });
-        if (!orgToken) return;
-        const subscriptionStatus = await fetchSubscriptionStatus(orgToken);
-
-        if (subscriptionStatus?.has_access) {
-          console.log("[OrganizationOnboarding] Session already present; routing to /flows", {
-            activeOrgId,
-          });
-          goToFlows();
-          return;
-        }
-
-        const createdBy = subscriptionStatus?.organisation_created_by;
-        if (createdBy && user?.id && createdBy !== user.id) {
-          setError(
-            `Access is inactive. Please contact the admin who created this organization (user id: ${createdBy}).`,
-          );
-          clearWorkspaceSession();
-          return;
-        }
-
-        clearWorkspaceSession();
-        goToPayment();
-      } catch (err) {
-        console.warn("[OrganizationOnboarding] Unable to verify subscription", err);
-      }
-    })();
-  }, [clearWorkspaceSession, cookies, getToken, goToFlows, goToPayment, isLoaded, isSignedIn, user?.id]);
+    if (orgSelected && activeOrgId && hasAccessToken) {
+      console.log("[OrganizationOnboarding] Session already present; routing to /flows", {
+        activeOrgId,
+      });
+      goToFlows();
+    }
+  }, [cookies, goToFlows, isLoaded, isSignedIn]);
 
   /**
    * When Clerk redirects back with ?selected=true,
@@ -680,7 +695,7 @@ export default function OrganizationOnboarding() {
               fontSize: "0.875rem",
             }}
           >
-            <strong>Unable to continue:</strong> {error}
+            <strong>Authentication error:</strong> {error}
           </div>
         )}
 
