@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 from datetime import datetime
+import re
 from typing import Any, Literal
 
 from lfx.log.logger import logger
@@ -27,6 +28,8 @@ from langflow.services.auth.clerk_metadata_constants import (
     ORG_ID_KEY,
 )
 from langflow.services.paddle.client import get_paddle_client
+
+_PADDLE_CUSTOMER_ID_RE = re.compile(r"(ctm_[a-z0-9]+)", re.IGNORECASE)
 
 
 async def ensure_paddle_customer_for_user(
@@ -56,6 +59,11 @@ async def _get_paddle_customer_id() -> str | None:
     return await get_paddle_customer_id_from_clerk_payload()
 
 
+def _extract_customer_id_from_error(exc: Exception) -> str | None:
+    match = _PADDLE_CUSTOMER_ID_RE.search(str(exc))
+    return match.group(1) if match else None
+
+
 async def _create_paddle_customer_and_update_clerk_metadata(
     client: Client,
     clerk_user_id: str,
@@ -76,35 +84,47 @@ async def _create_paddle_customer_and_update_clerk_metadata(
                         PADDLE_CUSTOM_DATA_USER_ID_KEY: str(clerk_user_id),
                     }
                 ),
+            ),
         )
-     )
         logger.info(f"Paddle customer creation response: {customer}")
     except Exception as exc:  # noqa: BLE001
-        if not _is_customer_already_exists_error(exc):
-            raise
-        logger.info(
-            "Paddle customer already exists for email %s; resolving existing customer.",
-            email,
-        )
-        existing_customer = await _find_existing_paddle_customer(
-            client=client,
-            email=email,
-            clerk_user_id=clerk_user_id,
-        )
-        if existing_customer is None:
-            logger.exception("Unable to resolve existing Paddle customer for email %s.", email)
-            raise
+        customer_id = _extract_customer_id_from_error(exc)
+
+        if not customer_id:
+            if not _is_customer_already_exists_error(exc):
+                raise
+
+            logger.info(
+                "Paddle customer already exists for email %s; resolving existing customer.",
+                email,
+            )
+            customer = await _find_existing_paddle_customer(
+                client=client,
+                email=email,
+                clerk_user_id=clerk_user_id,
+            )
+            if customer is None:
+                logger.exception("Unable to resolve existing Paddle customer for email %s.", email)
+                raise
+        else:
+            logger.info(
+                "Paddle reports existing customer %s for email %s",
+                customer_id,
+                email,
+            )
+            customer = await asyncio.to_thread(client.customers.get, customer_id)
+
         await _sync_paddle_customer_metadata(
             client=client,
-            customer=existing_customer,
+            customer=customer,
             clerk_user_id=clerk_user_id,
         )
-        paddle_customer_id = existing_customer.id
+
         await update_clerk_public_metadata(
             clerk_user_id=clerk_user_id,
-            public_metadata={PADDLE_CUSTOMER_ID_KEY: paddle_customer_id},
+            public_metadata={PADDLE_CUSTOMER_ID_KEY: customer.id},
         )
-        return paddle_customer_id
+        return customer.id
 
     paddle_customer_id = customer.id
 
@@ -119,7 +139,12 @@ async def _create_paddle_customer_and_update_clerk_metadata(
 
 def _is_customer_already_exists_error(exc: Exception) -> bool:
     message = str(exc).lower()
-    return "customer already exists" in message or ("already exists" in message and "customer" in message)
+    return (
+        "customer already exists" in message
+        or ("already exists" in message and "customer" in message)
+        or ("customer email conflicts" in message)
+        or ("email conflicts" in message and "customer" in message)
+    )
 
 
 async def _find_existing_paddle_customer(
