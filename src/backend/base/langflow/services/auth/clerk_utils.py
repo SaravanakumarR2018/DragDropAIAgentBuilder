@@ -357,52 +357,51 @@ async def clerk_token_middleware(request: Request, call_next):
         return await call_next(request)
 
     ctx_token: Token | None = None
-    response = None
 
     try:
         # 1️⃣ Clerk JWT
         auth_header = request.headers.get("Authorization")
         if auth_header and auth_header.startswith("Bearer "):
             token = auth_header[len("Bearer ") :]
+
             try:
                 payload = await verify_clerk_token(token)
-                ctx_token = auth_header_ctx.set(payload)
-                response = await call_next(request)
             except Exception as exc:  # noqa: BLE001
-
                 logger.warning(f"[ClerkMiddleware] Failed to verify Clerk token: {exc}")
-                response = JSONResponse(
+                return JSONResponse(
                     status_code=HTTP_401_UNAUTHORIZED,
                     content={"detail": "Invalid Clerk token"},
                 )
 
-        # 2️⃣ API Key
-        elif (api_key_header := request.headers.get("x-api-key")):
+            ctx_token = auth_header_ctx.set(payload)
+            return await call_next(request)
 
+        # 2️⃣ API Key
+        api_key_header = request.headers.get("x-api-key")
+        if api_key_header:
             from langflow.services.auth.api_key_codec import decode_api_key
 
             decoded = decode_api_key(api_key_header)
             if not decoded.is_encoded or not decoded.organization_id:
-                logger.warning(f"[ClerkMiddleware] Invalid or unscoped API key: {api_key_header}")
-                response = JSONResponse(
+                logger.warning("[ClerkMiddleware] Invalid or unscoped API key")
+                return JSONResponse(
                     status_code=HTTP_401_UNAUTHORIZED,
                     content={"detail": "Invalid or unscoped API key"},
                 )
-            else:
-                context_payload = {
+
+            ctx_token = auth_header_ctx.set(
+                {
                     ORG_ID_KEY: decoded.organization_id,
                     CLERK_JWT_UUID_KEY: decoded.user_id,
                 }
-                ctx_token = auth_header_ctx.set(context_payload)
-                response = await call_next(request)
+            )
+            return await call_next(request)
 
-        # 3️⃣ No auth header → pass through
-        else:
-            response = await call_next(request)
+        # 3️⃣ No auth → pass through
+        return await call_next(request)
 
     finally:
         if ctx_token is not None:
             auth_header_ctx.reset(ctx_token)
         else:
             auth_header_ctx.set(None)
-    return response
