@@ -186,22 +186,37 @@ async def _sync_paddle_customer_metadata(
     customer: Any,
     clerk_user_id: str,
 ) -> None:
-    existing_custom_data = dict(getattr(customer, "custom_data", None) or {})
+    # Safely extract the custom data dict from the SDK object
+    raw_custom_data = getattr(customer, "custom_data", None)
+
+    if raw_custom_data is None:
+        existing_custom_data = {}
+    elif isinstance(raw_custom_data, dict):
+        existing_custom_data = raw_custom_data
+    else:
+        # Extract the internal dict from the custom data object
+        existing_custom_data = dict(raw_custom_data.data)
+
+    # If metadata already matches, no need to update
     if str(existing_custom_data.get(PADDLE_CUSTOM_DATA_USER_ID_KEY, "")).strip() == str(clerk_user_id):
         return
 
+    # Prepare updated data
     updated_custom_data = dict(existing_custom_data)
     updated_custom_data[PADDLE_CUSTOM_DATA_USER_ID_KEY] = str(clerk_user_id)
+
+    # Send update request via Paddle API
     try:
         await asyncio.to_thread(
             client.customers.update,
             customer.id,
             UpdateCustomer(custom_data=CustomData(updated_custom_data)),
         )
-    except Exception as exc:  # noqa: BLE001
+    except Exception:
         logger.exception(
             "Failed to sync Paddle customer metadata for customer %s and clerk user %s.",
             customer.id,
             clerk_user_id,
         )
         raise
+
