@@ -2,11 +2,13 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 from sqlmodel.sql.expression import SelectOfScalar
 
+from lfx.log.logger import logger
 from langflow.api.utils import CurrentActiveUser, DbSession
 from langflow.api.v1.schemas import UsersResponse
 from langflow.initial_setup.setup import get_or_create_default_folder
@@ -19,10 +21,15 @@ from langflow.services.auth.utils import (
 from langflow.services.database.models.user.crud import get_user_by_id, update_user
 from langflow.services.database.models.user.model import User, UserCreate, UserRead, UserUpdate
 from langflow.services.deps import get_settings_service
+from langflow.services.paddle.subscriptions import ensure_paddle_customer_for_user
+from langflow.services.auth.clerk_utils import (
+    process_new_user_with_clerk,
+)
 
 router = APIRouter(tags=["Users"], prefix="/users")
 
 SENSITIVE_OPTIN_KEYS = {"skip_trial_access", "trial_access_until", "trial_access_days"}
+
 
 @router.post("/", response_model=UserRead, status_code=201)
 async def add_user(
@@ -39,6 +46,9 @@ async def add_user(
         await session.commit()
         await session.refresh(new_user)
         folder = await get_or_create_default_folder(session, new_user.id)
+        if get_settings_service().auth_settings.CLERK_AUTH_ENABLED:
+            logger.info(f"Ensuring Paddle customer for new user {new_user.id}")
+            await ensure_paddle_customer_for_user()
         if not folder:
             raise HTTPException(status_code=500, detail="Error creating default project")
     except IntegrityError as e:

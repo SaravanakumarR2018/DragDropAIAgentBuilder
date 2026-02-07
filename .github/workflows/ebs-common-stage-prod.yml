@@ -147,6 +147,34 @@ jobs:
             echo "PADDLE_ENVIRONMENT=${PADDLE_ENVIRONMENT}" >> "$ENV_FILE"
           fi
 
+      - name: Prepare Clerk API key
+        env:
+          ENVIRONMENT: ${{ github.event.inputs.environment }}
+          STAGING_CLERK_API_KEY: ${{ secrets.STAGING_CLERK_SECRET_KEY }}
+          PROD_CLERK_API_KEY: ${{ secrets.PROD_CLERK_SECRET_KEY }}
+        run: |
+          set -euo pipefail
+          ENV_FILE=".env-file"
+
+          if [ "$ENVIRONMENT" = "staging" ]; then
+            CLERK_API_KEY="$STAGING_CLERK_API_KEY"
+          else
+            CLERK_API_KEY="$PROD_CLERK_API_KEY"
+          fi
+
+          if [ -z "$CLERK_API_KEY" ]; then
+            echo "❌ Missing Clerk API key for ${ENVIRONMENT} environment"
+            exit 1
+          fi
+
+          echo "🔧 Injecting Clerk API key into ${ENV_FILE}"
+          echo "" >> "$ENV_FILE"
+          if grep -q '^CLERK_API_KEY=' "$ENV_FILE"; then
+            sed -i "s|^CLERK_API_KEY=.*|CLERK_API_KEY=${CLERK_API_KEY}|" "$ENV_FILE"
+          else
+            echo "CLERK_API_KEY=${CLERK_API_KEY}" >> "$ENV_FILE"
+          fi
+          
       - name: Ensure admin user exists in Clerk
         env:
           ENVIRONMENT: ${{ github.event.inputs.environment }}
