@@ -1,11 +1,11 @@
 import { jsonquery } from "@jsonquerylang/jsonquery";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
-import type {
-  Content,
+import {
+  type Content,
   createJSONEditor,
-  MenuItem,
-  Mode,
-  JsonEditor as VanillaJsonEditor,
+  type MenuItem,
+  type Mode,
+  type JsonEditor as VanillaJsonEditor,
 } from "vanilla-jsoneditor";
 import useAlertStore from "../../../stores/alertStore";
 import { cn } from "../../../utils/utils";
