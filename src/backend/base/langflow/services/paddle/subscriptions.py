@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 from datetime import datetime
+from http import HTTPStatus
 import re
 from typing import Any, Literal
 
@@ -88,7 +89,9 @@ async def _create_paddle_customer_and_update_clerk_metadata(
         )
         logger.info(f"Paddle customer creation response: {customer}")
     except Exception as exc:  # noqa: BLE001
-        customer_id = _extract_customer_id_from_error(exc)
+        customer_id = None
+        if hasattr(exc, 'status_code') and exc.status_code == HTTPStatus.CONFLICT:
+            customer_id = _extract_customer_id_from_error(exc)
 
         if not customer_id:
             if not _is_customer_already_exists_error(exc):
