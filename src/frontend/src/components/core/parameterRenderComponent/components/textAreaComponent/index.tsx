@@ -7,6 +7,7 @@ import { useUtilityStore } from "@/stores/utilityStore";
 import { cn } from "../../../../../utils/utils";
 import IconComponent from "../../../../common/genericIconComponent";
 import { Input } from "../../../../ui/input";
+import { ensureCurlHasApiKeyHeader } from "../webhookFieldComponent/utils/webhook-curl-utils";
 import { getPlaceholder } from "../../helpers/get-placeholder-disabled";
 import type { InputProps, TextAreaComponentType } from "../../types";
 import { getIconName } from "../inputComponent/components/helpers/get-icon-name";
@@ -96,7 +97,9 @@ export default function TextAreaComponent({
         flowName: nodeInformationMetadata?.flowName!,
         format: "singleline",
       });
-      handleOnNewValue({ value: curlWebhookCode });
+      handleOnNewValue({
+        value: ensureCurlHasApiKeyHeader(curlWebhookCode),
+      });
     } else if (value === MCP_SSE_VALUE) {
       const mcpSSEUrl = `${URL_MCP_SSE}`;
       handleOnNewValue({ value: mcpSSEUrl });
@@ -139,7 +142,9 @@ export default function TextAreaComponent({
         flowName: nodeInformationMetadata?.flowName!,
         format,
       });
-      handleOnNewValue({ value: curlWebhookCode });
+      handleOnNewValue({
+        value: ensureCurlHasApiKeyHeader(curlWebhookCode),
+      });
     }
   };
 
