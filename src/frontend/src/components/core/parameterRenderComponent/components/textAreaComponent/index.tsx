@@ -7,6 +7,7 @@ import { useUtilityStore } from "@/stores/utilityStore";
 import { cn } from "../../../../../utils/utils";
 import IconComponent from "../../../../common/genericIconComponent";
 import { Input } from "../../../../ui/input";
+import WebhookCurlApiKeyButton from "../webhookFieldComponent/components/webhook-curl-api-key-button";
 import { ensureCurlHasApiKeyHeader } from "../webhookFieldComponent/utils/webhook-curl-utils";
 import { getPlaceholder } from "../../helpers/get-placeholder-disabled";
 import type { InputProps, TextAreaComponentType } from "../../types";
@@ -148,6 +149,15 @@ export default function TextAreaComponent({
     }
   };
 
+  const handleApiKeyGenerated = (apiKeyValue: string) => {
+    if (!isWebhook) {
+      return;
+    }
+
+    const updatedCurl = ensureCurlHasApiKeyHeader(value ?? "", apiKeyValue);
+    handleOnNewValue({ value: updatedCurl });
+  };
+
   const renderIcon = () => (
     <div>
       {!disabled && !isFocused && (
@@ -215,6 +225,14 @@ export default function TextAreaComponent({
         setValue={(newValue) => handleOnNewValue({ value: newValue })}
         disabled={disabled}
         onCloseModal={() => changeWebhookFormat("singleline")}
+        footerSlot={
+          isWebhook ? (
+            <WebhookCurlApiKeyButton
+              onApiKeyGenerated={handleApiKeyGenerated}
+              disabled={disabled}
+            />
+          ) : undefined
+        }
       >
         <div
           onClick={() => changeWebhookFormat("multiline")}

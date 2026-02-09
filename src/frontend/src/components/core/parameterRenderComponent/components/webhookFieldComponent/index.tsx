@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { AuthContext } from "@/contexts/authContext";
 import { useGetBuildsMutation } from "@/controllers/API/queries/_builds/use-get-builds-polling-mutation";
 import SecretKeyModalButton from "@/customization/components/custom-secret-key-modal-button";
@@ -7,8 +7,6 @@ import { getModalPropsApiKey } from "@/customization/utils/get-modal-props";
 import type { InputProps, TextAreaComponentType } from "../../types";
 import CopyFieldAreaComponent from "../copyFieldAreaComponent";
 import TextAreaComponent from "../textAreaComponent";
-import WebhookCurlApiKeyButton from "./components/webhook-curl-api-key-button";
-import { ensureCurlHasApiKeyHeader } from "./utils/webhook-curl-utils";
 
 export default function WebhookFieldComponent({
   value,
@@ -30,21 +28,6 @@ export default function WebhookFieldComponent({
   const showGenerateToken =
     (isBackendUrl && !editNode && !isAuth) ||
     (ENABLE_DATASTAX_LANGFLOW && !editNode);
-  const handleApiKeyGenerated = useCallback(
-    (apiKeyValue: string) => {
-      if (!isCurlWebhook) {
-        return;
-      }
-
-      const updatedCurl = ensureCurlHasApiKeyHeader(
-        value ?? "",
-        apiKeyValue,
-      );
-      handleOnNewValue({ value: updatedCurl });
-    },
-    [handleOnNewValue, isCurlWebhook, value],
-  );
-
   useEffect(() => {
     const getBuilds =
       (!editNode && isBackendUrl && !hasInitialized.current) ||
@@ -88,13 +71,6 @@ export default function WebhookFieldComponent({
             {...baseInputProps}
             nodeInformationMetadata={nodeInformationMetadata}
           />
-          {!editNode && (
-            <div className="mt-2 flex items-center">
-              <WebhookCurlApiKeyButton
-                onApiKeyGenerated={handleApiKeyGenerated}
-              />
-            </div>
-          )}
         </div>
       )}
 
