@@ -142,7 +142,7 @@ export default function TextAreaComponent({
         flowName: nodeInformationMetadata?.flowName!,
         format,
       });
-      handleOnNewValue({ value: ensureCurlHasApiKeyHeader(curlWebhookCode,existingApiKey ?? WEBHOOK_API_KEY_PLACEHOLDER,),});
+      handleOnNewValue({ value: ensureCurlHasApiKeyHeader(curlWebhookCode,existingApiKey ?? WEBHOOK_API_KEY_PLACEHOLDER,), });
     }
   };
   const handleApiKeyGenerated = (apiKeyValue: string) => {if (!isWebhook) {return;}
