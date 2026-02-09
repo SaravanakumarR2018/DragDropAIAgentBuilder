@@ -1,56 +1,62 @@
-"""Webhook respomse evaluator logic for conditional and static responses."""
+"""Webhook response evaluator logic for conditional and static responses."""
 from __future__ import annotations
+
 import json
 import re
-import http import HTTPStatus
+from http import HTTPStatus
 
-def parse_json_content(value:str, fallback_key:str) -> dict | list:
+
+def parse_json_content(value: str, fallback_key: str) -> dict | list:
     try:
         parsed = json.loads(value)
-        if isinstance(parsed,(dict,list)):
+        if isinstance(parsed, (dict, list)):
             return parsed
-         return {fallback_key: parsed}
+        return {fallback_key: parsed}
     except json.JSONDecodeError:
         return {fallback_key: value}
 
-def normalize_webhook_response_body(response_body:object | None, raw_body:bytes|str)->dict | list:
-    raw_value=raw_body.decode() if isinstance(raw_body,bytes) else str(raw_body)
-    if response_body in (None,""):
-        return parse_json_content(raw_value,"payload")
-    if isinstance(response_body,(dict,list)):
+
+def normalize_webhook_response_body(response_body: object | None, raw_body: bytes | str) -> dict | list:
+    raw_value = raw_body.decode() if isinstance(raw_body, bytes) else str(raw_body)
+    if response_body in (None, ""):
+        return parse_json_content(raw_value, "payload")
+    if isinstance(response_body, (dict, list)):
         return response_body
-    if isinstance(response_body,str):
-        return parse_json_content(response_body,"message")
+    if isinstance(response_body, str):
+        return parse_json_content(response_body, "message")
     return {"message": str(response_body)}
 
-def coerce_webhook_status_code(value:object | None)->int:
+
+def coerce_webhook_status_code(value: object | None) -> int:
     try:
-        status_code=int(value) if value is not None else int(HTTPStatus.ACCEPTED)
-     except (TypeError,ValueError):
+        status_code = int(value) if value is not None else int(HTTPStatus.ACCEPTED)
+    except (TypeError, ValueError):
         return int(HTTPStatus.ACCEPTED)
     if status_code < 100 or status_code > 599:
-        return int(HTTPStatus.ACCEPTED) 
-     return status_code
+        return int(HTTPStatus.ACCEPTED)
+    return status_code
 
- def get_by_dotted_path(payload:object, path:str)->object| None:
+
+def get_by_dotted_path(payload: object, path: str) -> object | None:
     if not path:
         return None
-    p=path.strip()
+    p = path.strip()
     if p.startswith("$"):
-        p=p[1:]
+        p = p[1:]
     if p.startswith("."):
-        p=p[1:]
+        p = p[1:]
     if not p:
         return payload
-    current:object=payload
+    current: object = payload
     for seg in p.split("."):
         if not seg:
             return None
-        if isinstance(current,dict) and seg in current:
-            current=current[seg]
+        if isinstance(current, dict) and seg in current:
+            current = current[seg]
         else:
             return None
-    return current                                      
+    return current
+
 
 def match_rule_condition(cond: dict, payload: object) -> bool:
     path = cond.get("path")
@@ -207,9 +213,8 @@ def evaluate_configurable_webhook_response(
     payload_obj = parse_json_maybe(raw_text)
 
     # Prepare payload for matching
-    match_payload: object
     if isinstance(payload_obj, (dict, list)):
-        match_payload = payload_obj
+        match_payload: object = payload_obj
     else:
         match_payload = {"payload": payload_obj}
 
