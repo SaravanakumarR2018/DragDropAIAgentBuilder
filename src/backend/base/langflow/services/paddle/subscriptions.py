@@ -13,7 +13,7 @@ from paddle_billing import Client
 from paddle_billing.Entities.Shared import CustomData
 from paddle_billing.Resources.Customers.Operations import CreateCustomer, UpdateCustomer
 from paddle_billing.Resources.Subscriptions.Operations import ListSubscriptions
-
+from langflow.services.paddle.error_messages import error_messages
 
 from langflow.services.auth.clerk_utils import (
     get_org_id_from_clerk_payload,
@@ -28,6 +28,7 @@ from langflow.services.auth.clerk_metadata_constants import (
     ORG_ID_KEY,
 )
 from langflow.services.paddle.client import get_paddle_client
+from langflow.services.paddle.error_messages import PaddleErrorMessages
 
 _PADDLE_CUSTOMER_ID_RE = re.compile(r"(ctm_[a-z0-9]+)", re.IGNORECASE)
 
@@ -147,12 +148,7 @@ async def _create_paddle_customer_and_update_clerk_metadata(
 
 def _is_customer_already_exists_error(exc: Exception) -> bool:
     message = str(exc).lower()
-    return (
-        "customer already exists" in message
-        or ("already exists" in message and "customer" in message)
-        or ("customer email conflicts" in message)
-        or ("email conflicts" in message and "customer" in message)
-    )
+    return error_messages.paddle_customer_already_exist_message.lower() in message
 
 
 async def _find_existing_paddle_customer(
@@ -161,23 +157,38 @@ async def _find_existing_paddle_customer(
     email: str,
     clerk_user_id: str,
 ) -> Any | None:
-    def _list_customers() -> list[Any]:
-        return list(client.customers.list())
+    def _find_customer() -> Any | None:
+        candidate_by_email: Any | None = None
+        collection: Any | None = client.customers.list()
+        email_normalized = email.lower().strip()
 
-    customers = await asyncio.to_thread(_list_customers)
-    email_normalized = email.lower().strip()
+        while collection:
+            for customer in collection:
+                custom_data = getattr(customer, "custom_data", None) or {}
+                if str(custom_data.get(PADDLE_CUSTOM_DATA_USER_ID_KEY, "")).strip() == str(
+                    clerk_user_id
+                ):
+                    return customer
 
-    for customer in customers:
-        custom_data = getattr(customer, "custom_data", None) or {}
-        if str(custom_data.get(PADDLE_CUSTOM_DATA_USER_ID_KEY, "")).strip() == str(clerk_user_id):
-            return customer
+                customer_email = getattr(customer, "email", "")
+                if (
+                    candidate_by_email is None
+                    and isinstance(customer_email, str)
+                    and customer_email.lower().strip() == email_normalized
+                ):
+                    candidate_by_email = customer
 
-    for customer in customers:
-        customer_email = getattr(customer, "email", "")
-        if isinstance(customer_email, str) and customer_email.lower().strip() == email_normalized:
-            return customer
+            paginator = getattr(collection, "paginator", None)
+            next_page = getattr(paginator, "next", None) if paginator else None
+            if not callable(next_page):
+                break
+            try:
+                collection = next_page()
+            except Exception:  # noqa: BLE001
+                break
+        return candidate_by_email
 
-    return None
+    return await asyncio.to_thread(_find_customer)
 
 
 async def _sync_paddle_customer_metadata(
