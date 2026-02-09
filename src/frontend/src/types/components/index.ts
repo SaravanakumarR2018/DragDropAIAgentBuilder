@@ -692,6 +692,7 @@ export type textModalPropsType = {
   open?: boolean;
   setOpen?: (open: boolean) => void;
   onCloseModal?: () => void;
+  footerSlot?: ReactNode;
 };
 
 export interface ToolsModalProps {
