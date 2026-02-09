@@ -28,7 +28,6 @@ from langflow.services.auth.clerk_metadata_constants import (
     ORG_ID_KEY,
 )
 from langflow.services.paddle.client import get_paddle_client
-from langflow.services.paddle.error_messages import PaddleErrorMessages
 
 _PADDLE_CUSTOMER_ID_RE = re.compile(r"(ctm_[a-z0-9]+)", re.IGNORECASE)
 
