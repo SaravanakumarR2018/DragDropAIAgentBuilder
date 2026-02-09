@@ -201,6 +201,7 @@ async def simple_run_flow_task(
     stream: bool = False,
     api_key_user: User | None = None,
     event_manager: EventManager | None = None,
+    context: dict | None = None,
 ):
     """Run a flow task as a BackgroundTask, therefore it should not throw exceptions."""
     try:
@@ -210,6 +211,7 @@ async def simple_run_flow_task(
             stream=stream,
             api_key_user=api_key_user,
             event_manager=event_manager,
+            context=context,
         )
 
     except Exception:  # noqa: BLE001
@@ -472,8 +474,10 @@ async def webhook_run_flow(
     # Get the appropriate user for webhook execution based on auth settings
     webhook_user = await get_webhook_user(flow_id_or_name, request)
     response_config = get_configurable_webhook_response(flow.data)
-    response_payload:dict | list | None = None
-    response_status_code:int | None = None
+    response_payload: dict | list | None = None
+    response_status_code: int | None = None
+    request_variables = extract_global_variables_from_headers(request.headers)
+    context = {"request_variables": request_variables} if request_variables else None
 
     try:
         try:
@@ -507,6 +511,7 @@ async def webhook_run_flow(
                 flow=flow,
                 input_request=input_request,
                 api_key_user=webhook_user,
+                context=context,
             )
         except Exception as exc:
             error_msg = str(exc)
