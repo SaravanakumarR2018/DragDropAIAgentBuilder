@@ -11,7 +11,7 @@ import orjson
 import sqlalchemy as sa
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Request, UploadFile, status
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from lfx.custom.custom_component.component import Component
 from lfx.custom.utils import (
     add_code_field_to_build_config,
@@ -47,7 +47,10 @@ from langflow.schema.graph import Tweaks
 from langflow.services.auth.utils import api_key_security, get_current_active_user, get_webhook_user
 from langflow.services.cache.utils import save_uploaded_file
 from langflow.services.database.models.flow.model import Flow, FlowRead
-from langflow.services.database.models.flow.utils import get_all_webhook_components_in_flow
+from langflow.services.database.models.flow.utils import (
+    get_all_webhook_components_in_flow,
+    get_configurable_webhook_response,
+)
 from langflow.services.database.models.user.model import User, UserRead
 from langflow.services.deps import get_session_service, get_settings_service, get_telemetry_service
 from langflow.services.telemetry.schema import RunPayload
@@ -468,6 +471,9 @@ async def webhook_run_flow(
 
     # Get the appropriate user for webhook execution based on auth settings
     webhook_user = await get_webhook_user(flow_id_or_name, request)
+    response_config = get_configurable_webhook_response(flow.data)
+    response_payload:dict | list | None = None
+    response_status_code:int | None = None
 
     try:
         try:
@@ -505,6 +511,16 @@ async def webhook_run_flow(
         except Exception as exc:
             error_msg = str(exc)
             raise HTTPException(status_code=500, detail=error_msg) from exc
+        if response_config:
+            try:
+                from langflow.services.webhook.response_evaluator import evaluate_configurable_webhook_response
+                response_status_code, response_payload = evaluate_configurable_webhook_response(
+                    response_config, data
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"Failed to evaluate configurable webhook response: {exc}")
+                response_status_code = int(HTTPStatus.ACCEPTED)
+                response_payload={"message": "Task started in the background", "status": "in progress"}
     finally:
         background_tasks.add_task(
             telemetry_service.log_package_run,
@@ -516,6 +532,10 @@ async def webhook_run_flow(
             ),
         )
 
+    if response_payload is not None:
+        return JSONResponse(
+            status_code=response_status_code, content=response_payload
+        )
     return {"message": "Task started in the background", "status": "in progress"}
 
 
