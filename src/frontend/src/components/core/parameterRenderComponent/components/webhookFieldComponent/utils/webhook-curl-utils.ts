@@ -5,6 +5,24 @@ const API_KEY_HEADER_REGEX = /x-api-key:\s*([^'"]+)/i;
 const buildApiKeyHeader = (apiKeyValue: string) =>
   `-H "x-api-key: ${apiKeyValue}"`;
 
+export const getApiKeyFromCurl = (curlCommand: string): string | null => {
+  if (!curlCommand) {
+    return null;
+  }
+
+  const match = curlCommand.match(API_KEY_HEADER_REGEX);
+  if (!match) {
+    return null;
+  }
+
+  const apiKeyValue = match[1]?.trim();
+  if (!apiKeyValue || apiKeyValue === WEBHOOK_API_KEY_PLACEHOLDER) {
+    return null;
+  }
+
+  return apiKeyValue;
+};
+
 export const ensureCurlHasApiKeyHeader = (
   curlCommand: string,
   apiKeyValue: string = WEBHOOK_API_KEY_PLACEHOLDER,

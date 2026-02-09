@@ -7,6 +7,7 @@ import { createApiKey } from "@/controllers/API";
 type WebhookCurlApiKeyButtonProps = {
   onApiKeyGenerated: (apiKey: string) => void;
   disabled?: boolean;
+  hasGeneratedApiKey?: boolean;
 };
 
 const DEFAULT_API_KEY_NAME = "Webhook curl key";
@@ -14,12 +15,13 @@ const DEFAULT_API_KEY_NAME = "Webhook curl key";
 export default function WebhookCurlApiKeyButton({
   onApiKeyGenerated,
   disabled,
+  hasGeneratedApiKey = false,
 }: WebhookCurlApiKeyButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const generateToken = useGenerateToken();
 
   const handleGenerateKey = async () => {
-    if (isLoading) {
+    if (isLoading || hasGeneratedApiKey) {
       return;
     }
 
@@ -48,9 +50,13 @@ export default function WebhookCurlApiKeyButton({
       type="button"
       variant="secondary"
       onClick={handleGenerateKey}
-      disabled={disabled || isLoading}
+      disabled={disabled || isLoading || hasGeneratedApiKey}
     >
-      {isLoading ? "Generating..." : "Generate API Key"}
+      {hasGeneratedApiKey
+        ? "API key is generated"
+        : isLoading
+          ? "Generating..."
+          : "Generate API Key"}
     </Button>
   );
 }

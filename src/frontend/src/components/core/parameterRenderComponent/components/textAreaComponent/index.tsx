@@ -8,7 +8,11 @@ import { cn } from "../../../../../utils/utils";
 import IconComponent from "../../../../common/genericIconComponent";
 import { Input } from "../../../../ui/input";
 import WebhookCurlApiKeyButton from "../webhookFieldComponent/components/webhook-curl-api-key-button";
-import { ensureCurlHasApiKeyHeader } from "../webhookFieldComponent/utils/webhook-curl-utils";
+import {
+  ensureCurlHasApiKeyHeader,
+  getApiKeyFromCurl,
+  WEBHOOK_API_KEY_PLACEHOLDER,
+} from "../webhookFieldComponent/utils/webhook-curl-utils";
 import { getPlaceholder } from "../../helpers/get-placeholder-disabled";
 import type { InputProps, TextAreaComponentType } from "../../types";
 import { getIconName } from "../inputComponent/components/helpers/get-icon-name";
@@ -137,6 +141,7 @@ export default function TextAreaComponent({
 
   const changeWebhookFormat = (format: "multiline" | "singleline") => {
     if (isWebhook) {
+      const existingApiKey = getApiKeyFromCurl(value ?? "");
       const curlWebhookCode = getCurlWebhookCode({
         flowId: nodeInformationMetadata?.flowId!,
         webhookAuthEnable,
@@ -144,7 +149,10 @@ export default function TextAreaComponent({
         format,
       });
       handleOnNewValue({
-        value: ensureCurlHasApiKeyHeader(curlWebhookCode),
+        value: ensureCurlHasApiKeyHeader(
+          curlWebhookCode,
+          existingApiKey ?? WEBHOOK_API_KEY_PLACEHOLDER,
+        ),
       });
     }
   };
@@ -157,6 +165,8 @@ export default function TextAreaComponent({
     const updatedCurl = ensureCurlHasApiKeyHeader(value ?? "", apiKeyValue);
     handleOnNewValue({ value: updatedCurl });
   };
+
+  const hasGeneratedApiKey = !!getApiKeyFromCurl(value ?? "");
 
   const renderIcon = () => (
     <div>
@@ -230,6 +240,7 @@ export default function TextAreaComponent({
             <WebhookCurlApiKeyButton
               onApiKeyGenerated={handleApiKeyGenerated}
               disabled={disabled}
+              hasGeneratedApiKey={hasGeneratedApiKey}
             />
           ) : undefined
         }
