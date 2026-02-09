@@ -98,7 +98,7 @@ export default function TextAreaComponent({
         flowName: nodeInformationMetadata?.flowName!,
         format: "singleline",
       });
-      handleOnNewValue({value: ensureCurlHasApiKeyHeader(curlWebhookCode),});
+      handleOnNewValue({ value: ensureCurlHasApiKeyHeader(curlWebhookCode), });
     } else if (value === MCP_SSE_VALUE) {
       const mcpSSEUrl = `${URL_MCP_SSE}`;
       handleOnNewValue({ value: mcpSSEUrl });
