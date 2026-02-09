@@ -90,8 +90,7 @@ async def _create_paddle_customer_and_update_clerk_metadata(
         logger.info(f"Paddle customer creation response: {customer}")
     except Exception as exc:  # noqa: BLE001
         customer_id = None
-        if hasattr(exc, 'status_code') and exc.status_code == HTTPStatus.CONFLICT:
-            customer_id = _extract_customer_id_from_error(exc)
+        customer_id = _extract_customer_id_from_error(exc)
 
         if not customer_id:
             if not _is_customer_already_exists_error(exc):
@@ -152,6 +151,21 @@ def _is_customer_already_exists_error(exc: Exception) -> bool:
     message = str(exc).lower()
     return error_messages.paddle_customer_already_exist_message.lower() in message
 
+def _normalize_custom_data(raw_custom_data: Any) -> dict[str, Any]:
+    if raw_custom_data is None:
+        return {}
+    if isinstance(raw_custom_data, dict):
+        return raw_custom_data
+
+    data = getattr(raw_custom_data, "data", None)
+    if isinstance(data, dict):
+        return data
+
+    try:
+        return dict(raw_custom_data)
+    except (TypeError, ValueError):
+        return {}
+
 
 async def _find_existing_paddle_customer(
     *,
@@ -163,10 +177,11 @@ async def _find_existing_paddle_customer(
         candidate_by_email: Any | None = None
         collection: Any | None = client.customers.list()
         email_normalized = email.lower().strip()
+        logger.info(f"Searching for existing Paddle customer by clerk_user_id: {clerk_user_id}, email: {email}")
 
         while collection:
             for customer in collection:
-                custom_data = getattr(customer, "custom_data", None) or {}
+                custom_data = _normalize_custom_data(getattr(customer, "custom_data", None))
                 if str(custom_data.get(PADDLE_CUSTOM_DATA_USER_ID_KEY, "")).strip() == str(
                     clerk_user_id
                 ):
