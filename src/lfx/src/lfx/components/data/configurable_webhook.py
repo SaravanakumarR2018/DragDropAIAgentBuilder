@@ -1,7 +1,5 @@
 """Configurable webhook component with conditional response support."""
 
-from __future__ import annotations
-
 import json
 
 from lfx.custom.custom_component.component import Component
@@ -24,6 +22,20 @@ def _get_default_rules() -> str:
     "response": {
       "status_code": 200,
       "body": { "status": "customer_present", "customer_id": "{{ $.customer_id }}" }
+    }
+  },
+  {
+    "when": { "path": "$.event", "in": ["order.updated", "order.cancelled"] },
+    "response": {
+      "status_code": 200,
+      "body": { "status": "order_changed", "event": "{{ $.event }}" }
+    }
+  },
+  {
+    "when": { "path": "$.amount", "greater_than": 1000 },
+    "response": {
+      "status_code": 402,
+      "body": { "status": "too_large", "amount": "{{ $.amount }}" }
     }
   }
 ]"""
@@ -77,6 +89,7 @@ class ConfigurableWebhookComponent(Component):
             info="Return the default 202 response when enabled.",
             advanced=True,
         ),
+        # Conditional mode
         MultilineInput(
             name="response_rules",
             display_name="Response Rules (JSON)",
@@ -87,10 +100,14 @@ class ConfigurableWebhookComponent(Component):
         MultilineInput(
             name="default_response",
             display_name="Default Response (JSON)",
-            value='{"status_code": 202, "body": {"status": "accepted"}}',
+            value="""{
+  "status_code": 202,
+  "body": { "status": "accepted" }
+}""",
             info="Fallback response when no rules match (conditional mode).",
             advanced=True,
         ),
+        # Legacy static mode
         IntInput(
             name="response_status_code",
             display_name="Response Status Code (Legacy)",
@@ -114,24 +131,61 @@ class ConfigurableWebhookComponent(Component):
         ),
     ]
 
-    outputs = [Output(display_name="Data", name="output_data", method="build_data")]
+    outputs = [
+        Output(display_name="Data", name="output_data", method="build_data"),
+    ]
 
     def build_data(self) -> Data:
         """Build data output from webhook payload."""
-        message: str | Data = ""
         if not self.data:
             self.status = "No data provided."
             return Data(data={})
 
+        # Parse payload
+        payload_value = self.data.replace('"\n"', '"\\n"')
         try:
-            payload_value = self.data.replace('"\n"', '"\\n"')
-            body = json.loads(payload_value or "{}")
+            payload_obj = json.loads(payload_value or "{}")
         except json.JSONDecodeError:
-            body = {"payload": self.data}
-            message = f"Invalid JSON payload. Please check the format.\n\n{self.data}"
+            payload_obj = {"payload": payload_value}
 
-        data = Data(data=body)
-        if not message:
-            message = data
-        self.status = message
-        return data
+        # Import evaluation logic
+        from langflow.services.webhook.response_evaluator import (
+            evaluate_configurable_webhook_response,
+        )
+
+        # Get response configuration
+        response_config = {
+            "response_rules": self.response_rules,
+            "default_response": self.default_response,
+            "status_code": self.response_status_code,
+            "response_body": self.response_body,
+        }
+
+        # Evaluate response
+        try:
+            status_code, selected_body = evaluate_configurable_webhook_response(
+                response_config,
+                json.dumps(payload_obj) if isinstance(payload_obj, (dict, list)) else str(payload_obj),
+            )
+        except Exception as exc:  # noqa: BLE001
+            self.status = f"Error evaluating response: {exc}"
+            return Data(data=payload_obj if isinstance(payload_obj, dict) else {"payload": payload_obj})
+
+        # Return selected response or payload
+        if self.use_response_body_as_output:
+            if isinstance(selected_body, dict):
+                out_data = selected_body
+            elif isinstance(selected_body, list):
+                out_data = {"payload": selected_body}
+            else:
+                out_data = {"message": str(selected_body)}
+            self.status = f"Selected response as output.\nStatus Code: {status_code}"
+            return Data(data=out_data)
+
+        # Default: return payload
+        if isinstance(payload_obj, dict):
+            self.status = "Parsed payload."
+            return Data(data=payload_obj)
+
+        self.status = "Parsed payload."
+        return Data(data={"payload": payload_obj})
