@@ -25,10 +25,13 @@ export function StrRenderComponent({
   const isWebhook = ["webhook","configurablewebhook"].includes(
     nodeInformationMetadata?.nodeType?.toLowerCase()??"",
   );
+  const isWebhookSpecialField = ["curl", "endpoint"].includes(
+    nodeInformationMetadata?.variableName?.toLowerCase() ?? "",
+  );
 
   if (noOptions) {
     if (isMultiline) {
-      if (isWebhook) {
+      if (isWebhook && isWebhookSpecialField) {
         return <WebhookFieldComponent {...baseInputProps} />;
       }
 
