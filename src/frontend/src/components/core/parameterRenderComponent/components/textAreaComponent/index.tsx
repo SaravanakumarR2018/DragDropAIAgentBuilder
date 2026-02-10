@@ -81,7 +81,10 @@ export default function TextAreaComponent({
   const [cursor, setCursor] = useState<number | null>(null);
 
   const isWebhook = useMemo(
-    () => nodeInformationMetadata?.nodeType === "webhook",
+    () =>
+      ["webhook", "configurablewebhook"].includes(
+        nodeInformationMetadata?.nodeType?.toLowerCase() ?? "",
+      ),
     [nodeInformationMetadata?.nodeType],
   );
 
