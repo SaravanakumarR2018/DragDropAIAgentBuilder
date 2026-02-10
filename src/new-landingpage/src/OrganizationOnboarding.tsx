@@ -355,8 +355,8 @@ export default function OrganizationOnboarding() {
   }, []);
 
   const goToPricing = useCallback(() => {
-    console.log("[OrganizationOnboarding] Redirecting to /pricing");
-    window.location.assign("/pricing");
+    console.log("[OrganizationOnboarding] Redirecting to /payment");
+    window.location.assign("/payment");
   }, []);
 
   /**
