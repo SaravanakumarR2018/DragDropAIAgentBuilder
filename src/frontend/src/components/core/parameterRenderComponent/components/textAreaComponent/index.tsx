@@ -8,7 +8,11 @@ import { cn } from "../../../../../utils/utils";
 import IconComponent from "../../../../common/genericIconComponent";
 import { Input } from "../../../../ui/input";
 import WebhookCurlApiKeyButton from "../webhookFieldComponent/components/webhook-curl-api-key-button";
-import {ensureCurlHasApiKeyHeader,getApiKeyFromCurl,WEBHOOK_API_KEY_PLACEHOLDER,} from "../webhookFieldComponent/utils/webhook-curl-utils";
+import {
+  ensureCurlHasApiKeyHeader,
+  getApiKeyFromCurl,
+  WEBHOOK_API_KEY_PLACEHOLDER,
+} from "../webhookFieldComponent/utils/webhook-curl-utils";
 import { getPlaceholder } from "../../helpers/get-placeholder-disabled";
 import type { InputProps, TextAreaComponentType } from "../../types";
 import { getIconName } from "../inputComponent/components/helpers/get-icon-name";
@@ -81,7 +85,10 @@ export default function TextAreaComponent({
   const [cursor, setCursor] = useState<number | null>(null);
 
   const isWebhook = useMemo(
-    () => nodeInformationMetadata?.nodeType === "webhook",
+    () =>
+      ["webhook", "configurablewebhook"].includes(
+        nodeInformationMetadata?.nodeType?.toLowerCase() ?? "",
+      ),
     [nodeInformationMetadata?.nodeType],
   );
 
@@ -98,7 +105,7 @@ export default function TextAreaComponent({
         flowName: nodeInformationMetadata?.flowName!,
         format: "singleline",
       });
-      handleOnNewValue({ value: ensureCurlHasApiKeyHeader(curlWebhookCode), });
+      handleOnNewValue({ value: ensureCurlHasApiKeyHeader(curlWebhookCode) });
     } else if (value === MCP_SSE_VALUE) {
       const mcpSSEUrl = `${URL_MCP_SSE}`;
       handleOnNewValue({ value: mcpSSEUrl });
@@ -142,10 +149,18 @@ export default function TextAreaComponent({
         flowName: nodeInformationMetadata?.flowName!,
         format,
       });
-      handleOnNewValue({ value: ensureCurlHasApiKeyHeader(curlWebhookCode,existingApiKey ?? WEBHOOK_API_KEY_PLACEHOLDER,), });
+      handleOnNewValue({
+        value: ensureCurlHasApiKeyHeader(
+          curlWebhookCode,
+          existingApiKey ?? WEBHOOK_API_KEY_PLACEHOLDER,
+        ),
+      });
     }
   };
-  const handleApiKeyGenerated = (apiKeyValue: string) => {if (!isWebhook) {return;}
+  const handleApiKeyGenerated = (apiKeyValue: string) => {
+    if (!isWebhook) {
+      return;
+    }
     const updatedCurl = ensureCurlHasApiKeyHeader(value ?? "", apiKeyValue);
     handleOnNewValue({ value: updatedCurl });
   };

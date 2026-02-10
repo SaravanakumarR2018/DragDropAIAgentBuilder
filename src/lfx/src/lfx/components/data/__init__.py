@@ -6,6 +6,7 @@ from lfx.components._importing import import_mod
 
 if TYPE_CHECKING:
     from lfx.components.data.api_request import APIRequestComponent
+    from lfx.components.data.configurable_webhook import ConfigurableWebhookComponent
     from lfx.components.data.csv_to_data import CSVToDataComponent
     from lfx.components.data.directory import DirectoryComponent
     from lfx.components.data.file import FileComponent
@@ -20,6 +21,7 @@ if TYPE_CHECKING:
 _dynamic_imports = {
     "APIRequestComponent": "api_request",
     "CSVToDataComponent": "csv_to_data",
+    "ConfigurableWebhookComponent": "configurable_webhook",
     "DirectoryComponent": "directory",
     "FileComponent": "file",
     "JSONToDataComponent": "json_to_data",
@@ -34,6 +36,7 @@ _dynamic_imports = {
 __all__ = [
     "APIRequestComponent",
     "CSVToDataComponent",
+    "ConfigurableWebhookComponent",
     "DirectoryComponent",
     "FileComponent",
     "JSONToDataComponent",
