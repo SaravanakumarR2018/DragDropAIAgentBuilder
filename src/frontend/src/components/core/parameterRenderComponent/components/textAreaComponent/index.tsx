@@ -7,15 +7,15 @@ import { useUtilityStore } from "@/stores/utilityStore";
 import { cn } from "../../../../../utils/utils";
 import IconComponent from "../../../../common/genericIconComponent";
 import { Input } from "../../../../ui/input";
+import { getPlaceholder } from "../../helpers/get-placeholder-disabled";
+import type { InputProps, TextAreaComponentType } from "../../types";
+import { getIconName } from "../inputComponent/components/helpers/get-icon-name";
 import WebhookCurlApiKeyButton from "../webhookFieldComponent/components/webhook-curl-api-key-button";
 import {
   ensureCurlHasApiKeyHeader,
   getApiKeyFromCurl,
   WEBHOOK_API_KEY_PLACEHOLDER,
 } from "../webhookFieldComponent/utils/webhook-curl-utils";
-import { getPlaceholder } from "../../helpers/get-placeholder-disabled";
-import type { InputProps, TextAreaComponentType } from "../../types";
-import { getIconName } from "../inputComponent/components/helpers/get-icon-name";
 
 const inputClasses = {
   base: ({ isFocused, password }: { isFocused: boolean; password: boolean }) =>
@@ -84,13 +84,17 @@ export default function TextAreaComponent({
   const webhookAuthEnable = useUtilityStore((state) => state.webhookAuthEnable);
   const [cursor, setCursor] = useState<number | null>(null);
 
-  const isWebhook = useMemo(
-    () =>
-      ["webhook", "configurablewebhook"].includes(
-        nodeInformationMetadata?.nodeType?.toLowerCase() ?? "",
-      ),
-    [nodeInformationMetadata?.nodeType],
-  );
+  const isWebhook = useMemo(() => {
+    const isWebhookNode = ["webhook", "configurablewebhook"].includes(
+      nodeInformationMetadata?.nodeType?.toLowerCase() ?? "",
+    );
+    const isWebhookCurlField =
+      (nodeInformationMetadata?.variableName ?? "").toLowerCase() === "curl";
+    return isWebhookNode && isWebhookCurlField;
+  }, [
+    nodeInformationMetadata?.nodeType,
+    nodeInformationMetadata?.variableName,
+  ]);
 
   const _isMCPSSE = useMemo(
     () => nodeInformationMetadata?.nodeType === "mcp_sse",
@@ -233,8 +237,13 @@ export default function TextAreaComponent({
         setValue={(newValue) => handleOnNewValue({ value: newValue })}
         disabled={disabled}
         onCloseModal={() => changeWebhookFormat("singleline")}
-        footerSlot={ isWebhook ? (
-            <WebhookCurlApiKeyButton onApiKeyGenerated={handleApiKeyGenerated} disabled={disabled} hasGeneratedApiKey={hasGeneratedApiKey}/>
+        footerSlot={
+          isWebhook ? (
+            <WebhookCurlApiKeyButton
+              onApiKeyGenerated={handleApiKeyGenerated}
+              disabled={disabled}
+              hasGeneratedApiKey={hasGeneratedApiKey}
+            />
           ) : undefined
         }
       >
