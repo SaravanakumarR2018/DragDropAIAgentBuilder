@@ -22,11 +22,16 @@ export function StrRenderComponent({
   const isMultiline = templateData.multiline;
   const copyField = templateData.copy_field;
   const hasOptions = !!templateData.options;
-  const isWebhook = nodeInformationMetadata?.nodeType === "webhook";
+  const isWebhook = ["webhook","configurablewebhook"].includes(
+    nodeInformationMetadata?.nodeType?.toLowerCase()??"",
+  );
+  const isWebhookSpecialField = ["curl", "endpoint"].includes(
+    nodeInformationMetadata?.variableName?.toLowerCase() ?? "",
+  );
 
   if (noOptions) {
     if (isMultiline) {
-      if (isWebhook) {
+      if (isWebhook && isWebhookSpecialField) {
         return <WebhookFieldComponent {...baseInputProps} />;
       }
 
