@@ -149,7 +149,12 @@ async def _create_paddle_customer_and_update_clerk_metadata(
 
 def _is_customer_already_exists_error(exc: Exception) -> bool:
     message = str(exc).lower()
-    return error_messages.paddle_customer_already_exist_message.lower() in message
+    return (
+        "customer already exists" in message
+        or ("already exists" in message and "customer" in message)
+        or ("customer email conflicts" in message)
+        or ("email conflicts" in message and "customer" in message)
+    )
 
 def _normalize_custom_data(raw_custom_data: Any) -> dict[str, Any]:
     if raw_custom_data is None:
