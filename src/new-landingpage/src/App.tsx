@@ -25,9 +25,9 @@ function SessionRedirect({ children }: PropsWithChildren) {
   return <>{children}</>;
 }
 
-function FlowsRedirect() {
-  console.log("[App] Redirecting to /flows");
-  window.location.assign("/flows");
+function PricingRedirect() {
+  console.log("[App] Redirecting to /pricing");
+  window.location.assign("/pricing");
   return null;
 }
 
@@ -54,6 +54,7 @@ export default function App() {
             </SessionRedirect>
           }
         />
+        <Route path="/pricing" element={<PricingRedirect />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

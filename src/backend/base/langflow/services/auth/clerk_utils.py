@@ -22,6 +22,8 @@ from langflow.services.auth.clerk_metadata_constants import (
     CLERK_JWT_ORG_KEY,
     CLERK_JWT_UUID_KEY,
     PADDLE_CUSTOMER_ID_KEY,
+    PADDLE_SUBSCRIPTION_ID_KEY,
+    ORGANISATION_CREATED_BY_KEY,
     ORG_ID_KEY,
 )
 
@@ -102,6 +104,32 @@ class ClerkPublicMetadataManager:
         await self.set_public_metadata(merged)
         return merged
 
+
+
+async def update_clerk_organization(
+    *,
+    org_id: str,
+    public_metadata: dict | None = None,
+    max_allowed_members: int | None = None,
+) -> None:
+    """Update a Clerk organization's public metadata and/or seat limit."""
+    manager = ClerkPublicMetadataManager.for_organization(org_id)
+
+    if public_metadata is not None:
+        await manager.update_public_metadata(public_metadata)
+
+    if max_allowed_members is not None:
+        headers = manager._get_headers()
+        url = manager._get_resource_url()
+        async with httpx.AsyncClient() as client:
+            response = await client.patch(
+                url,
+                headers=headers,
+                json={"max_allowed_members": max_allowed_members},
+            )
+            response.raise_for_status()
+
+
 async def update_clerk_public_metadata(
     *,
     clerk_user_id: str,
@@ -156,6 +184,46 @@ async def get_paddle_customer_id_from_clerk_payload() -> str | None:
 
     logger.info(f"No {PADDLE_CUSTOMER_ID_KEY} found in Clerk JWT payload")
     return None
+
+
+
+
+def get_paddle_subscription_id_from_clerk_payload() -> str | None:
+    payload = auth_header_ctx.get()
+    if not payload:
+        return None
+
+    subscription_id = payload.get(PADDLE_SUBSCRIPTION_ID_KEY)
+    if isinstance(subscription_id, str) and subscription_id.strip():
+        return subscription_id.strip()
+    return None
+
+
+def get_organisation_created_by_from_clerk_payload() -> str | None:
+    payload = auth_header_ctx.get()
+    if not payload:
+        return None
+
+    created_by = payload.get(ORGANISATION_CREATED_BY_KEY)
+    if isinstance(created_by, str) and created_by.strip():
+        return created_by.strip()
+    return None
+
+
+def is_current_user_organisation_admin() -> bool:
+    payload = auth_header_ctx.get()
+    if not payload:
+        return False
+
+    current_user_id = payload.get(CLERK_JWT_SUB_KEY)
+    created_by = payload.get(ORGANISATION_CREATED_BY_KEY)
+    return (
+        isinstance(current_user_id, str)
+        and isinstance(created_by, str)
+        and current_user_id.strip()
+        and created_by.strip()
+        and current_user_id.strip() == created_by.strip()
+    )
 
 
 async def _get_jwks(issuer: str) -> dict[str, Any]:
