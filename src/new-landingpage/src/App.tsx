@@ -59,6 +59,7 @@ export default function App() {
           }
         />
         <Route path="/payment" element={<PaymentPage />} />
+        <Route path="/pricing" element={<PaymentPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

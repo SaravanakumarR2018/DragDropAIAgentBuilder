@@ -180,6 +180,13 @@ async function ensurePaddleCustomer(token: string) {
   });
 }
 
+async function fetchSubscriptionStatus(token: string) {
+  return requestJson("billing/subscription-status", {
+    method: "GET",
+    token,
+  });
+}
+
 async function backendLogin(username: string, token: string) {
   return requestJson("login", {
     method: "POST",
@@ -347,6 +354,11 @@ export default function OrganizationOnboarding() {
     window.location.assign("/flows");
   }, []);
 
+  const goToPricing = useCallback(() => {
+    console.log("[OrganizationOnboarding] Redirecting to /pricing");
+    window.location.assign("/pricing");
+  }, []);
+
   /**
    * Core bootstrap flow:
    * - createOrganisation
@@ -355,7 +367,10 @@ export default function OrganizationOnboarding() {
    * - persist cookies + storage
    * - redirect to /flows
    */
-  const bootstrapSession = useCallback(async () => {
+  const bootstrapSession = useCallback(async (
+    orgToken?: string,
+    { skipOrgEnsure = false }: { skipOrgEnsure?: boolean } = {},
+  ) => {
     if (!isSignedIn || !organization?.id || bootstrappedRef.current) return;
 
     setError(null);
@@ -366,9 +381,8 @@ export default function OrganizationOnboarding() {
     const activeOrgId = organization.id;
 
     try {
-      setStatus("Requesting Clerk token...");
-      const orgToken = await getToken();
-      if (!orgToken) {
+      const token = orgToken ?? (await getToken());
+      if (!token) {
         throw new Error("Unable to retrieve Clerk session token");
       }
 
@@ -378,30 +392,32 @@ export default function OrganizationOnboarding() {
         user?.id ||
         "clerk_user";
 
-      console.log("[OrganizationOnboarding] Calling createOrganisation()");
-      setStatus("Ensuring organization exists...");
-      await createOrganisation(orgToken);
-      console.log("[OrganizationOnboarding] createOrganisation() completed");
+      if (!skipOrgEnsure) {
+        console.log("[OrganizationOnboarding] Calling createOrganisation()");
+        setStatus("Ensuring organization exists...");
+        await createOrganisation(token);
+        console.log("[OrganizationOnboarding] createOrganisation() completed");
+      }
 
       console.log("[OrganizationOnboarding] Calling ensureLangflowUser()");
       setStatus("Synchronizing user profile...");
-      await ensureLangflowUser(orgToken, username);
+      await ensureLangflowUser(token, username);
       console.log("[OrganizationOnboarding] ensureLangflowUser() completed");
 
       const paddleCustomerId = getPaddleCustomerIdFromClerk(user ?? null);
       if (!paddleCustomerId) {
         console.log("[OrganizationOnboarding] Calling ensurePaddleCustomer()");
         setStatus("Finalizing billing profile...");
-        await ensurePaddleCustomer(orgToken);
+        await ensurePaddleCustomer(token);
         console.log("[OrganizationOnboarding] ensurePaddleCustomer() completed");
       }
 
       console.log("[OrganizationOnboarding] Calling backendLogin()");
       setStatus("Creating backend session...");
-      const tokens = await backendLogin(username, orgToken);
+      const tokens = await backendLogin(username, token);
       console.log("[OrganizationOnboarding] backendLogin() succeeded");
 
-      persistSession(orgToken, (tokens as any)?.refresh_token ?? null, activeOrgId);
+      persistSession(token, (tokens as any)?.refresh_token ?? null, activeOrgId);
 
       setStatus("Redirecting to workspace...");
       console.log(
@@ -432,6 +448,72 @@ export default function OrganizationOnboarding() {
     goToFlows,
   ]);
 
+  const handleOrgSelection = useCallback(async () => {
+    if (!isSignedIn || !organization?.id || bootstrappedRef.current) return;
+
+    setError(null);
+    setStatus("Preparing your workspace...");
+    setIsBootstrapping(true);
+
+    try {
+      setStatus("Requesting Clerk token...");
+      const baseToken = await getToken();
+      if (!baseToken) {
+        throw new Error("Unable to retrieve Clerk session token");
+      }
+
+      console.log("[OrganizationOnboarding] Calling createOrganisation()");
+      setStatus("Ensuring organization exists...");
+      await createOrganisation(baseToken);
+      console.log("[OrganizationOnboarding] createOrganisation() completed");
+
+      const refreshedToken = await getToken({ skipCache: true });
+      const tokenToUse = refreshedToken ?? baseToken;
+
+      setStatus("Checking subscription status...");
+      const subscriptionStatus = await fetchSubscriptionStatus(tokenToUse);
+
+      if (subscriptionStatus?.has_access) {
+        await bootstrapSession(tokenToUse, { skipOrgEnsure: true });
+        return;
+      }
+
+      const createdBy = subscriptionStatus?.organisation_created_by;
+      const isAdmin = Boolean(createdBy && user?.id && createdBy === user.id);
+      if (isAdmin) {
+        setStatus("Redirecting to pricing...");
+        goToPricing();
+        return;
+      }
+
+      const adminMessage = createdBy
+        ? `Access requires an active subscription. Please contact the organization admin (${createdBy}).`
+        : "Access requires an active subscription. Please contact the organization admin.";
+      setError(adminMessage);
+      bootstrappedRef.current = false;
+    } catch (err: any) {
+      console.error("[OrganizationOnboarding] Failed to prepare org", err);
+      const msg =
+        err instanceof Error && err.message
+          ? err.message
+          : "Authentication failed";
+      setError(msg);
+      bootstrappedRef.current = false;
+      await clearSession();
+    } finally {
+      setIsBootstrapping(false);
+      setStatus(null);
+    }
+  }, [
+    bootstrapSession,
+    clearSession,
+    getToken,
+    goToPricing,
+    isSignedIn,
+    organization?.id,
+    user?.id,
+  ]);
+
   useEffect(() => {
     if (!isLoaded || !isSignedIn || !organization?.id) return;
     if (!hasExistingOrgSelection || bootstrappedRef.current) return;
@@ -440,9 +522,9 @@ export default function OrganizationOnboarding() {
       "[OrganizationOnboarding] Existing org selection detected; bootstrapping",
     );
 
-    bootstrapSession();
+    handleOrgSelection();
   }, [
-    bootstrapSession,
+    handleOrgSelection,
     hasExistingOrgSelection,
     isLoaded,
     isSignedIn,
@@ -492,7 +574,7 @@ export default function OrganizationOnboarding() {
     (async () => {
       try {
         processedOrgRef.current = organization.id;
-        await bootstrapSession();
+        await handleOrgSelection();
       } finally {
         provisioningOrgRef.current = null;
         const next = new URLSearchParams(searchParams);
@@ -504,7 +586,7 @@ export default function OrganizationOnboarding() {
       bootstrappedRef.current = false;
     });
   }, [
-    bootstrapSession,
+    handleOrgSelection,
     isLoaded,
     isSignedIn,
     organization?.id,
