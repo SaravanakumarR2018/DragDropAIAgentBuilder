@@ -1,7 +1,9 @@
 //import LangflowLogoColor from "@/assets/LangflowLogocolor.svg?react";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { v4 as uuid } from "uuid";
 import { useShallow } from "zustand/react/shallow";
+import { markOptimisticMessageFailed } from "@/utils/optimisticMessageUtils";
 import ThemeButtons from "@/components/core/appHeaderComponent/components/ThemeButtons";
 import { useGetMessagesQuery } from "@/controllers/API/queries/messages";
 import { useDeleteSession } from "@/controllers/API/queries/messages/use-delete-sessions";
@@ -43,7 +45,6 @@ export default function IOModal({
   const outputs = useFlowStore((state) => state.outputs);
   const nodes = useFlowStore((state) => state.nodes);
   const buildFlow = useFlowStore((state) => state.buildFlow);
-  const setIsBuilding = useFlowStore((state) => state.setIsBuilding);
   const isBuilding = useFlowStore((state) => state.isBuilding);
   const newChatOnPlayground = useFlowStore(
     (state) => state.newChatOnPlayground,
@@ -75,6 +76,7 @@ export default function IOModal({
   const setErrorData = useAlertStore((state) => state.setErrorData);
   const setSuccessData = useAlertStore((state) => state.setSuccessData);
   const deleteSession = useMessagesStore((state) => state.deleteSession);
+  const addMessage = useMessagesStore((state) => state.addMessage);
   const currentFlowId = useGetFlowId();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -209,22 +211,58 @@ export default function IOModal({
       files?: string[];
     }): Promise<void> => {
       if (isBuilding) return;
+      const optimisticMessage =
+        playgroundPage && (chatValue || (files && files.length > 0))
+          ? {
+              id: `optimistic-${uuid()}`,
+              text: chatValue,
+              sender: "User",
+              sender_name: "User",
+              session_id: sessionId,
+              timestamp: new Date().toISOString(),
+              files: files ?? [],
+              edit: false,
+              background_color: "",
+              text_color: "",
+              flow_id: currentFlowId,
+              properties: { optimistic: true },
+            }
+          : null;
+
+      if (optimisticMessage) {
+        addMessage(optimisticMessage);
+      }
       setChatValue("");
-      for (let i = 0; i < repeat; i++) {
-        await buildFlow({
-          input_value: chatValue,
-          startNodeId: chatInput?.id,
-          files: files,
-          silent: true,
-          session: sessionId,
-          eventDelivery: eventDeliveryConfig,
-        }).catch((err) => {
-          console.error(err);
-          throw err;
-        });
+      try {
+        for (let i = 0; i < repeat; i++) {
+          await buildFlow({
+            input_value: chatValue,
+            startNodeId: chatInput?.id,
+            files: files,
+            silent: true,
+            session: sessionId,
+            eventDelivery: eventDeliveryConfig,
+          });
+        }
+      } catch (error) {
+        if (optimisticMessage) {
+          addMessage(markOptimisticMessageFailed(optimisticMessage));
+        }
+        throw error;
       }
     },
-    [isBuilding, setIsBuilding, chatValue, chatInput?.id, sessionId, buildFlow],
+    [
+      isBuilding,
+      addMessage,
+      chatValue,
+      chatInput?.id,
+      sessionId,
+      buildFlow,
+      currentFlowId,
+      eventDeliveryConfig,
+      playgroundPage,
+      setChatValue,
+    ],
   );
 
   useEffect(() => {
