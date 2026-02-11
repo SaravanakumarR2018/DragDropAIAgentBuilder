@@ -33,10 +33,11 @@ export const ProtectedRoute = ({ children }) => {
   const isAdminPage = currentPath.includes("/admin");
   const isRootPage = currentPath === "/";
   const isFlowsPage = currentPath.includes("/flows");
+  const isPricingPage = currentPath.includes("/pricing");
 
-  // ✅ Root path "/" is PUBLIC - don't redirect unauthenticated users
-  if (isRootPage) {
-    return children; // Always allow access to landing page
+  // ✅ Keep public pages accessible without forcing auth redirects
+  if (isRootPage || isPricingPage) {
+    return children;
   }
 
   // 1️⃣ Redirect to login if not authenticated (for protected pages only)
