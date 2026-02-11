@@ -31,6 +31,23 @@ export const useMessagesStore = create<MessagesStoreType>((set, get) => ({
       }
       return;
     }
+    if (message.sender === "User") {
+      const messages = get().messages;
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const candidate = messages[i];
+        if (
+          candidate.sender === "User" &&
+          candidate.properties?.optimistic &&
+          candidate.session_id === message.session_id &&
+          candidate.text === message.text
+        ) {
+          const updatedMessages = [...messages];
+          updatedMessages[i] = message;
+          set(() => ({ messages: updatedMessages }));
+          return;
+        }
+      }
+    }
     if (message.sender === "Machine") {
       set(() => ({ displayLoadingMessage: false }));
     }
