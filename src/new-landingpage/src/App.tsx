@@ -6,6 +6,7 @@ import OrganizationOnboarding from "./OrganizationOnboarding";
 import "./App.css";
 import { useCookies } from "react-cookie";
 import LandingPage from "./LandingPage";
+import PricingPage from "./PricingPage";
 import {
   hasWorkspaceSession,
   LANGFLOW_ACCESS_TOKEN,
@@ -23,12 +24,6 @@ function SessionRedirect({ children }: PropsWithChildren) {
   }
 
   return <>{children}</>;
-}
-
-function PricingRedirect() {
-  console.log("[App] Redirecting to /pricing");
-  window.location.assign("/pricing");
-  return null;
 }
 
 export default function App() {
@@ -54,7 +49,7 @@ export default function App() {
             </SessionRedirect>
           }
         />
-        <Route path="/pricing" element={<PricingRedirect />} />
+        <Route path="/pricing" element={<PricingPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
