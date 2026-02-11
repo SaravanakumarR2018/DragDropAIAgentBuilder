@@ -494,8 +494,8 @@ async def webhook_run_flow(
             for component in webhook_components:
                 tweaks[component["id"]] = {"data": data.decode() if isinstance(data, bytes) else data}
             input_request = SimplifiedAPIRequest(
-                input_value="",
-                input_type="chat",
+                input_value=None,
+                input_type="any",
                 output_type="chat",
                 tweaks=tweaks,
                 session_id=None,
