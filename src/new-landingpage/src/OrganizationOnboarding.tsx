@@ -436,7 +436,12 @@ export default function OrganizationOnboarding() {
           : "Authentication failed";
       setError(msg);
       bootstrappedRef.current = false;
-      await clearSession();
+
+      const statusCode = err instanceof HttpError ? err.status : undefined;
+      const shouldClearSession = statusCode === 401 || statusCode === 403;
+      if (shouldClearSession) {
+        await clearSession();
+      }
     } finally {
       setIsBootstrapping(false);
       setStatus(null);

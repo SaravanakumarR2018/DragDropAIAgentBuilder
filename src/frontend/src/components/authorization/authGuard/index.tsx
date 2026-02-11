@@ -58,6 +58,20 @@ export const ProtectedRoute = ({ children }) => {
     return children;
   }
 
+
+  // If Clerk user has org context but backend session is not ready yet,
+  // keep them on pricing instead of forcing login/logout loops from /flows.
+  const shouldRedirectFlowsToPricing =
+    isOrgLoaded &&
+    isFlowsPage &&
+    isSignedIn &&
+    isOrgSelected &&
+    !isAuthenticated;
+
+  if (shouldRedirectFlowsToPricing) {
+    return <CustomNavigate to="/pricing" replace />;
+  }
+
   // 1️⃣ Redirect to login if not authenticated (for protected pages only)
   const shouldRedirectToLogin =
     isOrgLoaded &&
