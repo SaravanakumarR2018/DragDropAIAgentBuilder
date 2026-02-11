@@ -3,7 +3,7 @@
 import json
 
 from lfx.custom.custom_component.component import Component
-from lfx.io import BoolInput, IntInput, MultilineInput, Output
+from lfx.io import BoolInput, MultilineInput, Output
 from lfx.schema.data import Data
 
 
@@ -107,21 +107,6 @@ class ConfigurableWebhookComponent(Component):
             info="Fallback response when no rules match (conditional mode).",
             advanced=True,
         ),
-        # Legacy static mode
-        IntInput(
-            name="response_status_code",
-            display_name="Response Status Code (Legacy)",
-            value=202,
-            info="(Legacy) HTTP status code for static responses.",
-            advanced=True,
-        ),
-        MultilineInput(
-            name="response_body",
-            display_name="Response Body (Legacy)",
-            value='{"message": "Task started in the background", "status": "in progress"}',
-            info="(Legacy) JSON or text to return. Leave blank to echo payload.",
-            advanced=True,
-        ),
         BoolInput(
             name="use_response_body_as_output",
             display_name="Use Response as Output",
@@ -157,8 +142,6 @@ class ConfigurableWebhookComponent(Component):
         response_config = {
             "response_rules": self.response_rules,
             "default_response": self.default_response,
-            "status_code": self.response_status_code,
-            "response_body": self.response_body,
         }
 
         # Evaluate response
