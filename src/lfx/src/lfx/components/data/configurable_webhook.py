@@ -3,39 +3,84 @@
 import json
 
 from lfx.custom.custom_component.component import Component
-from lfx.io import BoolInput, IntInput, MultilineInput, Output
+from lfx.io import BoolInput, MultilineInput, Output
 from lfx.schema.data import Data
 
 
 def _get_default_rules() -> str:
     """Get default example rules."""
-    return '''[
+    return '''#Examples of default Conditional Configuration 
+[
   {
-    "when": { "path": "$.event", "equals": "order.created" },
+    "when": { "path": "$.event", "equals": "order.created"},
     "response": {
       "status_code": 201,
-      "body": { "status": "created", "order_id": "{{ $.id }}" }
+      "body": { "condition": "equals", "status": "created", "order_id": "{{ $.id }}" }
     }
   },
   {
-    "when": { "path": "$.customer_id", "exists": true },
+    "when": { "path": "$.event", "in": ["order.updated", "order.cancelled"]},
     "response": {
       "status_code": 200,
-      "body": { "status": "customer_present", "customer_id": "{{ $.customer_id }}" }
-    }
-  },
-  {
-    "when": { "path": "$.event", "in": ["order.updated", "order.cancelled"] },
-    "response": {
-      "status_code": 200,
-      "body": { "status": "order_changed", "event": "{{ $.event }}" }
+      "body": { "condition": "in", "event": "{{ $.event }}" }
     }
   },
   {
     "when": { "path": "$.amount", "greater_than": 1000 },
     "response": {
       "status_code": 402,
-      "body": { "status": "too_large", "amount": "{{ $.amount }}" }
+      "body": { "condition": "greater_than", "error": "Amount too large", "amount": "{{ $.amount }}"
+      }
+    }
+  },
+  {
+    "when": { "path": "$.amount", "greater_than_or_equal": 500 },
+    "response": {
+      "status_code": 200,
+      "body": { "condition": "greater_than_or_equal", "tier": "medium", "amount": "{{ $.amount }}"
+      }
+    }
+  },
+  {
+    "when": { "path": "$.amount", "less_than_or_equal": 10 },
+    "response": {
+      "status_code": 200,
+      "body": { "condition": "less_than_or_equal", "tier": "tiny", "amount": "{{ $.amount }}" }
+    }
+  },
+  {
+    "when": { "path": "$.amount", "less_than": 100 },
+    "response": {
+      "status_code": 200,
+      "body": { "condition": "less_than", "tier": "low", "amount": "{{ $.amount }}" }
+    }
+  },
+  {
+    "when": { "path": "$.message", "contains": "error" },
+    "response": {
+      "status_code": 400,
+      "body": { "condition": "contains", "message": "{{ $.message }}" }
+    }
+  },
+  {
+    "when": { "path": "$.email", "regex": ".*@example.com$" },
+    "response": {
+      "status_code": 200,
+      "body": { "condition": "regex", "email": "{{ $.email }}" }
+    }
+  },
+  {
+    "when": { "path": "$.user_id", "exists": true },
+    "response": {
+      "status_code": 200,
+      "body": { "condition": "exists", "user_id": "{{ $.user_id }}" }
+    }
+  },
+  {
+    "when": { "path": "$.event", "exists": true, "not_equals": "order.created" },
+    "response": {
+      "status_code": 200,
+      "body": { "condition": "not_equals", "event": "{{ $.event }}" }
     }
   }
 ]'''
@@ -54,7 +99,7 @@ def _get_rules_info() -> str:
 
 
 class ConfigurableWebhookComponent(Component):
-    display_name = "Configurable Webhook"
+    display_name = "Webhook Configurable"
     description = "Webhook input with configurable response options (including conditional responses)."
     documentation: str = "https://docs.langflow.org/components-data#webhook"
     name = "ConfigurableWebhook"
@@ -104,21 +149,6 @@ class ConfigurableWebhookComponent(Component):
             info="Fallback response when no rules match (conditional mode).",
             advanced=True,
         ),
-        # Legacy static mode
-        IntInput(
-            name="response_status_code",
-            display_name="Response Status Code (Legacy)",
-            value=202,
-            info="(Legacy) HTTP status code for static responses.",
-            advanced=True,
-        ),
-        MultilineInput(
-            name="response_body",
-            display_name="Response Body (Legacy)",
-            value='{"message": "Task started in the background", "status": "in progress"}',
-            info="(Legacy) JSON or text to return. Leave blank to echo payload.",
-            advanced=True,
-        ),
         BoolInput(
             name="use_response_body_as_output",
             display_name="Use Response as Output",
@@ -154,8 +184,6 @@ class ConfigurableWebhookComponent(Component):
         response_config = {
             "response_rules": self.response_rules,
             "default_response": self.default_response,
-            "status_code": self.response_status_code,
-            "response_body": self.response_body,
         }
 
         # Evaluate response

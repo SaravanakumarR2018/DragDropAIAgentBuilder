@@ -200,15 +200,18 @@ def evaluate_configurable_webhook_response(
       1) response_rules + default_response (conditional mode)
       2) legacy response_status_code/response_body (static mode)
       3) echo payload / accepted
-
-    Args:
-        response_config: Configuration dict with response_rules, default_response,
-                        status_code, and response_body keys
-        raw_body: Raw request body as bytes or string
-
-    Returns:
-        Tuple of (status_code, response_body)
     """
+
+    def _strip_json_comments(text: str | None) -> str | None:
+        """Remove lines starting with # or // before JSON parsing."""
+        if not isinstance(text, str):
+            return text
+        return "\n".join(
+            line
+            for line in text.splitlines()
+            if line.strip() and not line.strip().startswith(("#", "//"))
+        )
+
     raw_text = raw_body.decode() if isinstance(raw_body, bytes) else str(raw_body)
     payload_obj = parse_json_maybe(raw_text)
 
@@ -218,10 +221,13 @@ def evaluate_configurable_webhook_response(
     else:
         match_payload = {"payload": payload_obj}
 
-    # Try conditional mode first
-    rules_raw = parse_json_maybe(response_config.get("response_rules"))
-    default_raw = parse_json_maybe(response_config.get("default_response"))
+    rules_text = _strip_json_comments(response_config.get("response_rules"))
+    default_text = _strip_json_comments(response_config.get("default_response"))
 
+    rules_raw = parse_json_maybe(rules_text)
+    default_raw = parse_json_maybe(default_text)
+
+    # Conditional mode
     if isinstance(rules_raw, list):
         # Evaluate rules
         for rule in rules_raw:
@@ -251,5 +257,7 @@ def evaluate_configurable_webhook_response(
 
     # Legacy static mode
     status_code = coerce_webhook_status_code(response_config.get("status_code"))
-    body = normalize_webhook_response_body(response_config.get("response_body"), raw_body)
+    body = normalize_webhook_response_body(
+        response_config.get("response_body"), raw_body
+    )
     return status_code, body
