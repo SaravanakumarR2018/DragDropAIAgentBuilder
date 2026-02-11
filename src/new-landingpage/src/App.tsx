@@ -6,7 +6,6 @@ import OrganizationOnboarding from "./OrganizationOnboarding";
 import "./App.css";
 import { useCookies } from "react-cookie";
 import LandingPage from "./LandingPage";
-import PricingPage from "./PricingPage";
 import {
   hasWorkspaceSession,
   LANGFLOW_ACCESS_TOKEN,
@@ -49,7 +48,6 @@ export default function App() {
             </SessionRedirect>
           }
         />
-        <Route path="/pricing" element={<PricingPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
