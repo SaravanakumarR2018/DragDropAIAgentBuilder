@@ -33,10 +33,43 @@ export const ProtectedRoute = ({ children }) => {
   const isAdminPage = currentPath.includes("/admin");
   const isRootPage = currentPath === "/";
   const isFlowsPage = currentPath.includes("/flows");
+  const isPricingPage = currentPath.includes("/pricing");
 
-  // ✅ Root path "/" is PUBLIC - don't redirect unauthenticated users
+  // ✅ Root path remains public
   if (isRootPage) {
-    return children; // Always allow access to landing page
+    return children;
+  }
+
+  // ✅ Pricing page requires a signed-in Clerk user + selected organization,
+  // but does not require backend session cookies yet.
+  if (isPricingPage) {
+    if (!isOrgLoaded || autoLogin === undefined) {
+      return null;
+    }
+
+    if (!isSignedIn || testMockAutoLogin) {
+      return <CustomNavigate to="/login?redirect=/pricing" replace />;
+    }
+
+    if (!isOrgSelected) {
+      return <CustomNavigate to="/organization" replace />;
+    }
+
+    return children;
+  }
+
+
+  // If Clerk user has org context but backend session is not ready yet,
+  // keep them on pricing instead of forcing login/logout loops from /flows.
+  const shouldRedirectFlowsToPricing =
+    isOrgLoaded &&
+    isFlowsPage &&
+    isSignedIn &&
+    isOrgSelected &&
+    !isAuthenticated;
+
+  if (shouldRedirectFlowsToPricing) {
+    return <CustomNavigate to="/pricing" replace />;
   }
 
   // 1️⃣ Redirect to login if not authenticated (for protected pages only)

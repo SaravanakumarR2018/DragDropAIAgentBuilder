@@ -180,6 +180,10 @@ async function ensurePaddleCustomer(token: string) {
   });
 }
 
+async function getOrgAccess(token: string) {
+  return requestJson("billing/org-access", { token });
+}
+
 async function backendLogin(username: string, token: string) {
   return requestJson("login", {
     method: "POST",
@@ -228,7 +232,7 @@ function setStoredActiveOrgId(orgId: string | null) {
   }
 }
 
-function getPaddleCustomerIdFromClerk(user:any) {
+function getPaddleCustomerIdFromClerk(user: any) {
   const publicMetadata = user?.publicMetadata as Record<string, unknown> | undefined;
   const customerId = publicMetadata?.paddle_customer_id;
   if (typeof customerId === "string" && customerId.trim()) {
@@ -347,6 +351,11 @@ export default function OrganizationOnboarding() {
     window.location.assign("/flows");
   }, []);
 
+  const goToPricing = useCallback(() => {
+    console.log("[OrganizationOnboarding] Redirecting to /pricing");
+    window.location.assign("/pricing");
+  }, []);
+
   /**
    * Core bootstrap flow:
    * - createOrganisation
@@ -396,6 +405,16 @@ export default function OrganizationOnboarding() {
         console.log("[OrganizationOnboarding] ensurePaddleCustomer() completed");
       }
 
+      console.log("[OrganizationOnboarding] Checking org billing access");
+      setStatus("Checking subscription status...");
+      const access = await getOrgAccess(orgToken);
+
+      if ((access as any)?.redirect_to === "/pricing") {
+        setStatus("Redirecting to billing...");
+        goToPricing();
+        return;
+      }
+
       console.log("[OrganizationOnboarding] Calling backendLogin()");
       setStatus("Creating backend session...");
       const tokens = await backendLogin(username, orgToken);
@@ -417,7 +436,12 @@ export default function OrganizationOnboarding() {
           : "Authentication failed";
       setError(msg);
       bootstrappedRef.current = false;
-      await clearSession();
+
+      const statusCode = err instanceof HttpError ? err.status : undefined;
+      const shouldClearSession = statusCode === 401 || statusCode === 403;
+      if (shouldClearSession) {
+        await clearSession();
+      }
     } finally {
       setIsBootstrapping(false);
       setStatus(null);
@@ -430,6 +454,7 @@ export default function OrganizationOnboarding() {
     persistSession,
     user,
     goToFlows,
+    goToPricing,
   ]);
 
   useEffect(() => {
@@ -449,20 +474,37 @@ export default function OrganizationOnboarding() {
     organization?.id,
   ]);
 
+
   useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
+    if (!isLoaded || !isSignedIn || !organization?.id || bootstrappedRef.current) return;
 
     const orgSelected = localStorage.getItem(ORG_SELECTED_KEY) === "true";
     const activeOrgId = localStorage.getItem(ACTIVE_ORG_STORAGE_KEY);
     const hasAccessToken = Boolean(cookies[LANGFLOW_ACCESS_TOKEN]);
 
-    if (orgSelected && activeOrgId && hasAccessToken) {
-      console.log("[OrganizationOnboarding] Session already present; routing to /flows", {
-        activeOrgId,
-      });
-      goToFlows();
-    }
-  }, [cookies, goToFlows, isLoaded, isSignedIn]);
+    if (!orgSelected || !activeOrgId || !hasAccessToken) return;
+
+    (async () => {
+      try {
+        const orgToken = await getToken();
+        if (!orgToken) return;
+
+        const access = await getOrgAccess(orgToken);
+        if ((access as any)?.redirect_to === "/pricing") {
+          goToPricing();
+          return;
+        }
+
+        console.log("[OrganizationOnboarding] Session already present; routing to /flows", {
+          activeOrgId,
+        });
+        goToFlows();
+      } catch (error) {
+        console.warn("[OrganizationOnboarding] Existing session access check failed", error);
+      }
+    })();
+  }, [cookies, getToken, goToFlows, goToPricing, isLoaded, isSignedIn, organization?.id]);
+
 
   /**
    * When Clerk redirects back with ?selected=true,

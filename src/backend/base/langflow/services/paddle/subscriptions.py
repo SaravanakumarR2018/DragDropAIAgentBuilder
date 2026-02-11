@@ -20,16 +20,89 @@ from langflow.services.auth.clerk_utils import (
     get_email_from_clerk_payload,
     get_clerk_user_id_from_payload,
     get_paddle_customer_id_from_clerk_payload,
+    get_paddle_subscription_id_from_clerk_payload,
+    get_organisation_created_by_from_clerk_payload,
     update_clerk_public_metadata,
+    update_clerk_organization,
 )
 from langflow.services.auth.clerk_metadata_constants import (
     PADDLE_CUSTOMER_ID_KEY,
+    PADDLE_SUBSCRIPTION_ID_KEY,
+    ORGANISATION_CREATED_BY_KEY,
     PADDLE_CUSTOM_DATA_USER_ID_KEY,
     ORG_ID_KEY,
 )
 from langflow.services.paddle.client import get_paddle_client
 
 _PADDLE_CUSTOMER_ID_RE = re.compile(r"(ctm_[a-z0-9]+)", re.IGNORECASE)
+
+
+ACTIVE_SUBSCRIPTION_STATUSES = {"active", "trialing"}
+
+
+async def get_subscription_status(
+    *,
+    subscription_id: str,
+    client: Client | None = None,
+) -> str | None:
+    paddle_client = client or get_paddle_client()
+    if hasattr(paddle_client.subscriptions, "get"):
+        subscription = await asyncio.to_thread(
+            paddle_client.subscriptions.get, subscription_id
+        )
+        return getattr(subscription, "status", None)
+
+    list_response = await asyncio.to_thread(
+        paddle_client.subscriptions.list,
+        ListSubscriptions(id=subscription_id),
+    )
+    for subscription in list_response:
+        return getattr(subscription, "status", None)
+    return None
+
+
+async def has_active_subscription(
+    *,
+    subscription_id: str | None = None,
+    client: Client | None = None,
+) -> dict[str, Any]:
+    sub_id = subscription_id or get_paddle_subscription_id_from_clerk_payload()
+    created_by = get_organisation_created_by_from_clerk_payload()
+    if not sub_id:
+        return {
+            "has_access": False,
+            "subscription_status": None,
+            "paddle_subscription_id": None,
+            "organisation_created_by": created_by,
+        }
+
+    status = await get_subscription_status(subscription_id=sub_id, client=client)
+    has_access = status in ACTIVE_SUBSCRIPTION_STATUSES if status else False
+    return {
+        "has_access": has_access,
+        "subscription_status": status,
+        "paddle_subscription_id": sub_id,
+        "organisation_created_by": created_by,
+    }
+
+
+async def update_org_billing_metadata(
+    *,
+    org_id: str,
+    subscription_id: str,
+    organisation_created_by: str,
+    seats: int,
+) -> None:
+    await update_clerk_organization(
+        org_id=org_id,
+        public_metadata={
+            PADDLE_SUBSCRIPTION_ID_KEY: subscription_id,
+            ORGANISATION_CREATED_BY_KEY: organisation_created_by,
+        },
+        max_allowed_members=seats,
+    )
+
+
 
 
 async def ensure_paddle_customer_for_user(

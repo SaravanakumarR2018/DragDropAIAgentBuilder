@@ -25,12 +25,6 @@ function SessionRedirect({ children }: PropsWithChildren) {
   return <>{children}</>;
 }
 
-function FlowsRedirect() {
-  console.log("[App] Redirecting to /flows");
-  window.location.assign("/flows");
-  return null;
-}
-
 export default function App() {
   console.log(`[App] App mounted with basename ${LANDING_BASENAME}`);
 
