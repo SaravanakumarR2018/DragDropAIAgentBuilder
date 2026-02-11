@@ -35,8 +35,26 @@ export const ProtectedRoute = ({ children }) => {
   const isFlowsPage = currentPath.includes("/flows");
   const isPricingPage = currentPath.includes("/pricing");
 
-  // ✅ Keep public pages accessible without forcing auth redirects
-  if (isRootPage || isPricingPage) {
+  // ✅ Root path remains public
+  if (isRootPage) {
+    return children;
+  }
+
+  // ✅ Pricing page requires a signed-in Clerk user + selected organization,
+  // but does not require backend session cookies yet.
+  if (isPricingPage) {
+    if (!isOrgLoaded || autoLogin === undefined) {
+      return null;
+    }
+
+    if (!isSignedIn || testMockAutoLogin) {
+      return <CustomNavigate to="/login?redirect=/pricing" replace />;
+    }
+
+    if (!isOrgSelected) {
+      return <CustomNavigate to="/organization" replace />;
+    }
+
     return children;
   }
 
