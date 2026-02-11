@@ -22,6 +22,8 @@ from langflow.services.auth.clerk_metadata_constants import (
     CLERK_JWT_ORG_KEY,
     CLERK_JWT_UUID_KEY,
     PADDLE_CUSTOMER_ID_KEY,
+    PADDLE_SUBSCRIPTION_ID_KEY,
+    ORGANISATION_CREATED_BY_KEY,
     ORG_ID_KEY,
 )
 
@@ -101,14 +103,46 @@ class ClerkPublicMetadataManager:
         merged = self.merge_metadata(existing, updates)
         await self.set_public_metadata(merged)
         return merged
+    
+
+async def update_clerk_organization(
+    *,
+    org_id: str,
+    public_metadata: dict | None = None,
+    max_allowed_members: int | None = None,
+) -> None:
+    """Update a Clerk organization's public metadata and/or seat limit."""
+    logger.info(f"Updating Clerk organization {org_id}: public_metadata={public_metadata}, max_allowed_members={max_allowed_members}")
+    manager = ClerkPublicMetadataManager.for_organization(org_id)
+
+    if public_metadata is not None:
+        logger.info(f"Updating organization {org_id} public metadata: {public_metadata}")
+        await manager.update_public_metadata(public_metadata)
+        logger.info(f"Successfully updated organization {org_id} public metadata")
+
+    if max_allowed_members is not None:
+        logger.info(f"Updating organization {org_id} max_allowed_members to {max_allowed_members}")
+        headers = manager._get_headers()
+        url = manager._get_resource_url()
+        async with httpx.AsyncClient() as client:
+            response = await client.patch(
+                url,
+                headers=headers,
+                json={"max_allowed_members": max_allowed_members},
+            )
+            response.raise_for_status()
+        logger.info(f"Successfully updated organization {org_id} max_allowed_members to {max_allowed_members}")
+
 
 async def update_clerk_public_metadata(
     *,
     clerk_user_id: str,
     public_metadata: dict,
 ) -> None:
+    logger.info(f"Updating Clerk user {clerk_user_id} public metadata: {public_metadata}")
     manager = ClerkPublicMetadataManager(resource_type="user", resource_id=clerk_user_id)
     await manager.update_public_metadata(public_metadata)
+    logger.info(f"Successfully updated Clerk user {clerk_user_id} public metadata")
 
 
 def get_clerk_user_id_from_payload() -> str:
@@ -156,6 +190,50 @@ async def get_paddle_customer_id_from_clerk_payload() -> str | None:
 
     logger.info(f"No {PADDLE_CUSTOMER_ID_KEY} found in Clerk JWT payload")
     return None
+
+
+async def get_paddle_subscription_id_from_clerk_payload() -> str | None:
+    payload = auth_header_ctx.get()
+    if not payload:
+        logger.info("No Clerk payload in request context for subscription ID")
+        return None
+
+    subscription_id = payload.get(PADDLE_SUBSCRIPTION_ID_KEY)
+    if isinstance(subscription_id, str) and subscription_id.strip():
+        logger.debug(f"Resolved Paddle subscription ID from JWT: {subscription_id}")
+        return subscription_id.strip()
+    logger.info(f"No {PADDLE_SUBSCRIPTION_ID_KEY} found in Clerk JWT payload")
+    return None
+
+
+async def get_organisation_created_by_from_clerk_payload() -> str | None:
+    payload = auth_header_ctx.get()
+    if not payload:
+        logger.info("No Clerk payload in request context for organisation_created_by")
+        return None
+
+    created_by = payload.get(ORGANISATION_CREATED_BY_KEY)
+    if isinstance(created_by, str) and created_by.strip():
+        logger.debug(f"Resolved organisation_created_by from JWT: {created_by}")
+        return created_by.strip()
+    logger.info(f"No {ORGANISATION_CREATED_BY_KEY} found in Clerk JWT payload")
+    return None
+
+
+def is_current_user_organisation_admin() -> bool:
+    payload = auth_header_ctx.get()
+    if not payload:
+        return False
+
+    current_user_id = payload.get(CLERK_JWT_SUB_KEY)
+    created_by = payload.get(ORGANISATION_CREATED_BY_KEY)
+    return (
+        isinstance(current_user_id, str)
+        and isinstance(created_by, str)
+        and current_user_id.strip()
+        and created_by.strip()
+        and current_user_id.strip() == created_by.strip()
+    )
 
 
 async def _get_jwks(issuer: str) -> dict[str, Any]:

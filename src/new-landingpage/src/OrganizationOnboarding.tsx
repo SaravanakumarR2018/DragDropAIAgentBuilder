@@ -127,7 +127,10 @@ async function requestJson(
  */
 
 async function fetchWhoAmI(token: string) {
-  return requestJson("users/whoami", { token });
+  console.log("[fetchWhoAmI] Fetching current user info");
+  const result = await requestJson("users/whoami", { token });
+  console.log("[fetchWhoAmI] Successfully fetched user info", result);
+  return result;
 }
 
 async function ensureLangflowUser(
@@ -174,14 +177,25 @@ async function ensureLangflowUser(
 }
 
 async function ensurePaddleCustomer(token: string) {
-  return requestJson("billing/ensure-paddle-customer", {
+  console.log("[ensurePaddleCustomer] Ensuring Paddle customer exists");
+  const result = await requestJson("billing/ensure-paddle-customer", {
     method: "POST",
     token,
   });
+  console.log("[ensurePaddleCustomer] Result:", result);
+  return result;
+}
+
+async function getOrgAccess(token: string) {
+  console.log("[getOrgAccess] Fetching organization access status");
+  const result = await requestJson("billing/org-access", { token });
+  console.log("[getOrgAccess] Access status:", result);
+  return result;
 }
 
 async function backendLogin(username: string, token: string) {
-  return requestJson("login", {
+  console.log("[backendLogin] Attempting backend login for user:", username);
+  const result = await requestJson("login", {
     method: "POST",
     token,
     body: new URLSearchParams({
@@ -189,22 +203,28 @@ async function backendLogin(username: string, token: string) {
       password: CLERK_DUMMY_PASSWORD,
     }),
   });
+  console.log("[backendLogin] Login successful for user:", username);
+  return result;
 }
 
 async function createOrganisation(token: string) {
+  console.log("[createOrganisation] Creating organization");
   try {
-    await requestJson("create_organisation", {
+    const result = await requestJson("create_organisation", {
       method: "POST",
       token,
     });
+    console.log("[createOrganisation] Organization created successfully", result);
   } catch (error: any) {
     // Some backends return 200 or 400 when org already exists
     if (
       error instanceof HttpError &&
       (error.status === 200 || error.status === 400)
     ) {
+      console.log("[createOrganisation] Organization already exists (status:", error.status, ")");
       return;
     }
+    console.error("[createOrganisation] Error:", error);
     throw error;
   }
 }
@@ -228,7 +248,7 @@ function setStoredActiveOrgId(orgId: string | null) {
   }
 }
 
-function getPaddleCustomerIdFromClerk(user:any) {
+function getPaddleCustomerIdFromClerk(user: any) {
   const publicMetadata = user?.publicMetadata as Record<string, unknown> | undefined;
   const customerId = publicMetadata?.paddle_customer_id;
   if (typeof customerId === "string" && customerId.trim()) {
@@ -347,6 +367,11 @@ export default function OrganizationOnboarding() {
     window.location.assign("/flows");
   }, []);
 
+  const goToPricing = useCallback(() => {
+    console.log("[OrganizationOnboarding] Redirecting to /pricing");
+    window.location.assign("/pricing");
+  }, []);
+
   /**
    * Core bootstrap flow:
    * - createOrganisation
@@ -396,6 +421,16 @@ export default function OrganizationOnboarding() {
         console.log("[OrganizationOnboarding] ensurePaddleCustomer() completed");
       }
 
+      console.log("[OrganizationOnboarding] Checking org billing access");
+      setStatus("Checking subscription status...");
+      const access = await getOrgAccess(orgToken);
+
+      if ((access as any)?.redirect_to === "/pricing") {
+        setStatus("Redirecting to billing...");
+        goToPricing();
+        return;
+      }
+
       console.log("[OrganizationOnboarding] Calling backendLogin()");
       setStatus("Creating backend session...");
       const tokens = await backendLogin(username, orgToken);
@@ -430,6 +465,7 @@ export default function OrganizationOnboarding() {
     persistSession,
     user,
     goToFlows,
+    goToPricing,
   ]);
 
   useEffect(() => {
@@ -449,20 +485,37 @@ export default function OrganizationOnboarding() {
     organization?.id,
   ]);
 
+
   useEffect(() => {
-    if (!isLoaded || !isSignedIn) return;
+    if (!isLoaded || !isSignedIn || !organization?.id || bootstrappedRef.current) return;
 
     const orgSelected = localStorage.getItem(ORG_SELECTED_KEY) === "true";
     const activeOrgId = localStorage.getItem(ACTIVE_ORG_STORAGE_KEY);
     const hasAccessToken = Boolean(cookies[LANGFLOW_ACCESS_TOKEN]);
 
-    if (orgSelected && activeOrgId && hasAccessToken) {
-      console.log("[OrganizationOnboarding] Session already present; routing to /flows", {
-        activeOrgId,
-      });
-      goToFlows();
-    }
-  }, [cookies, goToFlows, isLoaded, isSignedIn]);
+    if (!orgSelected || !activeOrgId || !hasAccessToken) return;
+
+    (async () => {
+      try {
+        const orgToken = await getToken();
+        if (!orgToken) return;
+
+        const access = await getOrgAccess(orgToken);
+        if ((access as any)?.redirect_to === "/pricing") {
+          goToPricing();
+          return;
+        }
+
+        console.log("[OrganizationOnboarding] Session already present; routing to /flows", {
+          activeOrgId,
+        });
+        goToFlows();
+      } catch (error) {
+        console.warn("[OrganizationOnboarding] Existing session access check failed", error);
+      }
+    })();
+  }, [cookies, getToken, goToFlows, goToPricing, isLoaded, isSignedIn, organization?.id]);
+
 
   /**
    * When Clerk redirects back with ?selected=true,
