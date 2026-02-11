@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { reconcileOptimisticUserMessages } from "@/utils/chat/optimistic-messages";
 import type { MessagesStoreType } from "../types/zustand/messages";
 
 export const useMessagesStore = create<MessagesStoreType>((set, get) => ({
@@ -34,7 +35,11 @@ export const useMessagesStore = create<MessagesStoreType>((set, get) => ({
     if (message.sender === "Machine") {
       set(() => ({ displayLoadingMessage: false }));
     }
-    set(() => ({ messages: [...get().messages, message] }));
+    set(() => ({
+      messages: reconcileOptimisticUserMessages(get().messages, message).concat(
+        message,
+      ),
+    }));
   },
   removeMessage: (message) => {
     set(() => ({

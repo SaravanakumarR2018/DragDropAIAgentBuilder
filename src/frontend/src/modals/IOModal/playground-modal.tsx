@@ -11,6 +11,7 @@ import { track } from "@/customization/utils/analytics";
 import { customOpenNewTab } from "@/customization/utils/custom-open-new-tab";
 import { LangflowButtonRedirectTarget } from "@/customization/utils/urls";
 import { useUtilityStore } from "@/stores/utilityStore";
+import { buildOptimisticUserMessage } from "@/utils/chat/optimistic-messages";
 import { swatchColors } from "@/utils/styleUtils";
 import LangflowLogoColor from "../../assets/LangflowLogoColor.svg?react";
 import IconComponent from "../../components/common/genericIconComponent";
@@ -209,10 +210,22 @@ export default function IOModal({
       files?: string[];
     }): Promise<void> => {
       if (isBuilding) return;
+      const messageText = chatValue.trim();
+      if (!messageText && (!files || files.length === 0)) {
+        return;
+      }
       setChatValue("");
+      useMessagesStore.getState().addMessage(
+        buildOptimisticUserMessage({
+          flowId: currentFlowId,
+          sessionId,
+          text: messageText,
+          files,
+        }),
+      );
       for (let i = 0; i < repeat; i++) {
         await buildFlow({
-          input_value: chatValue,
+          input_value: messageText,
           startNodeId: chatInput?.id,
           files: files,
           silent: true,
@@ -224,14 +237,23 @@ export default function IOModal({
         });
       }
     },
-    [isBuilding, setIsBuilding, chatValue, chatInput?.id, sessionId, buildFlow],
+    [
+      isBuilding,
+      setIsBuilding,
+      chatValue,
+      chatInput?.id,
+      sessionId,
+      buildFlow,
+      currentFlowId,
+      eventDeliveryConfig,
+    ],
   );
 
   useEffect(() => {
     if (playgroundPage && messages.length > 0) {
       window.sessionStorage.setItem(currentFlowId, JSON.stringify(messages));
     }
-    if (newChatOnPlayground && !sessionsLoading) {
+    if (newChatOnPlayground && !sessionsLoading && !isBuilding) {
       const handleRefetchAndSetSession = async () => {
         try {
           const result = await refetchSessions();
@@ -248,7 +270,15 @@ export default function IOModal({
       handleRefetchAndSetSession();
       setNewChatOnPlayground(false);
     }
-  }, [messages, playgroundPage]);
+  }, [
+    messages,
+    playgroundPage,
+    newChatOnPlayground,
+    sessionsLoading,
+    isBuilding,
+    refetchSessions,
+    setNewChatOnPlayground,
+  ]);
 
   useEffect(() => {
     if (!visibleSession) {
