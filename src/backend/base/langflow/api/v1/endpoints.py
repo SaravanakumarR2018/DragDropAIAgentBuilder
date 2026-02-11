@@ -161,7 +161,7 @@ async def simple_run_flow(
         if input_request.input_value is not None:
             inputs = [
                 InputValueRequest(
-                    components=[],
+                    components=input_request.components or [],
                     input_value=input_request.input_value,
                     type=input_request.input_type,
                 )
@@ -494,11 +494,12 @@ async def webhook_run_flow(
             for component in webhook_components:
                 tweaks[component["id"]] = {"data": data.decode() if isinstance(data, bytes) else data}
             input_request = SimplifiedAPIRequest(
-                input_value=None,
+                input_value="",
                 input_type="any",
                 output_type="chat",
                 tweaks=tweaks,
                 session_id=None,
+                components=[component["id"] for component in webhook_components],
             )
 
             await logger.adebug("Starting background task")
