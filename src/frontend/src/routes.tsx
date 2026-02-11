@@ -91,7 +91,6 @@ const PlaygroundPage = lazy(() => import("./pages/Playground"));
 const TermsOfServicePage = lazy(() => import("./pages/TermsOfServicePage"));
 const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage"));
 const RefundPolicyPage = lazy(() => import("./pages/RefundPolicyPage"));
-const LandingPage = lazy(() => import("./pages/LandingPage"));
 
 // ---- Router ----
 const router = createBrowserRouter(
@@ -402,14 +401,6 @@ const router = createBrowserRouter(
           }
         />
 
-        <Route
-          path="pricing"
-          element={
-            <Suspense fallback={<LoadingPage />}>
-              <LandingPage />
-            </Suspense>
-          }
-        />
 
         {/* Auth routes */}
         <Route
