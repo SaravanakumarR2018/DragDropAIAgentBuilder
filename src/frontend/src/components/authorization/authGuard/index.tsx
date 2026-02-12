@@ -15,7 +15,8 @@ export const ProtectedRoute = ({ children }) => {
   const autoLogin = useAuthStore((state) => state.autoLogin);
   const isOrgSelectedStore = useAuthStore((state) => state.isOrgSelected);
   const isOrgSelected =
-    isOrgSelectedStore || sessionStorage.getItem("isOrgSelected") === "true";
+    isOrgSelectedStore ||
+    sessionStorage.getItem("isOrgSelected") === "true";
   const { mutate: mutateRefresh } = useRefreshAccessToken();
   const testMockAutoLogin = sessionStorage.getItem("testMockAutoLogin");
 

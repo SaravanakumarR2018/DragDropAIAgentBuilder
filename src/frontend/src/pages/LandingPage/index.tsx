@@ -56,7 +56,8 @@ export default function Landing(): JSX.Element {
   };
 
   const handleDashboardClick = () => {
-    navigate("/flows");
+    const hasAccess = localStorage.getItem("has_access") === "true";
+    navigate(hasAccess ? "/flows" : "/pricing");
   };
   return (
     <div className="h-screen overflow-y-auto bg-[#0f1217] text-white">
