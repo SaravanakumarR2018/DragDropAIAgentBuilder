@@ -14,10 +14,6 @@ import { useOrganization, useAuth as useClerkAuth } from "@clerk/clerk-react";
 export const ProtectedRoute = ({ children }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const autoLogin = useAuthStore((state) => state.autoLogin);
-  const isOrgSelectedStore = useAuthStore((state) => state.isOrgSelected);
-  const isOrgSelected =
-    isOrgSelectedStore ||
-    sessionStorage.getItem("isOrgSelected") === "true";
   const { mutate: mutateRefresh } = useRefreshAccessToken();
   const testMockAutoLogin = sessionStorage.getItem("testMockAutoLogin");
   const [isCheckingFlowsAccess, setIsCheckingFlowsAccess] = useState(false);
@@ -26,6 +22,11 @@ export const ProtectedRoute = ({ children }) => {
   // Clerk values
   const { organization, isLoaded: isOrgLoaded } = useOrganization();
   const { isSignedIn, getToken } = useClerkAuth();
+  const isOrgSelectedStore = useAuthStore((state) => state.isOrgSelected);
+  const isOrgSelected =
+    Boolean(organization?.id) ||
+    isOrgSelectedStore ||
+    sessionStorage.getItem("isOrgSelected") === "true";
   const orgId = organization?.id;
 
   
