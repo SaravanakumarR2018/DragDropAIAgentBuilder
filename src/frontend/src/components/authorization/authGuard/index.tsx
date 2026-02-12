@@ -84,6 +84,23 @@ export const ProtectedRoute = ({ children }) => {
     };
   }, [getToken, isFlowsPage, isOrgLoaded, isOrgSelected, isSignedIn]);
 
+  // 🔄 Setup token refresh
+  useEffect(() => {
+    const refreshTime = isNaN(LANGFLOW_ACCESS_TOKEN_EXPIRE_SECONDS_ENV)
+      ? LANGFLOW_ACCESS_TOKEN_EXPIRE_SECONDS
+      : LANGFLOW_ACCESS_TOKEN_EXPIRE_SECONDS_ENV;
+
+    if (autoLogin !== undefined && !autoLogin && isAuthenticated) {
+      const intervalId = setInterval(() => {
+        mutateRefresh();
+      }, refreshTime * 1000);
+
+      return () => {
+        clearInterval(intervalId);
+      };
+    }
+  }, [isAuthenticated, autoLogin, mutateRefresh]);
+
   // ✅ Root path "/" is PUBLIC - don't redirect unauthenticated users
   if (isRootPage) {
     return children;
@@ -148,23 +165,6 @@ export const ProtectedRoute = ({ children }) => {
 
   // ✅ 3️⃣ DO NOT redirect "/" to "/flows" - authenticated users should stay on landing page
   const shouldRedirectHome = false;
-
-  // 🔄 Setup token refresh
-  useEffect(() => {
-    const refreshTime = isNaN(LANGFLOW_ACCESS_TOKEN_EXPIRE_SECONDS_ENV)
-      ? LANGFLOW_ACCESS_TOKEN_EXPIRE_SECONDS
-      : LANGFLOW_ACCESS_TOKEN_EXPIRE_SECONDS_ENV;
-
-    if (autoLogin !== undefined && !autoLogin && isAuthenticated) {
-      const intervalId = setInterval(() => {
-        mutateRefresh();
-      }, refreshTime * 1000);
-
-      return () => {
-        clearInterval(intervalId);
-      };
-    }
-  }, [isAuthenticated, autoLogin, mutateRefresh]);
 
   if (!isOrgLoaded || autoLogin === undefined) {
     return null;
