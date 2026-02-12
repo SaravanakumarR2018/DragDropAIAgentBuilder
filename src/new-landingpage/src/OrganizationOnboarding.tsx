@@ -425,7 +425,6 @@ export default function OrganizationOnboarding() {
       setStatus("Checking subscription status...");
       const access = await getOrgAccess(orgToken);
       const shouldGoToPricing = (access as any)?.redirect_to === "/pricing";
-      localStorage.setItem("has_access", shouldGoToPricing ? "false" : "true");
 
       if (shouldGoToPricing) {
         setStatus("Redirecting to billing...");
@@ -504,7 +503,6 @@ export default function OrganizationOnboarding() {
 
         const access = await getOrgAccess(orgToken);
         const shouldGoToPricing = (access as any)?.redirect_to === "/pricing";
-        localStorage.setItem("has_access", shouldGoToPricing ? "false" : "true");
 
         if (shouldGoToPricing) {
           goToPricing();

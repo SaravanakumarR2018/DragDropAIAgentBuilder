@@ -3,10 +3,11 @@ import {
   LANGFLOW_ACCESS_TOKEN_EXPIRE_SECONDS,
   LANGFLOW_ACCESS_TOKEN_EXPIRE_SECONDS_ENV,
 } from "@/constants/constants";
+import { api } from "@/controllers/API/api";
 import { useRefreshAccessToken } from "@/controllers/API/queries/auth";
 import { CustomNavigate } from "@/customization/components/custom-navigate";
 import useAuthStore from "@/stores/authStore";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useOrganization, useAuth as useClerkAuth } from "@clerk/clerk-react";
 
@@ -19,10 +20,12 @@ export const ProtectedRoute = ({ children }) => {
     sessionStorage.getItem("isOrgSelected") === "true";
   const { mutate: mutateRefresh } = useRefreshAccessToken();
   const testMockAutoLogin = sessionStorage.getItem("testMockAutoLogin");
+  const [isCheckingFlowsAccess, setIsCheckingFlowsAccess] = useState(false);
+  const [hasFlowsAccess, setHasFlowsAccess] = useState<boolean | null>(null);
 
   // Clerk values
   const { organization, isLoaded: isOrgLoaded } = useOrganization();
-  const { isSignedIn } = useClerkAuth();
+  const { isSignedIn, getToken } = useClerkAuth();
   const orgId = organization?.id;
 
   
@@ -35,6 +38,50 @@ export const ProtectedRoute = ({ children }) => {
   const isRootPage = currentPath === "/";
   const isFlowsPage = currentPath.includes("/flows");
   const isPricingPage = currentPath.includes("/pricing");
+
+  useEffect(() => {
+    if (!isFlowsPage || !isOrgLoaded || !isSignedIn || !isOrgSelected) {
+      setIsCheckingFlowsAccess(false);
+      setHasFlowsAccess(null);
+      return;
+    }
+
+    let active = true;
+    setIsCheckingFlowsAccess(true);
+
+    (async () => {
+      try {
+        const orgToken = await getToken();
+        if (!orgToken) {
+          if (active) {
+            setHasFlowsAccess(false);
+          }
+          return;
+        }
+
+        const response = await api.get("billing/org-access", {
+          headers: { Authorization: `Bearer ${orgToken}` },
+        });
+        const denied = response?.data?.redirect_to === "/pricing";
+
+        if (active) {
+          setHasFlowsAccess(!denied);
+        }
+      } catch (_error) {
+        if (active) {
+          setHasFlowsAccess(false);
+        }
+      } finally {
+        if (active) {
+          setIsCheckingFlowsAccess(false);
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [getToken, isFlowsPage, isOrgLoaded, isOrgSelected, isSignedIn]);
 
   // ✅ Root path "/" is PUBLIC - don't redirect unauthenticated users
   if (isRootPage) {
@@ -57,6 +104,14 @@ export const ProtectedRoute = ({ children }) => {
     }
 
     return children;
+  }
+
+  if (isFlowsPage && isCheckingFlowsAccess) {
+    return null;
+  }
+
+  if (isFlowsPage && hasFlowsAccess === false) {
+    return <CustomNavigate to="/pricing" replace />;
   }
 
 
