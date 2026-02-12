@@ -62,7 +62,7 @@ export const ProtectedRoute = ({ children }) => {
         const response = await api.get("billing/org-access", {
           headers: { Authorization: `Bearer ${orgToken}` },
         });
-        const denied = response?.data?.redirect_to === "/pricing";
+        const denied = response?.data?.has_access === false;
 
         if (active) {
           setHasFlowsAccess(!denied);
