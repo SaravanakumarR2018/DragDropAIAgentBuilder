@@ -111,7 +111,8 @@ export default function LandingPage(): JSX.Element {
   };
 
   const handleDashboardClick = () => {
-    window.location.assign("/flows");
+    const hasAccess = localStorage.getItem("has_access") === "true";
+    window.location.assign(hasAccess ? "/flows" : "/pricing");
   };
 
   /* -------------------- UI (copied structure from second file) -------------------- */
