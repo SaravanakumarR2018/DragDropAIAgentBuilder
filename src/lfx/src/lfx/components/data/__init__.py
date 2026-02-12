@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 _dynamic_imports = {
     "APIRequestComponent": "api_request",
     "CSVToDataComponent": "csv_to_data",
+    "ConfigurableWebhookComponent": "configurable_webhook",
     "DirectoryComponent": "directory",
     "FileComponent": "file",
     "JSONToDataComponent": "json_to_data",
@@ -34,6 +35,7 @@ _dynamic_imports = {
 __all__ = [
     "APIRequestComponent",
     "CSVToDataComponent",
+    "ConfigurableWebhookComponent",
     "DirectoryComponent",
     "FileComponent",
     "JSONToDataComponent",

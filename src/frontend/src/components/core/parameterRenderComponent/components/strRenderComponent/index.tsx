@@ -22,7 +22,9 @@ export function StrRenderComponent({
   const isMultiline = templateData.multiline;
   const copyField = templateData.copy_field;
   const hasOptions = !!templateData.options;
-  const isWebhook = nodeInformationMetadata?.nodeType === "webhook";
+  const isWebhook = ["webhook","configurablewebhook"].includes(
+    nodeInformationMetadata?.nodeType?.toLowerCase()??"",
+  );
 
   if (noOptions) {
     if (isMultiline) {
