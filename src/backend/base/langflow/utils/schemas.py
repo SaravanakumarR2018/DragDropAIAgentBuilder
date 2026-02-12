@@ -93,6 +93,8 @@ class ChatOutputResponse(BaseModel):
         if self.sender != MESSAGE_SENDER_AI:
             return self
 
+        if not isinstance(self.message, str):
+            return self
         # We need to make sure we don't duplicate \n
         # in the message
         message = self.message.replace("\n\n", "\n")
