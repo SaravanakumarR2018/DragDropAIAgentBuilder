@@ -26,8 +26,7 @@ export const ProtectedRoute = ({ children }) => {
     Boolean(organization?.id) ||
     isOrgSelectedStore ||
     sessionStorage.getItem("isOrgSelected") === "true";
-  const { isSignedIn, getToken } = useClerkAuth();
-  const orgId = organization?.id;
+  const { isLoaded: isClerkLoaded, isSignedIn, getToken } = useClerkAuth();
 
   // Get current path
   const location = useLocation();
@@ -46,7 +45,7 @@ export const ProtectedRoute = ({ children }) => {
   // 🔹 Billing check for /flows
   useEffect(() => {
     if (!isFlowsPage) return;
-    if (!isOrgLoaded || !isSignedIn || !isOrgSelected) return;
+    if (!isOrgLoaded || !isClerkLoaded || !isSignedIn || !isOrgSelected) return;
 
     let active = true;
     setIsCheckingAccess(true);
@@ -75,7 +74,7 @@ export const ProtectedRoute = ({ children }) => {
     return () => {
       active = false;
     };
-  }, [isFlowsPage, isOrgLoaded, isSignedIn, isOrgSelected, getToken]);
+    }, [isFlowsPage, isOrgLoaded, isClerkLoaded, isSignedIn, isOrgSelected, getToken]);
 
   // 🔄 Setup token refresh
   useEffect(() => {
@@ -101,7 +100,7 @@ export const ProtectedRoute = ({ children }) => {
 
   // ❌ Pricing should NOT be public
   if (isPricingPage) {
-    if (!isOrgLoaded || autoLogin === undefined) {
+    if (!isOrgLoaded || !isClerkLoaded || autoLogin === undefined) {
       return null;
     }
 
@@ -118,6 +117,18 @@ export const ProtectedRoute = ({ children }) => {
 
   // 🔒 Protect /flows with billing check
   if (isFlowsPage) {
+    if (!isOrgLoaded || !isClerkLoaded || isSignedIn === undefined) {
+      return null;
+    }
+
+    if (isSignedIn && !isOrgSelected) {
+      return <CustomNavigate to="/organization" replace />;
+    }
+
+    if (isSignedIn && hasAccess === null) {
+      return null;
+    }
+
     if (isCheckingAccess) {
       return null;
     }
@@ -130,14 +141,13 @@ export const ProtectedRoute = ({ children }) => {
   // 1️⃣ Redirect to login if not authenticated (for protected pages only)
   const shouldRedirectToLogin =
     isOrgLoaded &&
-    (!isAuthenticated || !isSignedIn) &&
+    (!isSignedIn || (!isAuthenticated && !isFlowsPage)) &&
     autoLogin !== undefined &&
     (!autoLogin || !IS_AUTO_LOGIN);
 
   // 2️⃣ Redirect to organization selection if signed in but no org yet
   const shouldRedirectToOrg =
     isOrgLoaded &&
-    isAuthenticated &&
     isSignedIn &&
     !isOrgSelected &&
     !isOrgPage &&
@@ -147,7 +157,7 @@ export const ProtectedRoute = ({ children }) => {
   // ✅ 3️⃣ DO NOT redirect "/" to "/flows" - authenticated users should stay on landing page
   const shouldRedirectHome = false;
 
-  if (!isOrgLoaded || autoLogin === undefined) {
+  if (!isOrgLoaded || !isClerkLoaded || autoLogin === undefined) {
     return null;
   }
 

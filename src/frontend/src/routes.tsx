@@ -406,7 +406,9 @@ const router = createBrowserRouter(
           path="pricing"
           element={
             <Suspense fallback={<LoadingPage />}>
-              <PricingPage />
+              <ProtectedRoute>
+                <PricingPage />
+              </ProtectedRoute>
             </Suspense>
           }
         />
