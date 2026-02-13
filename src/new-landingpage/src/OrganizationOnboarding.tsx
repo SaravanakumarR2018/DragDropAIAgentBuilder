@@ -424,8 +424,9 @@ export default function OrganizationOnboarding() {
       console.log("[OrganizationOnboarding] Checking org billing access");
       setStatus("Checking subscription status...");
       const access = await getOrgAccess(orgToken);
+      const shouldGoToPricing = (access as any)?.has_access === false;
 
-      if ((access as any)?.redirect_to === "/pricing") {
+      if (shouldGoToPricing) {
         setStatus("Redirecting to billing...");
         goToPricing();
         return;
@@ -501,7 +502,9 @@ export default function OrganizationOnboarding() {
         if (!orgToken) return;
 
         const access = await getOrgAccess(orgToken);
-        if ((access as any)?.redirect_to === "/pricing") {
+        const shouldGoToPricing = (access as any)?.has_access === false;
+
+        if (shouldGoToPricing) {
           goToPricing();
           return;
         }

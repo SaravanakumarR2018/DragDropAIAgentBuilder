@@ -66,7 +66,6 @@ async def get_org_access(
         return {
             "has_access": False,
             "is_admin": True,
-            "redirect_to": "/pricing",
             "reason": "organisation_created_by_missing",
             "organisation_created_by": None,
             "paddle_subscription_id": paddle_subscription_id,
@@ -78,7 +77,6 @@ async def get_org_access(
         return {
             "has_access": False,
             "is_admin": is_admin,
-            "redirect_to": "/pricing" if is_admin else None,
             "reason": "paddle_subscription_id_missing",
             "organisation_created_by": organisation_created_by,
             "paddle_subscription_id": None,
@@ -96,7 +94,6 @@ async def get_org_access(
         return {
             **subscription_access,
             "is_admin": is_admin,
-            "redirect_to": "/flows",
             "reason": "subscription_active",
         }
 
@@ -104,6 +101,5 @@ async def get_org_access(
     return {
         **subscription_access,
         "is_admin": is_admin,
-        "redirect_to": "/pricing" if is_admin else None,
         "reason": "subscription_inactive",
     }

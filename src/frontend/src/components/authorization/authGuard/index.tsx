@@ -3,28 +3,32 @@ import {
   LANGFLOW_ACCESS_TOKEN_EXPIRE_SECONDS,
   LANGFLOW_ACCESS_TOKEN_EXPIRE_SECONDS_ENV,
 } from "@/constants/constants";
+import { api } from "@/controllers/API/api";
 import { useRefreshAccessToken } from "@/controllers/API/queries/auth";
 import { CustomNavigate } from "@/customization/components/custom-navigate";
 import useAuthStore from "@/stores/authStore";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useOrganization, useAuth as useClerkAuth } from "@clerk/clerk-react";
+import { getURL } from "@/controllers/API/helpers/constants";
 
 export const ProtectedRoute = ({ children }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const autoLogin = useAuthStore((state) => state.autoLogin);
   const isOrgSelectedStore = useAuthStore((state) => state.isOrgSelected);
-  const isOrgSelected =
-    isOrgSelectedStore || sessionStorage.getItem("isOrgSelected") === "true";
+  
   const { mutate: mutateRefresh } = useRefreshAccessToken();
   const testMockAutoLogin = sessionStorage.getItem("testMockAutoLogin");
-
+  
   // Clerk values
   const { organization, isLoaded: isOrgLoaded } = useOrganization();
-  const { isSignedIn } = useClerkAuth();
+  const isOrgSelected =
+    Boolean(organization?.id) ||
+    isOrgSelectedStore ||
+    sessionStorage.getItem("isOrgSelected") === "true";
+  const { isSignedIn, getToken } = useClerkAuth();
   const orgId = organization?.id;
 
-  
   // Get current path
   const location = useLocation();
   const currentPath = location.pathname;
@@ -35,13 +39,67 @@ export const ProtectedRoute = ({ children }) => {
   const isFlowsPage = currentPath.includes("/flows");
   const isPricingPage = currentPath.includes("/pricing");
 
+  // 🔹 Billing state
+  const [hasAccess, setHasAccess] = useState<boolean | null>(null);
+  const [isCheckingAccess, setIsCheckingAccess] = useState(false);
+
+  // 🔹 Billing check for /flows
+  useEffect(() => {
+    if (!isFlowsPage) return;
+    if (!isOrgLoaded || !isSignedIn || !isOrgSelected) return;
+
+    let active = true;
+    setIsCheckingAccess(true);
+
+    (async () => {
+      try {
+        const token = await getToken();
+        if (!token) {
+          if (active) setHasAccess(false);
+          return;
+        }
+        const response = await api.get(getURL("BILLING_ACCESS"), {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        console.log("[ProtectedRoute] Billing access response:", response.data);
+        if (active) {
+          setHasAccess(response.data?.has_access === true);
+        }
+      } catch {
+        if (active) setHasAccess(false);
+      } finally {
+        if (active) setIsCheckingAccess(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [isFlowsPage, isOrgLoaded, isSignedIn, isOrgSelected, getToken]);
+
+  // 🔄 Setup token refresh
+  useEffect(() => {
+    const refreshTime = isNaN(LANGFLOW_ACCESS_TOKEN_EXPIRE_SECONDS_ENV)
+      ? LANGFLOW_ACCESS_TOKEN_EXPIRE_SECONDS
+      : LANGFLOW_ACCESS_TOKEN_EXPIRE_SECONDS_ENV;
+
+    if (autoLogin !== undefined && !autoLogin && isAuthenticated) {
+      const intervalId = setInterval(() => {
+        mutateRefresh();
+      }, refreshTime * 1000);
+
+      return () => {
+        clearInterval(intervalId);
+      };
+    }
+  }, [isAuthenticated, autoLogin, mutateRefresh]);
+
   // ✅ Root path "/" is PUBLIC - don't redirect unauthenticated users
   if (isRootPage) {
     return children;
   }
 
-  // ✅ Pricing page requires a signed-in Clerk user + selected organization,
-  // but does not require backend session cookies yet.
+  // ❌ Pricing should NOT be public
   if (isPricingPage) {
     if (!isOrgLoaded || autoLogin === undefined) {
       return null;
@@ -58,18 +116,15 @@ export const ProtectedRoute = ({ children }) => {
     return children;
   }
 
+  // 🔒 Protect /flows with billing check
+  if (isFlowsPage) {
+    if (isCheckingAccess) {
+      return null;
+    }
 
-  // If Clerk user has org context but backend session is not ready yet,
-  // keep them on pricing instead of forcing login/logout loops from /flows.
-  const shouldRedirectFlowsToPricing =
-    isOrgLoaded &&
-    isFlowsPage &&
-    isSignedIn &&
-    isOrgSelected &&
-    !isAuthenticated;
-
-  if (shouldRedirectFlowsToPricing) {
-    return <CustomNavigate to="/pricing" replace />;
+    if (hasAccess === false) {
+      return <CustomNavigate to="/pricing" replace />;
+    }
   }
 
   // 1️⃣ Redirect to login if not authenticated (for protected pages only)
@@ -91,23 +146,6 @@ export const ProtectedRoute = ({ children }) => {
 
   // ✅ 3️⃣ DO NOT redirect "/" to "/flows" - authenticated users should stay on landing page
   const shouldRedirectHome = false;
-
-  // 🔄 Setup token refresh
-  useEffect(() => {
-    const refreshTime = isNaN(LANGFLOW_ACCESS_TOKEN_EXPIRE_SECONDS_ENV)
-      ? LANGFLOW_ACCESS_TOKEN_EXPIRE_SECONDS
-      : LANGFLOW_ACCESS_TOKEN_EXPIRE_SECONDS_ENV;
-
-    if (autoLogin !== undefined && !autoLogin && isAuthenticated) {
-      const intervalId = setInterval(() => {
-        mutateRefresh();
-      }, refreshTime * 1000);
-
-      return () => {
-        clearInterval(intervalId);
-      };
-    }
-  }, [isAuthenticated, autoLogin, mutateRefresh]);
 
   if (!isOrgLoaded || autoLogin === undefined) {
     return null;
