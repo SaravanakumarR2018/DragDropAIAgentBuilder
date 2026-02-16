@@ -1,25 +1,25 @@
+import { useAuth as useClerkAuth, useOrganization } from "@clerk/clerk-react";
+import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   IS_AUTO_LOGIN,
   LANGFLOW_ACCESS_TOKEN_EXPIRE_SECONDS,
   LANGFLOW_ACCESS_TOKEN_EXPIRE_SECONDS_ENV,
 } from "@/constants/constants";
 import { api } from "@/controllers/API/api";
+import { getURL } from "@/controllers/API/helpers/constants";
 import { useRefreshAccessToken } from "@/controllers/API/queries/auth";
 import { CustomNavigate } from "@/customization/components/custom-navigate";
 import useAuthStore from "@/stores/authStore";
-import { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
-import { useOrganization, useAuth as useClerkAuth } from "@clerk/clerk-react";
-import { getURL } from "@/controllers/API/helpers/constants";
 
 export const ProtectedRoute = ({ children }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const autoLogin = useAuthStore((state) => state.autoLogin);
   const isOrgSelectedStore = useAuthStore((state) => state.isOrgSelected);
-  
+
   const { mutate: mutateRefresh } = useRefreshAccessToken();
   const testMockAutoLogin = sessionStorage.getItem("testMockAutoLogin");
-  
+
   // Clerk values
   const { organization, isLoaded: isOrgLoaded } = useOrganization();
   const isOrgSelected =
@@ -78,7 +78,15 @@ export const ProtectedRoute = ({ children }) => {
     return () => {
       active = false;
     };
-    }, [isFlowsPage, isOrgLoaded, isPricingBypass, isClerkLoaded, isSignedIn, isOrgSelected, getToken]);
+  }, [
+    isFlowsPage,
+    isPricingBypass,
+    isOrgLoaded,
+    isClerkLoaded,
+    isSignedIn,
+    isOrgSelected,
+    getToken,
+  ]);
 
   // 🔄 Setup token refresh
   useEffect(() => {
