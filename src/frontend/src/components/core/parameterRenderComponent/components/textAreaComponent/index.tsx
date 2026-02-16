@@ -80,10 +80,17 @@ export default function TextAreaComponent({
   const webhookAuthEnable = useUtilityStore((state) => state.webhookAuthEnable);
   const [cursor, setCursor] = useState<number | null>(null);
 
-  const isWebhook = useMemo(
-    () => nodeInformationMetadata?.nodeType === "webhook",
-    [nodeInformationMetadata?.nodeType],
-  );
+  const isWebhook = useMemo(() => {
+    const isWebhookNode = ["webhook", "configurablewebhook"].includes(
+      nodeInformationMetadata?.nodeType?.toLowerCase() ?? "",
+    );
+    const isWebhookCurlField =
+      (nodeInformationMetadata?.variableName ?? "").toLowerCase() === "curl";
+    return isWebhookNode && isWebhookCurlField;
+  }, [
+    nodeInformationMetadata?.nodeType,
+    nodeInformationMetadata?.variableName,
+  ]);
 
   const _isMCPSSE = useMemo(
     () => nodeInformationMetadata?.nodeType === "mcp_sse",
