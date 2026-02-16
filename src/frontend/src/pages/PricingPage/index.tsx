@@ -74,6 +74,5 @@ export default function PricingPage() {
           </button>
         </div>
       </div>
-    </div>
   );
 }
