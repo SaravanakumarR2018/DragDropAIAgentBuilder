@@ -1,4 +1,4 @@
-"""Configurable webhook component with conditional response support."""
+"""Configurable webhook component with conditional response support (JSON)."""
 
 import json
 
