@@ -76,6 +76,7 @@ class ConfigurableWebhookComponent(Component):
             value=True,
             info="Returns the default 202 response without applying any configured response rules.",
             advanced=True,
+            show=True,
         ),
         # Conditional mode
         MultilineInput(
@@ -87,6 +88,7 @@ class ConfigurableWebhookComponent(Component):
                 "example configurations on how to set up response rules."
             ),
             advanced=True,
+            show=True,
         ),
         MultilineInput(
             name="default_response",
@@ -101,6 +103,7 @@ class ConfigurableWebhookComponent(Component):
                 "example configurations."
             ),
             advanced=True,
+            show=True,
         ),
     ]
 
