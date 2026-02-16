@@ -1,25 +1,25 @@
+import { useAuth as useClerkAuth, useOrganization } from "@clerk/clerk-react";
+import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   IS_AUTO_LOGIN,
   LANGFLOW_ACCESS_TOKEN_EXPIRE_SECONDS,
   LANGFLOW_ACCESS_TOKEN_EXPIRE_SECONDS_ENV,
 } from "@/constants/constants";
 import { api } from "@/controllers/API/api";
+import { getURL } from "@/controllers/API/helpers/constants";
 import { useRefreshAccessToken } from "@/controllers/API/queries/auth";
 import { CustomNavigate } from "@/customization/components/custom-navigate";
 import useAuthStore from "@/stores/authStore";
-import { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
-import { useOrganization, useAuth as useClerkAuth } from "@clerk/clerk-react";
-import { getURL } from "@/controllers/API/helpers/constants";
 
 export const ProtectedRoute = ({ children }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const autoLogin = useAuthStore((state) => state.autoLogin);
   const isOrgSelectedStore = useAuthStore((state) => state.isOrgSelected);
-  
+
   const { mutate: mutateRefresh } = useRefreshAccessToken();
   const testMockAutoLogin = sessionStorage.getItem("testMockAutoLogin");
-  
+
   // Clerk values
   const { organization, isLoaded: isOrgLoaded } = useOrganization();
   const isOrgSelected =
@@ -31,12 +31,16 @@ export const ProtectedRoute = ({ children }) => {
   // Get current path
   const location = useLocation();
   const currentPath = location.pathname;
+  const currentSearch = location.search;
   const isLoginPage = currentPath.includes("login");
   const isOrgPage = currentPath.includes("organization");
   const isAdminPage = currentPath.includes("/admin");
   const isRootPage = currentPath === "/";
   const isFlowsPage = currentPath.includes("/flows");
   const isPricingPage = currentPath.includes("/pricing");
+  const isPricingBypass =
+    isFlowsPage &&
+    new URLSearchParams(currentSearch).get("pricing_bypass") === "1";
 
   // 🔹 Billing state
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
@@ -44,7 +48,7 @@ export const ProtectedRoute = ({ children }) => {
 
   // 🔹 Billing check for /flows
   useEffect(() => {
-    if (!isFlowsPage) return;
+    if (!isFlowsPage || isPricingBypass) return;
     if (!isOrgLoaded || !isClerkLoaded || !isSignedIn || !isOrgSelected) return;
 
     let active = true;
@@ -74,7 +78,15 @@ export const ProtectedRoute = ({ children }) => {
     return () => {
       active = false;
     };
-    }, [isFlowsPage, isOrgLoaded, isClerkLoaded, isSignedIn, isOrgSelected, getToken]);
+  }, [
+    isFlowsPage,
+    isPricingBypass,
+    isOrgLoaded,
+    isClerkLoaded,
+    isSignedIn,
+    isOrgSelected,
+    getToken,
+  ]);
 
   // 🔄 Setup token refresh
   useEffect(() => {
@@ -125,7 +137,9 @@ export const ProtectedRoute = ({ children }) => {
       return <CustomNavigate to="/organization" replace />;
     }
 
-    if (isSignedIn && hasAccess === null) {
+    if (isPricingBypass) {
+      // Temporary bypass from pricing placeholder until checkout is implemented
+    } else if (isSignedIn && hasAccess === null) {
       return null;
     }
 
@@ -133,7 +147,7 @@ export const ProtectedRoute = ({ children }) => {
       return null;
     }
 
-    if (hasAccess === false) {
+    if (!isPricingBypass && hasAccess === false) {
       return <CustomNavigate to="/pricing" replace />;
     }
   }

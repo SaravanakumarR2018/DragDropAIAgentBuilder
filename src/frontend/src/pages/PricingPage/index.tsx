@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 
 export default function PricingPage() {
   const navigate = useNavigate();
+  const pricingBypassRedirect = encodeURIComponent("/flows?pricing_bypass=1");
 
   return (
     <div
@@ -24,13 +25,39 @@ export default function PricingPage() {
           padding: "1.25rem",
         }}
       >
-        <h1 style={{ marginTop: 0, fontSize: "1.75rem" }}>Pricing (Placeholder)</h1>
+        <h1 style={{ marginTop: 0, fontSize: "1.75rem" }}>
+          Pricing (Placeholder)
+        </h1>
         <p style={{ opacity: 0.85, lineHeight: 1.6 }}>
-          Your organization requires billing setup before entering flows. This is a temporary
-          pricing page placeholder. Final Clerk + Paddle checkout UI will replace this soon.
+          Your organization requires billing setup before entering flows. This
+          is a temporary pricing page placeholder. Final Clerk + Paddle checkout
+          UI will replace this soon.
         </p>
 
-        <div style={{ display: "flex", gap: ".75rem", flexWrap: "wrap", marginTop: "1rem" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: ".75rem",
+            flexWrap: "wrap",
+            marginTop: "1rem",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() =>
+              navigate(`/organization?redirect=${pricingBypassRedirect}`)
+            }
+            style={{
+              padding: ".65rem 1rem",
+              borderRadius: "10px",
+              border: "1px solid rgba(74,222,128,.5)",
+              background: "rgba(20,83,45,.8)",
+              color: "#bbf7d0",
+              cursor: "pointer",
+            }}
+          >
+            Continue to flows (temporary)
+          </button>
           <button
             type="button"
             onClick={() => navigate("/organization")}
