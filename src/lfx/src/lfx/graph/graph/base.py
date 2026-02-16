@@ -782,8 +782,15 @@ class Graph:
             logger.exception("Error setting cache")
 
         try:
-            # Prioritize the webhook component if it exists
-            start_component_id = find_start_component_id(self._is_input_vertices)
+            # Prioritize explicitly provided input components (e.g. webhook-triggered runs).
+            start_component_id = None
+            if input_components:
+                for component_id in input_components:
+                    if component_id in self._is_input_vertices:
+                        start_component_id = component_id
+                        break
+            if start_component_id is None:
+                start_component_id = find_start_component_id(self._is_input_vertices)
             await self.process(
                 start_component_id=start_component_id,
                 fallback_to_env_vars=fallback_to_env_vars,

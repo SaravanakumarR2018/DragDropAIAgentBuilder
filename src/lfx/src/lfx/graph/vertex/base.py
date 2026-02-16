@@ -64,7 +64,10 @@ class Vertex:
         # TODO: This won't be enough in the long term
         # we need to have a better way to determine if a vertex is an input or an output
         type_strings = [self.id.split("-")[0], data["data"]["type"]]
-        self.is_input = any(input_component_name in type_strings for input_component_name in INPUT_COMPONENTS)
+        is_webhook_input = any("webhook" in str(type_name).lower() for type_name in type_strings)
+        self.is_input = is_webhook_input or any(
+            input_component_name in type_strings for input_component_name in INPUT_COMPONENTS
+        )
         self.is_output = any(output_component_name in type_strings for output_component_name in OUTPUT_COMPONENTS)
         self._is_loop = None
         self.has_session_id = None
