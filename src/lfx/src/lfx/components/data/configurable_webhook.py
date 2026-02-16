@@ -41,18 +41,6 @@ def _get_default_rules() -> str:
 ]"""
 
 
-def _get_rules_info() -> str:
-    """Get info text for rules field."""
-    return (
-        "JSON array of conditional rules. First match wins.\n"
-        'Condition supports: {"path":"$.a.b","equals":...,"not_equals":...,"exists":true,'
-        '"in":[...],"contains":"...","regex":"...","greater_than":...,'
-        '"greater_than_or_equal":...,"less_than":...,"less_than_or_equal":...}.\n'
-        'Response: {"status_code": 200-599, "body": <json with {{ $.path }} templates>}.\n'
-        "Leave empty to disable conditional mode."
-    )
-
-
 class ConfigurableWebhookComponent(Component):
     display_name = "Configurable Webhook"
     description = "Webhook input with configurable response options (including conditional responses)."
@@ -86,32 +74,32 @@ class ConfigurableWebhookComponent(Component):
             name="use_default_response",
             display_name="Use Default Response",
             value=True,
-            info="Return the default 202 response when enabled.",
+            info="Returns the default 202 response without applying any configured response rules.",
             advanced=True,
         ),
         # Conditional mode
         MultilineInput(
             name="response_rules",
-            display_name="Response Rules (JSON)",
+            display_name="Configured Response Rules (JSON)",
             value=_get_default_rules(),
-            info=_get_rules_info(),
+            info=(
+                "Define response rules in JSON format. Refer to the value field for "
+                "example configurations on how to set up response rules."
+            ),
             advanced=True,
         ),
         MultilineInput(
             name="default_response",
-            display_name="Default Response (JSON)",
+            display_name="Configured Default Response (JSON)",
             value="""{
   "status_code": 202,
   "body": { "status": "accepted" }
 }""",
-            info="Fallback response when no rules match (conditional mode).",
-            advanced=True,
-        ),
-        BoolInput(
-            name="use_response_body_as_output",
-            display_name="Use Response as Output",
-            value=False,
-            info="Use configured response body as component output instead of incoming payload.",
+            info=(
+                "Specifies the fallback response in JSON format when none of the "
+                "configured response rules match. Refer to the value field for "
+                "example configurations."
+            ),
             advanced=True,
         ),
     ]
@@ -132,38 +120,6 @@ class ConfigurableWebhookComponent(Component):
             payload_obj = json.loads(payload_value or "{}")
         except json.JSONDecodeError:
             payload_obj = {"payload": payload_value}
-
-        # Import evaluation logic
-        from langflow.services.webhook.response_evaluator import (
-            evaluate_configurable_webhook_response,
-        )
-
-        # Get response configuration
-        response_config = {
-            "response_rules": self.response_rules,
-            "default_response": self.default_response,
-        }
-
-        # Evaluate response
-        try:
-            status_code, selected_body = evaluate_configurable_webhook_response(
-                response_config,
-                json.dumps(payload_obj) if isinstance(payload_obj, (dict, list)) else str(payload_obj),
-            )
-        except Exception as exc:  # noqa: BLE001
-            self.status = f"Error evaluating response: {exc}"
-            return Data(data=payload_obj if isinstance(payload_obj, dict) else {"payload": payload_obj})
-
-        # Return selected response or payload
-        if self.use_response_body_as_output:
-            if isinstance(selected_body, dict):
-                out_data = selected_body
-            elif isinstance(selected_body, list):
-                out_data = {"payload": selected_body}
-            else:
-                out_data = {"message": str(selected_body)}
-            self.status = f"Selected response as output.\nStatus Code: {status_code}"
-            return Data(data=out_data)
 
         # Default: return payload
         if isinstance(payload_obj, dict):
