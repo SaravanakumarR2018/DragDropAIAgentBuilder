@@ -56,14 +56,8 @@ async def get_subscription_status(
         logger.info(f"Subscription {subscription_id} status: {status}")
         return status
 
-    except NotFoundException:
-        logger.warning(f"Subscription {subscription_id} not found")
-        return None
-
     except Exception as e:
-        logger.exception(
-            f"Unexpected error retrieving subscription {subscription_id}"
-        )
+        logger.info(f"Error retrieving subscription {subscription_id}: {e}")
         raise
 
 
