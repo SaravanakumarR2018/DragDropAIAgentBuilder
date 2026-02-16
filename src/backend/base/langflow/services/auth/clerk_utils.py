@@ -134,7 +134,7 @@ async def update_clerk_organization(
         logger.info(f"Successfully updated organization {org_id} max_allowed_members to {max_allowed_members}")
 
 
-async def update_clerk_public_metadata(
+async def update_clerk_user_metadata(
     *,
     clerk_user_id: str,
     public_metadata: dict,
@@ -218,22 +218,6 @@ async def get_organisation_created_by_from_clerk_payload() -> str | None:
         return created_by.strip()
     logger.info(f"No {ORGANISATION_CREATED_BY_KEY} found in Clerk JWT payload")
     return None
-
-
-def is_current_user_organisation_admin() -> bool:
-    payload = auth_header_ctx.get()
-    if not payload:
-        return False
-
-    current_user_id = payload.get(CLERK_JWT_SUB_KEY)
-    created_by = payload.get(ORGANISATION_CREATED_BY_KEY)
-    return (
-        isinstance(current_user_id, str)
-        and isinstance(created_by, str)
-        and current_user_id.strip()
-        and created_by.strip()
-        and current_user_id.strip() == created_by.strip()
-    )
 
 
 async def _get_jwks(issuer: str) -> dict[str, Any]:

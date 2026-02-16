@@ -31,12 +31,16 @@ export const ProtectedRoute = ({ children }) => {
   // Get current path
   const location = useLocation();
   const currentPath = location.pathname;
+  const currentSearch = location.search;
   const isLoginPage = currentPath.includes("login");
   const isOrgPage = currentPath.includes("organization");
   const isAdminPage = currentPath.includes("/admin");
   const isRootPage = currentPath === "/";
   const isFlowsPage = currentPath.includes("/flows");
   const isPricingPage = currentPath.includes("/pricing");
+  const isPricingBypass =
+    isFlowsPage &&
+    new URLSearchParams(currentSearch).get("pricing_bypass") === "1";
 
   // 🔹 Billing state
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
@@ -44,7 +48,7 @@ export const ProtectedRoute = ({ children }) => {
 
   // 🔹 Billing check for /flows
   useEffect(() => {
-    if (!isFlowsPage) return;
+    if (!isFlowsPage || isPricingBypass) return;
     if (!isOrgLoaded || !isClerkLoaded || !isSignedIn || !isOrgSelected) return;
 
     let active = true;
@@ -74,7 +78,7 @@ export const ProtectedRoute = ({ children }) => {
     return () => {
       active = false;
     };
-    }, [isFlowsPage, isOrgLoaded, isClerkLoaded, isSignedIn, isOrgSelected, getToken]);
+    }, [isFlowsPage, isOrgLoaded, isPricingBypass, isClerkLoaded, isSignedIn, isOrgSelected, getToken]);
 
   // 🔄 Setup token refresh
   useEffect(() => {
@@ -125,7 +129,9 @@ export const ProtectedRoute = ({ children }) => {
       return <CustomNavigate to="/organization" replace />;
     }
 
-    if (isSignedIn && hasAccess === null) {
+    if (isPricingBypass) {
+      // Temporary bypass from pricing placeholder until checkout is implemented
+    } else if (isSignedIn && hasAccess === null) {
       return null;
     }
 
@@ -133,7 +139,7 @@ export const ProtectedRoute = ({ children }) => {
       return null;
     }
 
-    if (hasAccess === false) {
+    if (!isPricingBypass && hasAccess === false) {
       return <CustomNavigate to="/pricing" replace />;
     }
   }

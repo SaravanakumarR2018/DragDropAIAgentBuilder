@@ -30,7 +30,20 @@ export default function PricingPage() {
           pricing page placeholder. Final Clerk + Paddle checkout UI will replace this soon.
         </p>
 
-        <div style={{ display: "flex", gap: ".75rem", flexWrap: "wrap", marginTop: "1rem" }}>
+          <button
+            type="button"
+            onClick={() => navigate("/flows?pricing_bypass=1")}
+            style={{
+              padding: ".65rem 1rem",
+              borderRadius: "10px",
+              border: "1px solid rgba(74,222,128,.5)",
+              background: "rgba(20,83,45,.8)",
+              color: "#bbf7d0",
+              cursor: "pointer",
+            }}
+          >
+            Continue to flows (temporary)
+          </button>
           <button
             type="button"
             onClick={() => navigate("/organization")}

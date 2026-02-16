@@ -22,7 +22,7 @@ from langflow.services.auth.clerk_utils import (
     get_paddle_customer_id_from_clerk_payload,
     get_paddle_subscription_id_from_clerk_payload,
     get_organisation_created_by_from_clerk_payload,
-    update_clerk_public_metadata,
+    update_clerk_user_metadata,
     update_clerk_organization,
 )
 from langflow.services.auth.clerk_metadata_constants import (
@@ -33,6 +33,7 @@ from langflow.services.auth.clerk_metadata_constants import (
     ORG_ID_KEY,
 )
 from langflow.services.paddle.client import get_paddle_client
+from paddle_billing.Exceptions.SdkExceptions import NotFoundException
 
 _PADDLE_CUSTOMER_ID_RE = re.compile(r"(ctm_[a-z0-9]+)", re.IGNORECASE)
 
@@ -45,26 +46,25 @@ async def get_subscription_status(
     client: Client | None = None,
 ) -> str | None:
     paddle_client = client or get_paddle_client()
-    if hasattr(paddle_client.subscriptions, "get"):
-        logger.info(f"Retrieving subscription status for {subscription_id} using get method")
+
+    try:
         subscription = await asyncio.to_thread(
-            paddle_client.subscriptions.get, subscription_id
+            paddle_client.subscriptions.get,
+            subscription_id,
         )
         status = getattr(subscription, "status", None)
         logger.info(f"Subscription {subscription_id} status: {status}")
         return status
 
-    logger.info(f"Retrieving subscription status for {subscription_id} using list method")
-    list_response = await asyncio.to_thread(
-        paddle_client.subscriptions.list,
-        ListSubscriptions(id=subscription_id),
-    )
-    for subscription in list_response:
-        status = getattr(subscription, "status", None)
-        logger.info(f"Subscription {subscription_id} status: {status}")
-        return status
-    logger.info(f"No subscription found for {subscription_id}")
-    return None
+    except NotFoundException:
+        logger.warning(f"Subscription {subscription_id} not found")
+        return None
+
+    except Exception as e:
+        logger.exception(
+            f"Unexpected error retrieving subscription {subscription_id}"
+        )
+        raise
 
 
 async def has_active_subscription(
@@ -211,7 +211,7 @@ async def _create_paddle_customer_and_update_clerk_metadata(
             clerk_user_id=clerk_user_id,
         )
 
-        await update_clerk_public_metadata(
+        await update_clerk_user_metadata(
             clerk_user_id=clerk_user_id,
             public_metadata={PADDLE_CUSTOMER_ID_KEY: customer.id},
         )
@@ -220,7 +220,7 @@ async def _create_paddle_customer_and_update_clerk_metadata(
     paddle_customer_id = customer.id
 
     logger.info(f"Created Paddle customer {paddle_customer_id} for user {clerk_user_id}")
-    await update_clerk_public_metadata(
+    await update_clerk_user_metadata(
         clerk_user_id=clerk_user_id,
         public_metadata={PADDLE_CUSTOMER_ID_KEY: paddle_customer_id},
     )
