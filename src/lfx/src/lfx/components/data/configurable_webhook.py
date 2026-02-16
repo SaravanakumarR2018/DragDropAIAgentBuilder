@@ -75,7 +75,7 @@ class ConfigurableWebhookComponent(Component):
             display_name="Use Default Response",
             value=True,
             info="Returns the default 202 response without applying any configured response rules.",
-            advanced=True,
+            advanced=False,
             show=True,
         ),
         # Conditional mode
@@ -87,7 +87,7 @@ class ConfigurableWebhookComponent(Component):
                 "Define response rules in JSON format. Refer to the value field for "
                 "example configurations on how to set up response rules."
             ),
-            advanced=True,
+            advanced=False,
             show=True,
         ),
         MultilineInput(
@@ -102,7 +102,7 @@ class ConfigurableWebhookComponent(Component):
                 "configured response rules match. Refer to the value field for "
                 "example configurations."
             ),
-            advanced=True,
+            advanced=False,
             show=True,
         ),
     ]
