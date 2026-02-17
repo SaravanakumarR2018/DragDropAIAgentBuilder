@@ -32,6 +32,7 @@ export const URLs = {
   MCP_SERVERS: `mcp/servers`,
   KNOWLEDGE_BASES: `knowledge_bases`,
   BILLING_ACCESS: `billing/org-access`,
+  CREATE_SUBSCRIPTION: `billing/create-subscription`,
 } as const;
 
 // IMPORTANT: FOLDERS endpoint now points to 'projects' for backward compatibility

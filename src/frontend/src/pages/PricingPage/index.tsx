@@ -1,10 +1,19 @@
 import type { SVGProps } from "react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import {useAuth} from "@clerk/clerk-react";
+import axios from "axios";
+import { getURL } from "../../controllers/API/helpers/constants";
 
 const MIN_SEATS = 1;
 
 type PlanKey = "starter" | "pro" | "enterprise";
+
+const PLAN_KEY_MAP: Record<PlanKey, "starter_pack_monthly" | "pro_pack_monthly" | "enterprise_pack_monthly"> = {
+  starter: "starter_pack_monthly",
+  pro: "pro_pack_monthly",
+  enterprise: "enterprise_pack_monthly",
+};
 
 interface PlanConfig {
   key: PlanKey;
@@ -68,6 +77,7 @@ function CheckIcon(props: SVGProps<SVGSVGElement>) {
 
 export default function PricingPage() {
   const navigate = useNavigate();
+  const { getToken } = useAuth();
 
   const [selectedPlan, setSelectedPlan] = useState<PlanKey>("starter");
   const [seatsByPlan, setSeatsByPlan] = useState<Record<PlanKey, number>>({
@@ -90,22 +100,36 @@ export default function PricingPage() {
     }));
   };
 
-  const handleSelectPlan = (plan: PlanConfig) => {
+  const handleSelectPlan = async (plan: PlanConfig) => {
+    const token = await getToken();
     const seats = seatsByPlan[plan.key];
-    const total = seats * plan.pricePerSeat;
 
     setSelectedPlan(plan.key);
 
-    // Future: Send this to backend API
-    console.log("Selected Plan Payload:");
-    console.log({
-      planName: plan.name,
-      planKey: plan.key,
+    const payload = {
+      plan_key: PLAN_KEY_MAP[plan.key],
       seats,
-      pricePerSeat: plan.pricePerSeat,
-      totalAmount: total,
-      trialDays: plan.hasTrial ? plan.trialDays : 0,
-    });
+    };
+
+    try {
+      const response = await axios.post(
+        getURL("CREATE_SUBSCRIPTION"),
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      console.log("Subscription created successfully:", response.data);
+      // Handle successful subscription creation
+      // e.g., redirect to success page or show confirmation
+    } catch (error) {
+      console.error("Failed to create subscription:", error);
+      // Handle error - show error message to user
+    }
   };
 
   return (
