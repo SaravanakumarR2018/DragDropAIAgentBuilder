@@ -152,7 +152,14 @@ def get_db_service(*, use_organisation: bool = True) -> DatabaseService:
     from langflow.services.database.organisation import OrganizationService
 
     if use_organisation and get_settings_service().auth_settings.CLERK_AUTH_ENABLED:
-        return OrganizationService.get_db_service_for_request()
+        try:
+            return OrganizationService.get_db_service_for_request()
+        except RuntimeError as exc:
+            # Anonymous/public requests can hit dependencies before an org-scoped
+            # auth context exists. Fall back to the shared DB service instead of
+            # emitting noisy errors on landing-page loads.
+            if str(exc) != "Missing organisation id":
+                raise
 
     from langflow.services.database.factory import DatabaseServiceFactory
 

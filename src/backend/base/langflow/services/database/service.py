@@ -222,6 +222,15 @@ class DatabaseService(Service):
             async with self.async_session_maker() as session:
                 yield session
 
+    def with_session(self):
+        """Return a database session context manager.
+
+        This public method preserves compatibility with existing call sites that
+        still depend on ``with_session()`` while internal code migrates to
+        ``session_scope()`` helpers.
+        """
+        return self._with_session()
+        
     async def assign_orphaned_flows_to_superuser(self) -> None:
         """Assign orphaned flows to the default superuser when auto login is enabled."""
         settings_service = get_settings_service()
