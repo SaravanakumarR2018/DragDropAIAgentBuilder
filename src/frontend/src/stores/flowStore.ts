@@ -11,7 +11,10 @@ import { create } from "zustand";
 import { checkCodeValidity } from "@/CustomNodes/helpers/check-code-validity";
 import { MISSED_ERROR_ALERT } from "@/constants/alerts_constants";
 import { BROKEN_EDGES_WARNING } from "@/constants/constants";
-import { ENABLE_DATASTAX_LANGFLOW } from "@/customization/feature-flags";
+import {
+  ENABLE_DATASTAX_LANGFLOW,
+  ENABLE_INSPECTION_PANEL,
+} from "@/customization/feature-flags";
 import {
   track,
   trackDataLoaded,
@@ -38,7 +41,6 @@ import {
   buildPositionDictionary,
   checkChatInput,
   cleanEdges,
-  detectBrokenEdgesEdges,
   getConnectedSubgraph,
   getHandleId,
   getNodeId,
@@ -119,6 +121,8 @@ const useFlowStore = create<FlowStoreType>((set, get) => ({
   nodes: [],
   edges: [],
   isBuilding: false,
+  buildStartTime: null,
+  buildDuration: null,
   stopBuilding: () => {
     get().buildController.abort();
     get().updateEdgesRunningByNodes(
@@ -217,14 +221,14 @@ const useFlowStore = create<FlowStoreType>((set, get) => ({
   resetFlow: (flow) => {
     const nodes = flow?.data?.nodes ?? [];
     const edges = flow?.data?.edges ?? [];
-    const brokenEdges = detectBrokenEdgesEdges(nodes, edges);
+    const { edges: newEdges, brokenEdges } = cleanEdges(nodes, edges);
+
     if (brokenEdges.length > 0) {
       useAlertStore.getState().setErrorData({
         title: BROKEN_EDGES_WARNING,
         list: brokenEdges.map((edge) => brokenEdgeMessage(edge)),
       });
     }
-    const newEdges = cleanEdges(nodes, edges);
     const { inputs, outputs } = getInputsAndOutputs(nodes);
     get().updateComponentsToUpdate(nodes);
     set({
@@ -250,10 +254,25 @@ const useFlowStore = create<FlowStoreType>((set, get) => ({
       flowPool: {},
       currentFlow: flow,
       positionDictionary: {},
+      rightClickedNodeId: null,
     });
   },
   setIsBuilding: (isBuilding) => {
-    set({ isBuilding });
+    const current = get();
+    set({
+      isBuilding,
+      // Reset buildStartTime and buildDuration when a new build begins
+      buildStartTime:
+        isBuilding && !current.isBuilding ? null : current.buildStartTime,
+      buildDuration:
+        isBuilding && !current.isBuilding ? null : current.buildDuration,
+    });
+  },
+  setBuildStartTime: (time) => {
+    set({ buildStartTime: time });
+  },
+  setBuildDuration: (duration) => {
+    set({ buildDuration: duration });
   },
   setFlowState: (flowState) => {
     const newFlowState =
@@ -281,7 +300,7 @@ const useFlowStore = create<FlowStoreType>((set, get) => ({
   setNodes: (change) => {
     const newChange =
       typeof change === "function" ? change(get().nodes) : change;
-    const newEdges = cleanEdges(newChange, get().edges);
+    const { edges: newEdges } = cleanEdges(newChange, get().edges);
     const { inputs, outputs } = getInputsAndOutputs(newChange);
     get().updateComponentsToUpdate(newChange);
     set({
@@ -336,7 +355,7 @@ const useFlowStore = create<FlowStoreType>((set, get) => ({
       return node;
     });
 
-    const newEdges = cleanEdges(newNodes, get().edges);
+    const { edges: newEdges } = cleanEdges(newNodes, get().edges);
 
     set((state) => {
       if (callback) {
@@ -380,6 +399,19 @@ const useFlowStore = create<FlowStoreType>((set, get) => ({
     );
 
     get().setNodes(filteredNodes);
+
+    // Clear rightClickedNodeId if the deleted node was right-clicked
+    const rightClickedNodeId = get().rightClickedNodeId;
+    if (rightClickedNodeId && deletedNode) {
+      const isRightClickedNodeDeleted =
+        typeof nodeId === "string"
+          ? nodeId === rightClickedNodeId
+          : nodeId.includes(rightClickedNodeId);
+
+      if (isRightClickedNodeDeleted) {
+        set({ rightClickedNodeId: null });
+      }
+    }
 
     if (deletedNode) {
       track("Component Deleted", { componentType: deletedNode.data.type });
@@ -580,6 +612,10 @@ const useFlowStore = create<FlowStoreType>((set, get) => ({
     set({ getFilterComponent: newState });
   },
   getFilterComponent: "",
+  rightClickedNodeId: null,
+  setRightClickedNodeId: (nodeId) => {
+    set({ rightClickedNodeId: nodeId });
+  },
   onConnect: (connection) => {
     const _dark = useDarkStore.getState().dark;
     // const commonMarkerProps = {
@@ -626,11 +662,11 @@ const useFlowStore = create<FlowStoreType>((set, get) => ({
     const newNodes = cloneDeep(get().nodes);
     newNodes.forEach((node) => {
       node.selected = false;
-      const newEdges = cleanEdges(newNodes, get().edges);
-      set({
-        nodes: newNodes,
-        edges: newEdges,
-      });
+    });
+    const { edges: newEdges } = cleanEdges(newNodes, get().edges);
+    set({
+      nodes: newNodes,
+      edges: newEdges,
     });
   },
   pastBuildFlowParams: null,
@@ -1063,6 +1099,7 @@ const useFlowStore = create<FlowStoreType>((set, get) => ({
       isPending: true,
       positionDictionary: {},
       componentsToUpdate: [],
+      rightClickedNodeId: null,
     });
   },
   dismissedNodes: [],
@@ -1100,6 +1137,16 @@ const useFlowStore = create<FlowStoreType>((set, get) => ({
   helperLineEnabled: false,
   setHelperLineEnabled: (helperLineEnabled: boolean) => {
     set({ helperLineEnabled });
+  },
+  inspectionPanelVisible: ENABLE_INSPECTION_PANEL
+    ? localStorage.getItem("inspectionPanelVisible") !== null
+      ? localStorage.getItem("inspectionPanelVisible") === "true"
+      : true
+    : false,
+  setInspectionPanelVisible: (visible: boolean) => {
+    if (!ENABLE_INSPECTION_PANEL) return;
+    localStorage.setItem("inspectionPanelVisible", String(visible));
+    set({ inspectionPanelVisible: visible });
   },
   setNewChatOnPlayground: (newChat: boolean) => {
     set({ newChatOnPlayground: newChat });

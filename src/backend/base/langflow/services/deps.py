@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
 
 from lfx.log.logger import logger
 
@@ -16,15 +16,22 @@ if TYPE_CHECKING:
     from langflow.services.cache.service import AsyncBaseCacheService, CacheService
     from langflow.services.chat.service import ChatService
     from langflow.services.database.service import DatabaseService
-    from langflow.services.job_queue.service import JobQueueService
     from langflow.services.session.service import SessionService
     from langflow.services.state.service import StateService
-    from langflow.services.storage.service import StorageService
     from langflow.services.store.service import StoreService
     from langflow.services.task.service import TaskService
-    from langflow.services.telemetry.service import TelemetryService
     from langflow.services.tracing.service import TracingService
     from langflow.services.variable.service import VariableService
+
+# These imports MUST be outside TYPE_CHECKING because FastAPI uses eval_str=True
+# to evaluate type annotations, and these types are used as return types for
+# dependency functions that FastAPI evaluates at module load time.
+from lfx.services.auth.base import BaseAuthService  # noqa: TC002
+from lfx.services.settings.service import SettingsService  # noqa: TC002
+
+from langflow.services.job_queue.service import JobQueueService  # noqa: TC001
+from langflow.services.storage.service import StorageService  # noqa: TC001
+from langflow.services.telemetry.service import TelemetryService  # noqa: TC001
 
 
 def get_service(service_type: ServiceType, default=None):
@@ -108,6 +115,17 @@ def get_variable_service() -> VariableService:
     return get_service(ServiceType.VARIABLE_SERVICE, VariableServiceFactory())
 
 
+def is_settings_service_initialized() -> bool:
+    """Check if the SettingsService is already initialized without triggering initialization.
+
+    Returns:
+        bool: True if the SettingsService is already initialized, False otherwise.
+    """
+    from lfx.services.manager import get_service_manager
+
+    return ServiceType.SETTINGS_SERVICE in get_service_manager().services
+
+
 def get_settings_service() -> SettingsService:
     """Retrieves the SettingsService instance.
 
@@ -178,7 +196,7 @@ async def session_scope(*, use_organisation: bool = True) -> AsyncGenerator[Asyn
             raise
 
 
-def get_cache_service() -> CacheService | AsyncBaseCacheService:
+def get_cache_service() -> Union[CacheService, AsyncBaseCacheService]:  # noqa: UP007
     """Retrieves the cache service from the service manager.
 
     Returns:
@@ -246,3 +264,21 @@ def get_queue_service() -> JobQueueService:
     from langflow.services.job_queue.factory import JobQueueServiceFactory
 
     return get_service(ServiceType.JOB_QUEUE_SERVICE, JobQueueServiceFactory())
+
+
+def get_auth_service() -> BaseAuthService:
+    """Retrieve the authentication service."""
+    from langflow.services.auth.factory import AuthServiceFactory
+
+    return get_service(ServiceType.AUTH_SERVICE, AuthServiceFactory())
+
+
+def get_job_service():
+    """Retrieves the JobService instance from the service manager.
+
+    Returns:
+        JobService: The JobService instance.
+    """
+    from langflow.services.jobs.factory import JobServiceFactory
+
+    return get_service(ServiceType.JOB_SERVICE, JobServiceFactory())

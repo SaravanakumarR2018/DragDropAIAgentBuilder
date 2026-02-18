@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-import inspect
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from typing import TYPE_CHECKING
+
+from fastapi import HTTPException
+from sqlalchemy.exc import InvalidRequestError
 
 from lfx.log.logger import logger
 from lfx.services.schema import ServiceType
@@ -12,15 +14,17 @@ from lfx.services.schema import ServiceType
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
-    from sqlmodel.ext.asyncio.session import AsyncSession
+    from sqlalchemy.ext.asyncio import AsyncSession
 
     from lfx.services.interfaces import (
+        AuthServiceProtocol,
         CacheServiceProtocol,
         ChatServiceProtocol,
         DatabaseServiceProtocol,
         SettingsServiceProtocol,
         StorageServiceProtocol,
         TracingServiceProtocol,
+        TransactionServiceProtocol,
         VariableServiceProtocol,
     )
 
@@ -109,6 +113,29 @@ def get_tracing_service() -> TracingServiceProtocol | None:
 
     return get_service(ServiceType.TRACING_SERVICE)
 
+def get_transaction_service() -> TransactionServiceProtocol | None:
+    """Retrieves the transaction service instance.
+
+    Returns the transaction service for logging component executions.
+    Returns None if no transaction service is registered.
+    """
+    from lfx.services.schema import ServiceType
+
+    return get_service(ServiceType.TRANSACTION_SERVICE)
+
+def get_auth_service() -> AuthServiceProtocol | None:
+    """Retrieves the auth service instance.
+
+    Returns the pluggable auth service (minimal LFX or full Langflow when configured).
+    """
+    from lfx.services.schema import ServiceType
+
+    return get_service(ServiceType.AUTH_SERVICE)
+
+async def injectable_session_scope():
+    async with session_scope() as session:
+        yield session
+
 
 @asynccontextmanager
 async def session_scope(*, use_organisation: bool = True) -> AsyncGenerator[AsyncSession, None]:
@@ -127,6 +154,26 @@ async def session_scope(*, use_organisation: bool = True) -> AsyncGenerator[Asyn
     async with db_service.with_session() as session:
         yield session
 
+async def injectable_session_scope_readonly():
+    async with session_scope_readonly() as session:
+        yield session
+
+@asynccontextmanager
+async def session_scope_readonly() -> AsyncGenerator[AsyncSession, None]:
+    """Context manager for managing a read-only async session scope.
+
+    This is used with `async with session_scope_readonly() as session:` for direct session management
+    when only reading data. No auto-commit or rollback - the session is simply closed after use.
+
+    Yields:
+        AsyncSession: The async session object.
+    """
+    db_service = get_db_service()
+    async with db_service._with_session() as session:  # noqa: SLF001
+        yield session
+        # No commit - read-only
+        # No clean up - client is responsible (plus, read only sessions are not committed)
+        # No explicit close needed - _with_session() handles it
 
 def get_session():
     """Get database session.

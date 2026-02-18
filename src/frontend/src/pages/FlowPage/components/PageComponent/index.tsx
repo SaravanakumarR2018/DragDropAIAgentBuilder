@@ -22,6 +22,7 @@ import { useShallow } from "zustand/react/shallow";
 import { DefaultEdge } from "@/CustomEdges";
 import NoteNode from "@/CustomNodes/NoteNode";
 import FlowToolbar from "@/components/core/flowToolbarComponent";
+import InspectionPanel from "@/pages/FlowPage/components/InspectionPanel";
 import {
   COLOR_OPTIONS,
   NOTE_NODE_MIN_HEIGHT,
@@ -132,6 +133,9 @@ export default function Page({
     (state) => state.setLastCopiedSelection,
   );
   const onConnect = useFlowStore((state) => state.onConnect);
+  const setRightClickedNodeId = useFlowStore(
+    (state) => state.setRightClickedNodeId,
+  );
   const setErrorData = useAlertStore((state) => state.setErrorData);
   const updateCurrentFlow = useFlowStore((state) => state.updateCurrentFlow);
   const [selectionMenuVisible, setSelectionMenuVisible] = useState(false);
@@ -329,6 +333,12 @@ export default function Page({
     }
   }
 
+  function handleEscape(e: KeyboardEvent) {
+    if (e.key === "Escape") {
+      setRightClickedNodeId(null);
+    }
+  }
+
   function handleDownload(e: KeyboardEvent) {
     if (!isWrappedWithClass(e, "noflow")) {
       e.preventDefault();
@@ -369,6 +379,8 @@ export default function Page({
   useHotkeys(downloadAction, handleDownload);
   //@ts-ignore
   useHotkeys("delete", handleDelete);
+  //@ts-ignore
+  useHotkeys("escape", handleEscape);
 
   const onConnectMod = useCallback(
     (params: Connection) => {
@@ -589,14 +601,38 @@ export default function Page({
   const onSelectionChange = useCallback(
     (flow: OnSelectionChangeParams): void => {
       setLastSelection(flow);
+      if (flow.nodes && (flow.nodes.length === 0 || flow.nodes.length > 1)) {
+        setRightClickedNodeId(null);
+      }
     },
-    [],
+    [setRightClickedNodeId],
+  );
+
+  const onNodeContextMenu = useCallback(
+    (event: React.MouseEvent, node: AllNodeType) => {
+      event.preventDefault();
+      if (isLocked) return;
+
+      // Set the right-clicked node ID to show its dropdown menu
+      setRightClickedNodeId(node.id);
+
+      // Focus/select the right-clicked node (same as left-click behavior)
+      setNodes((currentNodes) => {
+        return currentNodes.map((n) => ({
+          ...n,
+          selected: n.id === node.id,
+        }));
+      });
+    },
+    [isLocked, setRightClickedNodeId, setNodes],
   );
 
   const onPaneClick = useCallback(
     (event: React.MouseEvent) => {
       setFilterEdge([]);
       setFilterComponent("");
+      // Hide right-click dropdown when clicking on the pane
+      setRightClickedNodeId(null);
       if (isAddingNote) {
         const shadowBox = document.getElementById("shadow-box");
         if (shadowBox) {
@@ -621,6 +657,8 @@ export default function Page({
           id: newId,
           type: "noteNode",
           position: position || { x: 0, y: 0 },
+          width: NOTE_NODE_MIN_WIDTH,
+          height: NOTE_NODE_MIN_HEIGHT,
           data: {
             ...data,
             id: newId,
@@ -706,6 +744,39 @@ export default function Page({
     maxZoom: MAX_ZOOM,
   };
 
+  // Get inspection panel visibility from store
+  const inspectionPanelVisible = useFlowStore(
+    (state) => state.inspectionPanelVisible,
+  );
+
+  // Determine if InspectionPanel should be visible
+  const showInspectionPanel =
+    inspectionPanelVisible &&
+    lastSelection?.nodes?.length === 1 &&
+    lastSelection.nodes[0].type === "genericNode";
+
+  // Get the fresh node data from the store instead of using stale reference
+  const selectedNodeId = showInspectionPanel ? lastSelection.nodes[0].id : null;
+  const selectedNode = selectedNodeId
+    ? (nodes.find((n) => n.id === selectedNodeId) as AllNodeType)
+    : null;
+
+  // Handler to close the inspection panel by deselecting all nodes
+  const handleCloseInspectionPanel = useCallback(() => {
+    setNodes((nds) =>
+      nds.map((node) => ({
+        ...node,
+        selected: false,
+      })),
+    );
+  }, [setNodes]);
+
+  useEffect(() => {
+    if (inspectionPanelVisible) {
+      setSelectionMenuVisible(false);
+    }
+  }, [inspectionPanelVisible]);
+
   return (
     <div className="h-full w-full bg-canvas" ref={reactFlowWrapper}>
       {showCanvas ? (
@@ -715,11 +786,15 @@ export default function Page({
               <>
                 <MemoizedLogCanvasControls />
                 <MemoizedCanvasControls
+                  selectedNode={selectedNode}
                   setIsAddingNote={setIsAddingNote}
                   shadowBoxWidth={shadowBoxWidth}
                   shadowBoxHeight={shadowBoxHeight}
                 />
                 <FlowToolbar />
+                {inspectionPanelVisible && (
+                  <InspectionPanel selectedNode={selectedNode} />
+                )}
               </>
             )}
             <MemoizedSidebarTrigger />
@@ -765,12 +840,14 @@ export default function Page({
               maxZoom={MAX_ZOOM}
               zoomOnScroll={!view}
               zoomOnPinch={!view}
+              selectNodesOnDrag={false}
               panOnDrag={!view}
               panActivationKeyCode={""}
               proOptions={{ hideAttribution: true }}
               onPaneClick={onPaneClick}
               onEdgeClick={handleEdgeClick}
               onKeyDown={handleKeyDown}
+              onNodeContextMenu={onNodeContextMenu}
             >
               <FlowBuildingComponent />
               <UpdateAllComponents />
@@ -787,6 +864,7 @@ export default function Page({
               backgroundColor: `${shadowBoxBackgroundColor}`,
               opacity: 0.7,
               pointerEvents: "none",
+              borderRadius: "12px",
               // Prevent shadow-box from showing unexpectedly during initial renders
               display: "none",
             }}

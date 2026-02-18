@@ -9,7 +9,6 @@ from sqlalchemy import delete
 from sqlalchemy import exc as sqlalchemy_exc
 from sqlmodel import col, select
 
-from langflow.services.auth.utils import create_super_user, verify_password
 from langflow.services.cache.base import ExternalAsyncBaseCacheService
 from langflow.services.cache.factory import CacheServiceFactory
 from langflow.services.database.models.transactions.model import TransactionTable
@@ -30,12 +29,13 @@ async def get_or_create_super_user(session: AsyncSession, username, password, is
     result = await session.exec(stmt)
     user = result.first()
 
+    auth = get_auth_service()
     if user and user.is_superuser:
         return None  # Superuser already exists
 
     if user and is_default:
         if user.is_superuser:
-            if verify_password(password, user.password):
+            if auth.verify_password(password, user.password):
                 return None
             # Superuser exists but password is incorrect
             # which means that the user has changed the
@@ -53,7 +53,7 @@ async def get_or_create_super_user(session: AsyncSession, username, password, is
         return None
 
     if user:
-        if verify_password(password, user.password):
+        if auth.verify_password(password, user.password):
             msg = "User with superuser credentials exists but is not a superuser."
             raise ValueError(msg)
         msg = "Incorrect superuser credentials"
@@ -123,7 +123,6 @@ async def teardown_superuser(settings_service, session: AsyncSession) -> None:
 
         except Exception as exc:
             logger.exception(exc)
-            await session.rollback()
             msg = "Could not remove default superuser."
             raise RuntimeError(msg) from exc
 
@@ -191,11 +190,9 @@ async def clean_transactions(settings_service: SettingsService, session: AsyncSe
         )
 
         await session.exec(delete_stmt)
-        await session.commit()
         logger.debug("Successfully cleaned up old transactions")
     except (sqlalchemy_exc.SQLAlchemyError, asyncio.TimeoutError) as exc:
         logger.error(f"Error cleaning up transactions: {exc!s}")
-        await session.rollback()
         # Don't re-raise since this is a cleanup task
 
 
@@ -220,11 +217,9 @@ async def clean_vertex_builds(settings_service: SettingsService, session: AsyncS
         )
 
         await session.exec(delete_stmt)
-        await session.commit()
         logger.debug("Successfully cleaned up old vertex builds")
     except (sqlalchemy_exc.SQLAlchemyError, asyncio.TimeoutError) as exc:
         logger.error(f"Error cleaning up vertex builds: {exc!s}")
-        await session.rollback()
         # Don't re-raise since this is a cleanup task
 
 
@@ -232,12 +227,14 @@ def register_all_service_factories() -> None:
     """Register all available service factories with the service manager."""
     # Import all service factories
     from lfx.services.manager import get_service_manager
+    from lfx.services.schema import ServiceType
 
     service_manager = get_service_manager()
     from lfx.services.mcp_composer import factory as mcp_composer_factory
     from lfx.services.settings import factory as settings_factory
 
     from langflow.services.auth import factory as auth_factory
+    from langflow.services.auth.service import AuthService
     from langflow.services.cache import factory as cache_factory
     from langflow.services.chat import factory as chat_factory
     from langflow.services.database import factory as database_factory
@@ -250,6 +247,7 @@ def register_all_service_factories() -> None:
     from langflow.services.task import factory as task_factory
     from langflow.services.telemetry import factory as telemetry_factory
     from langflow.services.tracing import factory as tracing_factory
+    from langflow.services.transaction import factory as transaction_factory
     from langflow.services.variable import factory as variable_factory
 
     # Register all factories
@@ -262,11 +260,14 @@ def register_all_service_factories() -> None:
     service_manager.register_factory(variable_factory.VariableServiceFactory())
     service_manager.register_factory(telemetry_factory.TelemetryServiceFactory())
     service_manager.register_factory(tracing_factory.TracingServiceFactory())
+    service_manager.register_factory(transaction_factory.TransactionServiceFactory())
     service_manager.register_factory(state_factory.StateServiceFactory())
     service_manager.register_factory(job_queue_factory.JobQueueServiceFactory())
     service_manager.register_factory(task_factory.TaskServiceFactory())
     service_manager.register_factory(store_factory.StoreServiceFactory())
     service_manager.register_factory(shared_component_cache_factory.SharedComponentCacheServiceFactory())
+    # Override LFX's no-op auth service with Langflow's full JWT implementation
+    service_manager.register_service_class(ServiceType.AUTH_SERVICE, AuthService, override=True)
     service_manager.register_factory(auth_factory.AuthServiceFactory())
     service_manager.register_factory(mcp_composer_factory.MCPComposerServiceFactory())
     service_manager.set_factory_registered()

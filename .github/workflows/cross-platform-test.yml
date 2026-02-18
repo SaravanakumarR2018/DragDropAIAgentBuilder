@@ -56,12 +56,20 @@ jobs:
       - name: Build main package
         run: make build_langflow args="--wheel"
       - name: Upload base artifact
+<<<<<<< HEAD
         uses: actions/upload-artifact@v4
+=======
+        uses: actions/upload-artifact@v6
+>>>>>>> origin/langflow-main
         with:
           name: adhoc-dist-base
           path: src/backend/base/dist
       - name: Upload main artifact
+<<<<<<< HEAD
         uses: actions/upload-artifact@v4
+=======
+        uses: actions/upload-artifact@v6
+>>>>>>> origin/langflow-main
         with:
           name: adhoc-dist-main
           path: dist
@@ -134,7 +142,11 @@ jobs:
         shell: bash
 
       - name: Setup Python
+<<<<<<< HEAD
         uses: actions/setup-python@v5
+=======
+        uses: actions/setup-python@v6
+>>>>>>> origin/langflow-main
         with:
           python-version: ${{ matrix.python-version }}
           architecture: ${{ matrix.arch == 'amd64' && 'x64' || matrix.arch }}
@@ -158,21 +170,33 @@ jobs:
       # Download artifacts for wheel installation
       - name: Download LFX package artifact
         if: steps.install-method.outputs.method == 'wheel' && inputs.lfx-artifact-name != ''
+<<<<<<< HEAD
         uses: actions/download-artifact@v5
+=======
+        uses: actions/download-artifact@v7
+>>>>>>> origin/langflow-main
         with:
           name: ${{ inputs.lfx-artifact-name }}
           path: ./lfx-dist
 
       - name: Download base package artifact
         if: steps.install-method.outputs.method == 'wheel'
+<<<<<<< HEAD
         uses: actions/download-artifact@v5
+=======
+        uses: actions/download-artifact@v7
+>>>>>>> origin/langflow-main
         with:
           name: ${{ inputs.base-artifact-name || needs.build-if-needed.outputs.base-artifact-name || 'adhoc-dist-base' }}
           path: ./base-dist
 
       - name: Download main package artifact
         if: steps.install-method.outputs.method == 'wheel'
+<<<<<<< HEAD
         uses: actions/download-artifact@v5
+=======
+        uses: actions/download-artifact@v7
+>>>>>>> origin/langflow-main
         with:
           name: ${{ inputs.main-artifact-name || needs.build-if-needed.outputs.main-artifact-name || 'adhoc-dist-main' }}
           path: ./main-dist
@@ -190,7 +214,11 @@ jobs:
           find ./lfx-dist -name "*.whl" -type f
           WHEEL_FILE=$(find ./lfx-dist -name "*.whl" -type f | head -1)
           if [ -n "$WHEEL_FILE" ]; then
+<<<<<<< HEAD
             uv pip install --python ./test-env/Scripts/python.exe "$WHEEL_FILE"
+=======
+            uv pip install --prerelease=allow --python ./test-env/Scripts/python.exe "$WHEEL_FILE"
+>>>>>>> origin/langflow-main
           else
             echo "No wheel file found in ./lfx-dist/"
             exit 1
@@ -218,7 +246,11 @@ jobs:
           find ./main-dist -name "*.whl" -type f
           WHEEL_FILE=$(find ./main-dist -name "*.whl" -type f | head -1)
           if [ -n "$WHEEL_FILE" ]; then
+<<<<<<< HEAD
             uv pip install --python ./test-env/Scripts/python.exe "$WHEEL_FILE"
+=======
+            uv pip install --prerelease=allow --python ./test-env/Scripts/python.exe "$WHEEL_FILE"
+>>>>>>> origin/langflow-main
           else
             echo "No wheel file found in ./main-dist/"
             exit 1
@@ -232,7 +264,11 @@ jobs:
           find ./lfx-dist -name "*.whl" -type f
           WHEEL_FILE=$(find ./lfx-dist -name "*.whl" -type f | head -1)
           if [ -n "$WHEEL_FILE" ]; then
+<<<<<<< HEAD
             uv pip install --python ./test-env/bin/python "$WHEEL_FILE"
+=======
+            uv pip install --prerelease=allow --python ./test-env/bin/python "$WHEEL_FILE"
+>>>>>>> origin/langflow-main
           else
             echo "No wheel file found in ./lfx-dist/"
             exit 1
@@ -260,7 +296,11 @@ jobs:
           find ./main-dist -name "*.whl" -type f
           WHEEL_FILE=$(find ./main-dist -name "*.whl" -type f | head -1)
           if [ -n "$WHEEL_FILE" ]; then
+<<<<<<< HEAD
             uv pip install --python ./test-env/bin/python "$WHEEL_FILE"
+=======
+            uv pip install --prerelease=allow --python ./test-env/bin/python "$WHEEL_FILE"
+>>>>>>> origin/langflow-main
           else
             echo "No wheel file found in ./main-dist/"
             exit 1
@@ -302,17 +342,28 @@ jobs:
         shell: bash
 
       # Test steps
+<<<<<<< HEAD
       - name: Test CLI help command (Windows)
         if: matrix.os == 'windows'
         run: |
           call test-env\Scripts\activate.bat
           python -m langflow --help
+=======
+      - name: Test CLI help command
+        if: matrix.os == 'windows'
+        run: |
+          uv run --python ./test-env/Scripts/python.exe python -m langflow --help
+>>>>>>> origin/langflow-main
         shell: cmd
 
       - name: Test CLI help command (Unix)
         if: matrix.os != 'windows'
         run: |
+<<<<<<< HEAD
           ./test-env/bin/python -m langflow --help
+=======
+          uv run --python ./test-env/bin/python python -m langflow --help
+>>>>>>> origin/langflow-main
         shell: bash
 
       - name: Test server startup (Windows)
@@ -342,6 +393,11 @@ jobs:
       - name: Test server startup (Unix)
         if: matrix.os != 'windows'
         timeout-minutes: 5
+<<<<<<< HEAD
+=======
+        env:
+          OBJC_DISABLE_INITIALIZE_FORK_SAFETY: YES
+>>>>>>> origin/langflow-main
         run: |
           # Start server in background
           ./test-env/bin/python -m langflow run --host localhost --port 7860 --backend-only &
@@ -432,7 +488,11 @@ jobs:
         shell: bash
 
       - name: Setup Python
+<<<<<<< HEAD
         uses: actions/setup-python@v5
+=======
+        uses: actions/setup-python@v6
+>>>>>>> origin/langflow-main
         with:
           python-version: ${{ matrix.python-version }}
           architecture: ${{ matrix.arch == 'amd64' && 'x64' || matrix.arch }}
@@ -456,21 +516,33 @@ jobs:
       # Download artifacts for wheel installation
       - name: Download LFX package artifact
         if: steps.install-method.outputs.method == 'wheel' && inputs.lfx-artifact-name != ''
+<<<<<<< HEAD
         uses: actions/download-artifact@v5
+=======
+        uses: actions/download-artifact@v7
+>>>>>>> origin/langflow-main
         with:
           name: ${{ inputs.lfx-artifact-name }}
           path: ./lfx-dist
 
       - name: Download base package artifact
         if: steps.install-method.outputs.method == 'wheel'
+<<<<<<< HEAD
         uses: actions/download-artifact@v5
+=======
+        uses: actions/download-artifact@v7
+>>>>>>> origin/langflow-main
         with:
           name: ${{ inputs.base-artifact-name || needs.build-if-needed.outputs.base-artifact-name || 'adhoc-dist-base' }}
           path: ./base-dist
 
       - name: Download main package artifact
         if: steps.install-method.outputs.method == 'wheel'
+<<<<<<< HEAD
         uses: actions/download-artifact@v5
+=======
+        uses: actions/download-artifact@v7
+>>>>>>> origin/langflow-main
         with:
           name: ${{ inputs.main-artifact-name || needs.build-if-needed.outputs.main-artifact-name || 'adhoc-dist-main' }}
           path: ./main-dist
@@ -488,7 +560,11 @@ jobs:
           find ./lfx-dist -name "*.whl" -type f
           WHEEL_FILE=$(find ./lfx-dist -name "*.whl" -type f | head -1)
           if [ -n "$WHEEL_FILE" ]; then
+<<<<<<< HEAD
             uv pip install --python ./test-env/Scripts/python.exe "$WHEEL_FILE"
+=======
+            uv pip install --prerelease=allow --python ./test-env/Scripts/python.exe "$WHEEL_FILE"
+>>>>>>> origin/langflow-main
           else
             echo "No wheel file found in ./lfx-dist/"
             exit 1
@@ -530,7 +606,11 @@ jobs:
           find ./lfx-dist -name "*.whl" -type f
           WHEEL_FILE=$(find ./lfx-dist -name "*.whl" -type f | head -1)
           if [ -n "$WHEEL_FILE" ]; then
+<<<<<<< HEAD
             uv pip install --python ./test-env/bin/python "$WHEEL_FILE"
+=======
+            uv pip install --prerelease=allow --python ./test-env/bin/python "$WHEEL_FILE"
+>>>>>>> origin/langflow-main
           else
             echo "No wheel file found in ./lfx-dist/"
             exit 1
@@ -558,13 +638,76 @@ jobs:
           find ./main-dist -name "*.whl" -type f
           WHEEL_FILE=$(find ./main-dist -name "*.whl" -type f | head -1)
           if [ -n "$WHEEL_FILE" ]; then
+<<<<<<< HEAD
             uv pip install --python ./test-env/bin/python "$WHEEL_FILE"
+=======
+            uv pip install --prerelease=allow --python ./test-env/bin/python "$WHEEL_FILE"
+>>>>>>> origin/langflow-main
           else
             echo "No wheel file found in ./main-dist/"
             exit 1
           fi
         shell: bash
 
+<<<<<<< HEAD
+=======
+      - name: Force reinstall local wheels to prevent downgrades (Windows)
+        if: steps.install-method.outputs.method == 'wheel' && matrix.os == 'windows'
+        run: |
+          # Reinstall LFX if it was provided
+          if [ -n "${{ inputs.lfx-artifact-name }}" ]; then
+            LFX_WHEEL=$(find ./lfx-dist -name "*.whl" -type f | head -1)
+            if [ -n "$LFX_WHEEL" ]; then
+              echo "Force reinstalling LFX: $LFX_WHEEL"
+              NO_DEPS="--no-deps"
+              if [ "${{ inputs.pre_release }}" = "true" ]; then
+                NO_DEPS=""
+              fi
+              uv pip install --force-reinstall $NO_DEPS --prerelease=allow --python ./test-env/Scripts/python.exe "$LFX_WHEEL"
+            fi
+          fi
+
+          # Reinstall base
+          BASE_WHEEL=$(find ./base-dist -name "*.whl" -type f | head -1)
+          if [ -n "$BASE_WHEEL" ]; then
+            echo "Force reinstalling langflow-base: $BASE_WHEEL"
+            NO_DEPS="--no-deps"
+            if [ "${{ inputs.pre_release }}" = "true" ]; then
+              NO_DEPS=""
+            fi
+            uv pip install --force-reinstall $NO_DEPS --prerelease=allow --python ./test-env/Scripts/python.exe "$BASE_WHEEL"
+          fi
+        shell: bash
+
+      - name: Force reinstall local wheels to prevent downgrades (Unix)
+        if: steps.install-method.outputs.method == 'wheel' && matrix.os != 'windows'
+        run: |
+          # Reinstall LFX if it was provided
+          if [ -n "${{ inputs.lfx-artifact-name }}" ]; then
+            LFX_WHEEL=$(find ./lfx-dist -name "*.whl" -type f | head -1)
+            if [ -n "$LFX_WHEEL" ]; then
+              echo "Force reinstalling LFX: $LFX_WHEEL"
+              NO_DEPS="--no-deps"
+              if [ "${{ inputs.pre_release }}" = "true" ]; then
+                NO_DEPS=""
+              fi
+              uv pip install --force-reinstall $NO_DEPS --prerelease=allow --python ./test-env/bin/python "$LFX_WHEEL"
+            fi
+          fi
+
+          # Reinstall base
+          BASE_WHEEL=$(find ./base-dist -name "*.whl" -type f | head -1)
+          if [ -n "$BASE_WHEEL" ]; then
+            echo "Force reinstalling langflow-base: $BASE_WHEEL"
+            NO_DEPS="--no-deps"
+            if [ "${{ inputs.pre_release }}" = "true" ]; then
+              NO_DEPS=""
+            fi
+            uv pip install --force-reinstall $NO_DEPS --prerelease=allow --python ./test-env/bin/python "$BASE_WHEEL"
+          fi
+        shell: bash
+
+>>>>>>> origin/langflow-main
       # PyPI installation steps
       - name: Install langflow from PyPI (Windows)
         if: steps.install-method.outputs.method == 'pypi' && matrix.os == 'windows'
@@ -603,14 +746,22 @@ jobs:
       - name: Test CLI help command (Windows)
         if: matrix.os == 'windows'
         run: |
+<<<<<<< HEAD
           call test-env\Scripts\activate.bat
           python -m langflow --help
+=======
+          uv run --python ./test-env/Scripts/python.exe python -m langflow --help
+>>>>>>> origin/langflow-main
         shell: cmd
 
       - name: Test CLI help command (Unix)
         if: matrix.os != 'windows'
         run: |
+<<<<<<< HEAD
           ./test-env/bin/python -m langflow --help
+=======
+          uv run --python ./test-env/bin/python python -m langflow --help
+>>>>>>> origin/langflow-main
         shell: bash
 
       - name: Test server startup (Windows)
@@ -640,6 +791,11 @@ jobs:
       - name: Test server startup (Unix)
         if: matrix.os != 'windows'
         timeout-minutes: 5
+<<<<<<< HEAD
+=======
+        env:
+          OBJC_DISABLE_INITIALIZE_FORK_SAFETY: YES
+>>>>>>> origin/langflow-main
         run: |
           # Start server in background
           ./test-env/bin/python -m langflow run --host localhost --port 7860 --backend-only &

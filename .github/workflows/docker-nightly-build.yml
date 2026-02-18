@@ -72,7 +72,11 @@ jobs:
         id: version
         run: |
           echo "Extracting base version from pyproject.toml"
+<<<<<<< HEAD
           version=$(uv tree 2>/dev/null | grep '^langflow-base' | cut -d' ' -f2 | sed 's/^v//')
+=======
+          version=$(uv tree 2>/dev/null | grep 'langflow-base' | awk '{print $3}' | sed 's/^v//' | head -n 1)
+>>>>>>> origin/langflow-main
 
 
           # Verify nightly tag format
@@ -345,7 +349,11 @@ jobs:
         id: version
         run: |
           if [[ "${{ inputs.release_type }}" == "nightly-base" ]]; then
+<<<<<<< HEAD
             version=$(uv tree 2>/dev/null | grep '^langflow-base' | cut -d' ' -f2 | sed 's/^v//')
+=======
+            version=$(uv tree 2>/dev/null | grep 'langflow-base' | awk '{print $3}' | sed 's/^v//' | head -n 1)
+>>>>>>> origin/langflow-main
           else
             version=$(uv tree 2>/dev/null | grep '^langflow' | grep -v '^langflow-base' | cut -d' ' -f2 | sed 's/^v//')
           fi

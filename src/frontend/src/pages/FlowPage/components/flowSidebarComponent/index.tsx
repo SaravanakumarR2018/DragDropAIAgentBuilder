@@ -1,5 +1,5 @@
 import Fuse from "fuse.js";
-import { cloneDeep } from "lodash";
+import { cloneDeep, debounce } from "lodash";
 import {
   createContext,
   memo,
@@ -22,7 +22,10 @@ import {
 } from "@/components/ui/sidebar";
 import SkeletonGroup from "@/components/ui/skeletonGroup";
 import { useGetMCPServers } from "@/controllers/API/queries/mcp/use-get-mcp-servers";
-import { ENABLE_NEW_SIDEBAR } from "@/customization/feature-flags";
+import {
+  ENABLE_KNOWLEDGE_BASES,
+  ENABLE_NEW_SIDEBAR,
+} from "@/customization/feature-flags";
 import { useAddComponent } from "@/hooks/use-add-component";
 import { useShortcutsStore } from "@/stores/shortcuts";
 import { setLocalStorage } from "@/utils/local-storage-util";
@@ -55,6 +58,7 @@ import { traditionalSearchMetadata } from "./helpers/traditional-search-metadata
 
 const CATEGORIES = SIDEBAR_CATEGORIES;
 const BUNDLES = SIDEBAR_BUNDLES;
+const MCP_COMPONENT_CATEGORY = "models_and_agents";
 
 // Search context for the sidebar
 export type SearchContextType = {
@@ -63,7 +67,7 @@ export type SearchContextType = {
   // Additional properties for the sidebar to use
   search?: string;
   setSearch?: (value: string) => void;
-  searchInputRef?: React.RefObject<HTMLInputElement>;
+  searchInputRef?: React.RefObject<HTMLInputElement | null>;
   handleInputFocus?: () => void;
   handleInputBlur?: () => void;
   handleInputChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
@@ -146,7 +150,35 @@ interface FlowSidebarComponentProps {
 }
 
 export function FlowSidebarComponent({ isLoading }: FlowSidebarComponentProps) {
-  const data = useTypesStore((state) => state.data);
+  const rawData = useTypesStore((state) => state.data);
+
+  // Filter out knowledge components from files_and_knowledge category when ENABLE_KNOWLEDGE_BASES is OFF
+  const data = useMemo(() => {
+    if (ENABLE_KNOWLEDGE_BASES) {
+      return rawData;
+    }
+
+    const knowledgeComponentNames = [
+      "KnowledgeIngestion",
+      "KnowledgeRetrieval",
+    ];
+
+    // Create a deep copy to avoid mutating the original
+    const filteredData = cloneDeep(rawData);
+
+    if (filteredData.files_and_knowledge) {
+      // Filter out knowledge components by creating a new object without them
+      const filteredCategory = Object.fromEntries(
+        Object.entries(filteredData.files_and_knowledge).filter(
+          ([componentName]) => !knowledgeComponentNames.includes(componentName),
+        ),
+      );
+
+      filteredData.files_and_knowledge = filteredCategory;
+    }
+
+    return filteredData;
+  }, [rawData]);
 
   const {
     getFilterEdge,
@@ -202,6 +234,19 @@ export function FlowSidebarComponent({ isLoading }: FlowSidebarComponentProps) {
   const showBetaStorage = getBooleanFromStorage("showBeta", true);
   const showLegacyStorage = getBooleanFromStorage("showLegacy", false);
 
+  // Debounced search value for filtering
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
+
+  const debouncedSetSearch = useMemo(
+    () => debounce((value: string) => setDebouncedSearch(value), 300),
+    [],
+  );
+
+  useEffect(() => {
+    debouncedSetSearch(search);
+    return () => debouncedSetSearch.cancel();
+  }, [search, debouncedSetSearch]);
+
   // State
   const [fuse, setFuse] = useState<Fuse<any> | null>(null);
   const [openCategories, setOpenCategories] = useState<string[]>([]);
@@ -223,8 +268,12 @@ export function FlowSidebarComponent({ isLoading }: FlowSidebarComponentProps) {
 
   // Create base data that includes MCP category when available
   const baseData = useMemo(() => {
-    if (mcpSuccess && mcpServers && data["agents"]?.["MCPTools"]) {
-      const mcpComponent = data["agents"]["MCPTools"];
+    if (
+      mcpSuccess &&
+      mcpServers &&
+      data[MCP_COMPONENT_CATEGORY]?.["MCPTools"]
+    ) {
+      const mcpComponent = data[MCP_COMPONENT_CATEGORY]["MCPTools"];
       const newMcpSearchData = mcpServers.map((mcpServer) => ({
         ...mcpComponent,
         display_name: mcpServer.name,
@@ -260,10 +309,10 @@ export function FlowSidebarComponent({ isLoading }: FlowSidebarComponentProps) {
   }, [data]);
 
   const searchResults = useMemo(() => {
-    if (!search || !fuse) return null;
+    if (!debouncedSearch || !fuse) return null;
 
-    const searchTerm = normalizeString(search);
-    const fuseResults = fuse.search(search).map((result) => ({
+    const searchTerm = normalizeString(debouncedSearch);
+    const fuseResults = fuse.search(debouncedSearch).map((result) => ({
       ...result,
       item: { ...result.item, score: result.score },
     }));
@@ -278,10 +327,10 @@ export function FlowSidebarComponent({ isLoading }: FlowSidebarComponentProps) {
       combinedResults,
       traditionalResults,
     };
-  }, [search, fuse, baseData]);
+  }, [debouncedSearch, fuse, baseData]);
 
   const searchFilteredData = useMemo(() => {
-    if (!search || !searchResults) return cloneDeep(baseData);
+    if (!debouncedSearch || !searchResults) return cloneDeep(baseData);
 
     const filteredData = filteredDataFn(
       baseData,
@@ -290,7 +339,7 @@ export function FlowSidebarComponent({ isLoading }: FlowSidebarComponentProps) {
     );
 
     return filteredData;
-  }, [baseData, search, searchResults]);
+  }, [baseData, debouncedSearch, searchResults]);
 
   const sortedCategories = useMemo(() => {
     if (!searchResults || !searchFilteredData) return [];
@@ -372,7 +421,7 @@ export function FlowSidebarComponent({ isLoading }: FlowSidebarComponentProps) {
     setFilterData(finalFilteredData);
 
     if (
-      search !== "" ||
+      debouncedSearch !== "" ||
       filterType ||
       getFilterEdge.length > 0 ||
       getFilterComponent !== ""
@@ -384,7 +433,7 @@ export function FlowSidebarComponent({ isLoading }: FlowSidebarComponentProps) {
     }
   }, [
     finalFilteredData,
-    search,
+    debouncedSearch,
     filterType,
     getFilterEdge,
     setFilterComponent,
@@ -413,8 +462,12 @@ export function FlowSidebarComponent({ isLoading }: FlowSidebarComponentProps) {
     );
 
     // MCP data is already included in baseData, but we still need mcpSearchData for non-search display
-    if (mcpSuccess && mcpServers && data["agents"]?.["MCPTools"]) {
-      const mcpComponent = data["agents"]["MCPTools"];
+    if (
+      mcpSuccess &&
+      mcpServers &&
+      data[MCP_COMPONENT_CATEGORY]?.["MCPTools"]
+    ) {
+      const mcpComponent = data[MCP_COMPONENT_CATEGORY]["MCPTools"];
       const newMcpSearchData = mcpServers.map((mcpServer) => ({
         ...mcpComponent,
         mcpServerName: mcpServer.name, // adds this field and makes it searchable
@@ -445,13 +498,13 @@ export function FlowSidebarComponent({ isLoading }: FlowSidebarComponentProps) {
 
   useEffect(() => {
     if (
-      search === "" &&
+      debouncedSearch === "" &&
       getFilterEdge.length === 0 &&
       getFilterComponent === ""
     ) {
       setOpenCategories([]);
     }
-  }, [search, getFilterEdge, getFilterComponent]);
+  }, [debouncedSearch, getFilterEdge, getFilterComponent]);
 
   const searchComponentsSidebar = useShortcutsStore(
     (state) => state.searchComponentsSidebar,
@@ -525,7 +578,9 @@ export function FlowSidebarComponent({ isLoading }: FlowSidebarComponentProps) {
   const hasMcpServers = Boolean(mcpServers && mcpServers.length > 0);
 
   const hasSearchInput =
-    search !== "" || filterType !== undefined || getFilterComponent !== "";
+    debouncedSearch !== "" ||
+    filterType !== undefined ||
+    getFilterComponent !== "";
 
   const showComponents =
     (ENABLE_NEW_SIDEBAR &&
@@ -613,14 +668,14 @@ export function FlowSidebarComponent({ isLoading }: FlowSidebarComponentProps) {
               <>
                 {hasResults ? (
                   <>
-                    {showComponents && (
+                    {showComponents && !showMcp && (
                       <CategoryGroup
                         dataFilter={dataFilter}
                         sortedCategories={sortedCategories}
                         CATEGORIES={CATEGORIES}
                         openCategories={openCategories}
                         setOpenCategories={setOpenCategories}
-                        search={search}
+                        search={debouncedSearch}
                         nodeColors={nodeColors}
                         onDragStart={onDragStart}
                         sensitiveSort={sensitiveSort}
@@ -640,7 +695,7 @@ export function FlowSidebarComponent({ isLoading }: FlowSidebarComponentProps) {
                         openCategories={openCategories}
                         mcpLoading={mcpLoading}
                         mcpSuccess={mcpSuccess}
-                        search={search}
+                        search={debouncedSearch}
                         hasMcpServers={hasMcpServers}
                         showSearchConfigTrigger={
                           activeSection !== "mcp" &&
@@ -654,7 +709,7 @@ export function FlowSidebarComponent({ isLoading }: FlowSidebarComponentProps) {
                     {showBundles && (
                       <MemoizedSidebarGroup
                         BUNDLES={BUNDLES}
-                        search={search}
+                        search={debouncedSearch}
                         sortedCategories={sortedCategories}
                         dataFilter={dataFilter}
                         nodeColors={nodeColors}

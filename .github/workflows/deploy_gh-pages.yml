@@ -1,13 +1,13 @@
 name: Deploy to GitHub Pages
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'docs/**'
-    # Review gh actions docs if you want to further define triggers, paths, etc
-    # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#on
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to deploy docs from"
+        required: false
+        default: "main"
+        type: string
 
 jobs:
   deploy:
@@ -15,8 +15,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+<<<<<<< HEAD
       - uses: actions/setup-node@v4
         with:
+=======
+        with:
+          ref: ${{ inputs.branch }}
+      - uses: actions/setup-node@v6
+        with:
+>>>>>>> origin/langflow-main
           node-version: 22
           cache: npm
           cache-dependency-path: ./docs/package-lock.json

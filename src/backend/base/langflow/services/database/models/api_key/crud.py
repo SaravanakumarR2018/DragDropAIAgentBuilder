@@ -1,9 +1,10 @@
+import binascii
 import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy.orm import selectinload
-from sqlmodel import select
+from cryptography.fernet import InvalidToken
+from sqlmodel import select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from langflow.services.auth.api_key_codec import apply_api_key_context, generate_api_key_for_user
@@ -16,36 +17,63 @@ if TYPE_CHECKING:
 
 
 async def get_api_keys(session: AsyncSession, user_id: UUID) -> list[ApiKeyRead]:
+    """Get all API keys for a user with decrypted values."""
+    settings_service = get_settings_service()
     query: SelectOfScalar = select(ApiKey).where(ApiKey.user_id == user_id)
-    api_keys = (await session.exec(query)).all()
-    return [ApiKeyRead.model_validate(api_key) for api_key in api_keys]
+    api_key_objects = (await session.exec(query)).all()
+
+    fernet = auth_utils.get_fernet(settings_service)
+    api_keys = []
+    for api_key_obj in api_key_objects:
+        data = api_key_obj.model_dump()
+
+        api_key = data.get("api_key")
+        if api_key:
+            try:
+                actual_key = auth_utils.decrypt_api_key(api_key, settings_service=settings_service, fernet_obj=fernet)
+            except (ValueError, TypeError, InvalidToken, UnicodeDecodeError, AttributeError, binascii.Error):
+                # Fallback to stored value for legacy entries
+                actual_key = api_key
+        else:
+            actual_key = api_key
+
+        data["api_key"] = actual_key
+        api_keys.append(ApiKeyRead.model_validate(data))
+
+    return api_keys
 
 
 async def create_api_key(session: AsyncSession, api_key_create: ApiKeyCreate, user_id: UUID) -> UnmaskedApiKeyRead:
     generated_api_key = generate_api_key_for_user(user_id)
 
+    settings_service = get_settings_service()
+
+    stored_api_key = auth_utils.encrypt_api_key(generated_api_key, settings_service=settings_service)
+
     api_key = ApiKey(
-        api_key=generated_api_key,
+        api_key=stored_api_key,
         name=api_key_create.name,
         user_id=user_id,
         created_at=api_key_create.created_at or datetime.datetime.now(datetime.timezone.utc),
     )
 
     session.add(api_key)
-    await session.commit()
+    await session.flush()
     await session.refresh(api_key)
     unmasked = UnmaskedApiKeyRead.model_validate(api_key, from_attributes=True)
     unmasked.api_key = generated_api_key
     return unmasked
 
 
-async def delete_api_key(session: AsyncSession, api_key_id: UUID) -> None:
+async def delete_api_key(session: AsyncSession, api_key_id: UUID, user_id: UUID) -> None:
     api_key = await session.get(ApiKey, api_key_id)
     if api_key is None:
         msg = "API Key not found"
         raise ValueError(msg)
+    if api_key.user_id != user_id:
+        msg = "API Key not found"
+        raise ValueError(msg)
     await session.delete(api_key)
-    await session.commit()
 
 
 async def check_key(session: AsyncSession, api_key: str) -> User | None:
@@ -66,14 +94,25 @@ async def check_key(session: AsyncSession, api_key: str) -> User | None:
     return None
 
 
-async def update_total_uses(api_key_id: UUID):
-    """Update the total uses and last used at."""
-    async with session_scope() as session:
-        new_api_key = await session.get(ApiKey, api_key_id)
-        if new_api_key is None:
-            msg = "API Key not found"
-            raise ValueError(msg)
-        new_api_key.total_uses += 1
-        new_api_key.last_used_at = datetime.datetime.now(datetime.timezone.utc)
-        session.add(new_api_key)
-        await session.commit()
+async def _check_key_from_env(session: AsyncSession, api_key: str, settings_service) -> User | None:
+    """Validate API key against the environment variable.
+
+    When API_KEY_SOURCE='env', the x-api-key header is validated against
+    LANGFLOW_API_KEY environment variable. If valid, returns the superuser for authorization.
+    """
+    from langflow.services.database.models.user.crud import get_user_by_username
+
+    env_api_key = os.getenv("LANGFLOW_API_KEY")
+    if not env_api_key:
+        return None
+
+    # Compare the provided API key with the environment variable
+    if api_key != env_api_key:
+        return None
+
+    # Return the superuser for authorization purposes
+    superuser_username = settings_service.auth_settings.SUPERUSER
+    user = await get_user_by_username(session, superuser_username)
+    if user and user.is_active:
+        return user
+    return None

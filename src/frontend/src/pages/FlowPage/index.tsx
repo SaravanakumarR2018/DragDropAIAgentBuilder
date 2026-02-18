@@ -1,16 +1,25 @@
 import { useEffect, useState } from "react";
 import { useBlocker, useParams } from "react-router-dom";
+import { FlowPageSlidingContainerContent } from "@/components/core/playgroundComponent/sliding-container/components/flow-page-sliding-container";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import {
+  SimpleSidebar,
+  SimpleSidebarProvider,
+} from "@/components/ui/simple-sidebar";
 import { useGetFlow } from "@/controllers/API/queries/flows/use-get-flow";
 import { useGetTypes } from "@/controllers/API/queries/flows/use-get-types";
 import { ENABLE_NEW_SIDEBAR } from "@/customization/feature-flags";
 import { useCustomNavigate } from "@/customization/hooks/use-custom-navigate";
 import useSaveFlow from "@/hooks/flows/use-save-flow";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useRefreshModelInputs } from "@/hooks/use-refresh-model-inputs";
+import { useWebhookEvents } from "@/hooks/use-webhook-events";
 import { SaveChangesModal } from "@/modals/saveChangesModal";
 import useAlertStore from "@/stores/alertStore";
+import { usePlaygroundStore } from "@/stores/playgroundStore";
 import { useTypesStore } from "@/stores/typesStore";
 import { customStringify } from "@/utils/reactflowUtils";
+import { cn } from "@/utils/utils";
 import useFlowStore from "../../stores/flowStore";
 import useFlowsManagerStore from "../../stores/flowsManagerStore";
 import {
@@ -18,7 +27,6 @@ import {
   FlowSidebarComponent,
 } from "./components/flowSidebarComponent";
 import Page from "./components/PageComponent";
-import { FlowSidebarComponent } from "./components/flowSidebarComponent";
 import { WorkspaceLoadingPage } from "../WorkspaceLoadingPage";
 import { clearMutateTemplateDebounce } from "@/CustomNodes/helpers/mutate-template"; 
 
@@ -55,6 +63,10 @@ export default function FlowPage({ view }: { view?: boolean }): JSX.Element {
   const stopBuilding = useFlowStore((state) => state.stopBuilding);
 
   const { mutateAsync: getFlow } = useGetFlow();
+  const { refreshAllModelInputs } = useRefreshModelInputs();
+
+  // Connect to webhook events SSE for real-time feedback
+  useWebhookEvents();
 
   const handleSave = () => {
     let saving = true;
@@ -132,6 +144,9 @@ export default function FlowPage({ view }: { view?: boolean }): JSX.Element {
 
       setCurrentFlow(undefined);
       clearMutateTemplateDebounce();
+      // Reset playground state when leaving the flow
+      setSlidingContainerOpen(false);
+      setIsFullscreen(false);
     };
   }, [id]);
 
@@ -157,14 +172,44 @@ export default function FlowPage({ view }: { view?: boolean }): JSX.Element {
   }, [blocker.state, isBuilding]);
 
   const getFlowToAddToCanvas = async (id: string) => {
-    const flow = await getFlow({ id: id });
+    const flow = await getFlow({ id });
     setCurrentFlow(flow);
+    refreshAllModelInputs({ silent: true });
   };
 
   const isMobile = useIsMobile();
+  const isSlidingContainerOpen = usePlaygroundStore((state) => state.isOpen);
+  const setSlidingContainerOpen = usePlaygroundStore(
+    (state) => state.setIsOpen,
+  );
+  const isFullscreen = usePlaygroundStore((state) => state.isFullscreen);
+  const setIsFullscreen = usePlaygroundStore((state) => state.setIsFullscreen);
+  const inputs = useFlowStore((state) => state.inputs);
+  const outputs = useFlowStore((state) => state.outputs);
+
+  // Auto-close playground when all chat components are removed
+  useEffect(() => {
+    const hasChatInput = inputs.some((input) => input.type === "ChatInput");
+    const hasChatOutput = outputs.some(
+      (output) => output.type === "ChatOutput",
+    );
+
+    if (isSlidingContainerOpen && !hasChatInput && !hasChatOutput) {
+      setSlidingContainerOpen(false);
+      setIsFullscreen(false);
+    }
+  }, [
+    inputs,
+    outputs,
+    isSlidingContainerOpen,
+    setSlidingContainerOpen,
+    setIsFullscreen,
+  ]);
 
   return (
     <>
+      {/* TODO: will be revert - original main layout without playground panel */}
+      {/*
       <div className="flow-page-positioning">
         {currentFlow && (
           <div className="flex h-full overflow-hidden">
@@ -176,7 +221,7 @@ export default function FlowPage({ view }: { view?: boolean }): JSX.Element {
               <FlowSearchProvider>
                 {!view && <FlowSidebarComponent isLoading={isLoading} />}
                 <main className="flex w-full overflow-hidden">
-                  <div className="h-full w-full">
+                  <div className="h-full w/full">
                     <Page setIsLoading={setIsLoading} />
                   </div>
                 </main>
@@ -185,11 +230,56 @@ export default function FlowPage({ view }: { view?: boolean }): JSX.Element {
           </div>
         )}
       </div>
-      {(!currentFlow) && (
-        <div className="fixed inset-0 flex items-center justify-center">
-          <WorkspaceLoadingPage overlay={Boolean(currentFlow)} />
+      */}
+
+      <SimpleSidebarProvider
+        width="326px"
+        minWidth={0.15}
+        maxWidth={0.6}
+        open={isSlidingContainerOpen}
+        onOpenChange={(open) => {
+          setSlidingContainerOpen(open);
+        }}
+        fullscreen={isFullscreen}
+        onMaxWidth={() => {
+          setIsFullscreen(true);
+          setSlidingContainerOpen(true);
+        }}
+      >
+        <div className="flow-page-positioning">
+          {currentFlow && (
+            <div className="flex h-full overflow-hidden">
+              <SidebarProvider
+                width="17.5rem"
+                defaultOpen={!isMobile}
+                segmentedSidebar={ENABLE_NEW_SIDEBAR}
+              >
+                <FlowSearchProvider>
+                  {!view && <FlowSidebarComponent isLoading={isLoading} />}
+                  <main
+                    className={cn(
+                      "flex flex-1 min-w-0 overflow-hidden transition-all duration-300",
+                      isSlidingContainerOpen &&
+                        !isFullscreen &&
+                        "rounded-xl m-2 mr-0",
+                    )}
+                  >
+                    <div className="h-full w-full">
+                      <Page setIsLoading={setIsLoading} />
+                    </div>
+                  </main>
+                </FlowSearchProvider>
+              </SidebarProvider>
+              <SimpleSidebar resizable={!isFullscreen} className="h-full">
+                <FlowPageSlidingContainerContent
+                  isFullscreen={isFullscreen}
+                  setIsFullscreen={setIsFullscreen}
+                />
+              </SimpleSidebar>
+            </div>
+          )}
         </div>
-      )}
+      </SimpleSidebarProvider>
       {blocker.state === "blocked" && (
         <>
           {!isBuilding && currentSavedFlow && (

@@ -15,7 +15,9 @@ import click
 import httpx
 import typer
 from dotenv import load_dotenv
+from fastapi import HTTPException
 from httpx import HTTPError
+from jwt import InvalidTokenError
 from lfx.log.logger import configure, logger
 from lfx.services.settings.constants import DEFAULT_SUPERUSER, DEFAULT_SUPERUSER_PASSWORD
 from multiprocess import cpu_count
@@ -30,15 +32,97 @@ from sqlmodel import select
 from langflow.cli.progress import create_langflow_progress
 from langflow.initial_setup.setup import get_or_create_default_folder
 from langflow.main import setup_app
-from langflow.services.deps import get_db_service, get_settings_service, session_scope
+from langflow.services.auth.utils import get_current_user_from_access_token
+from langflow.services.database.models.api_key.crud import check_key
+from langflow.services.deps import get_db_service, get_settings_service, is_settings_service_initialized, session_scope
 from langflow.services.utils import initialize_services
 from langflow.utils.version import fetch_latest_version, get_version_info
 from langflow.utils.version import is_pre_release as langflow_is_pre_release
 
-# Initialize console with Windows-safe settings
-console = Console(legacy_windows=True, emoji=False) if platform.system() == "Windows" else Console()
-
 app = typer.Typer(no_args_is_help=True)
+console = Console()
+if platform.system() == "Windows":
+    console = Console(legacy_windows=True, emoji=False)  # Initialize console with Windows-safe settings
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())  # type: ignore[attr-defined]
+
+# Add LFX commands as a sub-app
+try:
+    from lfx.cli.commands import serve_command
+    from lfx.cli.run import run as lfx_run
+
+    lfx_app = typer.Typer(name="lfx", help="Langflow Executor commands")
+    lfx_app.command(name="serve", help="Serve a flow as an API", no_args_is_help=True)(serve_command)
+    lfx_app.command(name="run", help="Run a flow directly", no_args_is_help=True)(lfx_run)
+
+    app.add_typer(lfx_app, name="lfx")
+except ImportError:
+    # LFX not available, skip adding the sub-app
+    pass
+
+
+class ProcessManager:
+    """Manages the lifecycle of the backend process."""
+
+    def __init__(self):
+        self.webapp_process = None
+        self.shutdown_in_progress = False
+        if platform.system() == "Windows":
+            self._farewell_emoji = ":)"  # ASCII smiley
+        else:
+            self._farewell_emoji = "👋"  # Unicode wave
+
+    # params are required for signal handlers, even if they are not used
+    def handle_sigterm(self, _signum: int, _frame) -> None:
+        """Handle SIGTERM signal gracefully."""
+        if self.shutdown_in_progress:
+            return  # Already shutting down, ignore
+        self.shutdown_in_progress = True
+        self.shutdown()
+
+    # params are required for signal handlers, even if they are not used
+    def handle_sigint(self, _signum: int, _frame) -> None:
+        """Handle SIGINT signal gracefully."""
+        if self.shutdown_in_progress:
+            return  # Already shutting down, ignore
+        self.shutdown_in_progress = True
+        self.shutdown()
+
+    def shutdown(self):
+        """Gracefully shutdown the webapp process."""
+        if self.webapp_process and self.webapp_process.is_alive():
+            # Just terminate the process - the actual shutdown progress is handled
+            # by the FastAPI lifespan context in main.py
+            self.webapp_process.terminate()
+            # The long wait allows the process to finish setup, preventing it from
+            # getting in a state where background tasks continue to do work after termination
+            # is sent.
+            self.webapp_process.join(timeout=30)
+            if self.webapp_process.is_alive():
+                logger.warning("Process didn't terminate gracefully, killing it.")
+                self.webapp_process.kill()
+                self.webapp_process.join()
+            self.print_farewell_message()
+
+        sys.exit(0)
+
+    def print_farewell_message(self) -> None:
+        """Print a nice farewell message after shutdown is complete."""
+        # Clear any progress indicator output that might be on the current line
+        sys.stdout.write("\r")  # Move cursor to beginning of line
+        sys.stdout.write(" " * 80)  # Clear the line with spaces
+        sys.stdout.write("\r")  # Move cursor back to beginning
+
+        click.echo()
+        farewell = click.style(f"{self._farewell_emoji} See you next time!", fg="bright_blue", bold=True)
+        click.echo(farewell)
+
+
+# Create a single instance of ProcessManager
+process_manager = ProcessManager()
+
+# Update signal handlers to use the instance methods
+signal.signal(signal.SIGTERM, process_manager.handle_sigterm)
+signal.signal(signal.SIGINT, process_manager.handle_sigint)
 
 # Add LFX commands as a sub-app
 try:
@@ -155,7 +239,6 @@ def set_var_for_macos_issue() -> None:
         os.environ["OBJC_DISABLE_INITIALIZE_FORK_SAFETY"] = "YES"
         # https://stackoverflow.com/questions/75747888/uwsgi-segmentation-fault-with-flask-python-app-behind-nginx-after-running-for-2 # noqa: E501
         os.environ["no_proxy"] = "*"  # to avoid error with gunicorn
-        logger.debug("Set OBJC_DISABLE_INITIALIZE_FORK_SAFETY to YES to avoid error")
 
 
 def wait_for_server_ready(host, port, protocol) -> None:
@@ -265,17 +348,19 @@ def run(
 ) -> None:
     """Run Langflow."""
     if env_file:
+        if is_settings_service_initialized():
+            err = (
+                "Settings service is already initialized. This indicates potential race conditions "
+                "with settings initialization. Ensure the settings service is not created during "
+                "module loading."
+            )
+            # i.e. ensures the env file is loaded before the settings service is initialized
+            raise ValueError(err)
         load_dotenv(env_file, override=True)
 
-    # Set default log level if not provided
-    log_level_str = "info" if log_level is None else log_level.lower()
-
-    # Must set as env var for child process to pick up
-    env_log_level = os.environ.get("LANGFLOW_LOG_LEVEL")
-    if env_log_level is None:
-        os.environ["LANGFLOW_LOG_LEVEL"] = log_level_str
-    else:
-        os.environ["LANGFLOW_LOG_LEVEL"] = env_log_level.lower()
+    # Set and normalize log level, with precedence: cli > env > default
+    log_level = (log_level or os.environ.get("LANGFLOW_LOG_LEVEL") or "info").lower()
+    os.environ["LANGFLOW_LOG_LEVEL"] = log_level
 
     configure(log_level=log_level, log_file=log_file, log_rotation=log_rotation)
 
@@ -668,6 +753,7 @@ def superuser(
 
     asyncio.run(_create_superuser(username, password, auth_token))
 
+
 async def _create_superuser(username: str, password: str, auth_token: str | None):
     """Create a superuser."""
     await initialize_services()
@@ -711,6 +797,7 @@ async def _create_superuser(username: str, password: str, auth_token: str | None
 
         typer.echo(f"AUTO_LOGIN enabled. Creating default superuser '{username}'...")
         # Do not echo the default password to avoid exposing it in logs.
+    # AUTO_LOGIN is false - production mode
     elif is_first_setup:
         typer.echo("No superusers found. Creating first superuser...")
     else:
@@ -723,17 +810,13 @@ async def _create_superuser(username: str, password: str, auth_token: str | None
 
         # Validate the auth token
         try:
-            from fastapi import HTTPException
-            from jose import JWTError
-
-            from langflow.services.auth.utils import check_key, get_current_user_by_jwt
             auth_user = None
             async with session_scope() as session:
                 # Try JWT first
                 user = None
                 try:
-                    user = await get_current_user_by_jwt(auth_token, session)
-                except (JWTError, HTTPException):
+                    user = await get_current_user_from_access_token(auth_token, session)
+                except (InvalidTokenError, HTTPException):
                     # Try API key
                     api_key_result = await check_key(session, auth_token)
                     if api_key_result and hasattr(api_key_result, "is_superuser"):
@@ -751,10 +834,12 @@ async def _create_superuser(username: str, password: str, auth_token: str | None
             typer.echo(f"Error: Authentication failed - {e!s}")
             raise typer.Exit(1) from None
 
+    # Auth complete, create the superuser
     async with session_scope() as session:
-        from langflow.services.auth.utils import create_super_user
+        from langflow.services.deps import get_auth_service
 
-        if await create_super_user(db=session, username=username, password=password):
+        auth = get_auth_service()
+        if await auth.create_super_user(username, password, db=session):
             # Verify that the superuser was created
             from langflow.services.database.models.user.model import User
 
@@ -883,12 +968,10 @@ def api_key(
             stmt = select(ApiKey).where(ApiKey.user_id == superuser.id)
             api_key = (await session.exec(stmt)).first()
             if api_key:
-                await delete_api_key(session, api_key.id)
+                await delete_api_key(session, api_key.id, superuser.id)
 
             api_key_create = ApiKeyCreate(name="CLI")
-            unmasked_api_key = await create_api_key(session, api_key_create, user_id=superuser.id)
-            await session.commit()
-            return unmasked_api_key
+            return await create_api_key(session, api_key_create, user_id=superuser.id)
 
     unmasked_api_key = asyncio.run(aapi_key())
     # Create a banner to display the API key and tell the user it won't be shown again

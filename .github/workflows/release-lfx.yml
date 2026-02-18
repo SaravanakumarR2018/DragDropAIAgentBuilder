@@ -185,7 +185,11 @@ jobs:
           echo "LFX CLI test completed successfully"
 
       - name: Upload artifacts
+<<<<<<< HEAD
         uses: actions/upload-artifact@v4
+=======
+        uses: actions/upload-artifact@v6
+>>>>>>> origin/langflow-main
         with:
           name: lfx-dist
           path: src/lfx/dist/
@@ -261,7 +265,11 @@ jobs:
             org.opencontainers.image.version=${{ github.event.inputs.version }}
 
       - name: Build and push Docker image
+<<<<<<< HEAD
         uses: docker/build-push-action@v5
+=======
+        uses: docker/build-push-action@v6
+>>>>>>> origin/langflow-main
         with:
           context: .
           file: src/lfx/docker/Dockerfile${{ matrix.variant == 'alpine' && '.alpine' || '' }}
@@ -284,7 +292,11 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Download artifacts
+<<<<<<< HEAD
         uses: actions/download-artifact@v5
+=======
+        uses: actions/download-artifact@v7
+>>>>>>> origin/langflow-main
         with:
           name: lfx-dist
           path: dist/

@@ -12,12 +12,15 @@ from pathlib import Path
 
 import orjson
 
+<<<<<<< HEAD
 try:
     from packaging.version import InvalidVersion, Version
 except ImportError as e:
     msg = "The 'packaging' library is required for version comparison"
     raise ImportError(msg) from e
 
+=======
+>>>>>>> origin/langflow-main
 
 def _get_lfx_version():
     """Get the installed lfx version.
@@ -71,6 +74,7 @@ def _strip_dynamic_fields(obj):
     return obj
 
 
+<<<<<<< HEAD
 def _load_index_from_file(index_path: Path) -> dict:
     """Load a component index from a JSON file.
 
@@ -333,6 +337,8 @@ def _load_existing_index() -> dict:
     return existing_index
 
 
+=======
+>>>>>>> origin/langflow-main
 def _import_components() -> tuple[dict, int]:
     """Import all lfx components using the async import function.
 
@@ -362,8 +368,11 @@ def _import_components() -> tuple[dict, int]:
 def build_component_index() -> dict:
     """Build the component index by scanning all modules in lfx.components.
 
+<<<<<<< HEAD
     Merges hash history from the existing index to track component evolution.
 
+=======
+>>>>>>> origin/langflow-main
     Returns:
         A dictionary containing version, entries, and sha256 hash
 
@@ -373,7 +382,10 @@ def build_component_index() -> dict:
     """
     print("Building component index...")
 
+<<<<<<< HEAD
     existing_index = _load_existing_index()
+=======
+>>>>>>> origin/langflow-main
     modules_dict, components_count = _import_components()
     current_version = _get_lfx_version()
 
@@ -390,12 +402,15 @@ def build_component_index() -> dict:
             component = dict(components_dict[comp_name])
             component["metadata"] = dict(component.get("metadata", {}))
 
+<<<<<<< HEAD
             existing_component = (
                 _find_component_in_index(existing_index, category_name, comp_name) if existing_index else None
             )
             hash_history = _merge_hash_history(component, existing_component, current_version)
             component["metadata"]["hash_history"] = hash_history
 
+=======
+>>>>>>> origin/langflow-main
             sorted_components[comp_name] = component
 
         entries.append([category_name, sorted_components])
@@ -405,7 +420,10 @@ def build_component_index() -> dict:
         "metadata": {
             "num_modules": len(modules_dict),
             "num_components": components_count,
+<<<<<<< HEAD
             "hash_history_format": "inline_ranges_v1",  # Document the format for future evolution
+=======
+>>>>>>> origin/langflow-main
         },
         "entries": entries,
     }
@@ -435,6 +453,13 @@ def build_component_index() -> dict:
     return index
 
 
+<<<<<<< HEAD
+=======
+# Standard location for component index
+COMPONENT_INDEX_PATH = Path(__file__).parent.parent / "src" / "lfx" / "src" / "lfx" / "_assets" / "component_index.json"
+
+
+>>>>>>> origin/langflow-main
 def main():
     """Main entry point for building the component index."""
     try:
@@ -450,10 +475,16 @@ def main():
     # Create directory if it doesn't exist
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
+<<<<<<< HEAD
     # Always minify to reduce file size and git history bloat (from 83k to ~5k lines)
     # The index is auto-generated and can be inspected with `jq` if needed
     print(f"\nWriting minified index to {output_path}")
     json_bytes = orjson.dumps(index, option=orjson.OPT_SORT_KEYS)
+=======
+    # Pretty-print for readable git diffs and resolvable merge conflicts
+    print(f"\nWriting formatted index to {output_path}")
+    json_bytes = orjson.dumps(index, option=orjson.OPT_SORT_KEYS | orjson.OPT_INDENT_2)
+>>>>>>> origin/langflow-main
     output_path.write_text(json_bytes.decode("utf-8"), encoding="utf-8")
 
     print("\nIndex successfully written!")

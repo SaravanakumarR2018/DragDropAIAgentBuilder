@@ -9,6 +9,9 @@ import { ApiInterceptor } from "../controllers/API/api";
 import { AuthProvider } from "./authContext";
 import { ClerkAuthAdapter, IS_CLERK_AUTH } from "@/clerk/auth";
 
+// Export queryClient for use in utility functions (e.g., messageUtils, buildUtils)
+export const queryClient = new QueryClient();
+
 export default function ContextWrapper({ children }: { children: ReactNode }) {
   const queryClient = new QueryClient();
 

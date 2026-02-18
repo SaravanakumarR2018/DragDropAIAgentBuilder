@@ -4,18 +4,13 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useHotkeys } from "react-hotkeys-hook";
 import { useShallow } from "zustand/react/shallow";
 import ForwardedIconComponent from "@/components/common/genericIconComponent";
-import ShadTooltip from "@/components/common/shadTooltipComponent";
 import { usePostValidateComponentCode } from "@/controllers/API/queries/nodes/use-post-validate-component-code";
 import { CustomNodeStatus } from "@/customization/components/custom-NodeStatus";
 import UpdateComponentModal from "@/modals/updateComponentModal";
 import { useAlternate } from "@/shared/hooks/use-alternate";
 import type { FlowStoreType } from "@/types/zustand/flow";
 import { Button } from "../../components/ui/button";
-import {
-  ICON_STROKE_WIDTH,
-  TOOLTIP_HIDDEN_OUTPUTS,
-  TOOLTIP_OPEN_HIDDEN_OUTPUTS,
-} from "../../constants/constants";
+import { ICON_STROKE_WIDTH } from "../../constants/constants";
 import NodeToolbarComponent from "../../pages/FlowPage/components/nodeToolbarComponent";
 import { useChangeOnUnfocus } from "../../shared/hooks/use-change-on-unfocus";
 import useAlertStore from "../../stores/alertStore";
@@ -364,6 +359,8 @@ function GenericNode({
     return useFlowStore.getState().nodes.filter((node) => node.selected).length;
   }, [selected]);
 
+  const rightClickedNodeId = useFlowStore((state) => state.rightClickedNodeId);
+
   const shouldShowUpdateComponent = useMemo(
     () => (isOutdated || hasBreakingChange) && !isUserEdited && !dismissAll,
     [isOutdated, hasBreakingChange, isUserEdited, dismissAll],
@@ -374,8 +371,16 @@ function GenericNode({
     [data.node?.legacy, data.node?.replacement, dismissAllLegacy],
   );
 
+  const inspectionPanelVisible = useFlowStore(
+    (state) => state.inspectionPanelVisible,
+  );
+
   const memoizedNodeToolbarComponent = useMemo(() => {
-    return selected && selectedNodesCount === 1 ? (
+    const isRightClicked = rightClickedNodeId === data.id;
+    const isSelectedSingle = selected && selectedNodesCount === 1;
+    const shouldShowToolbar = isSelectedSingle || isRightClicked;
+
+    return shouldShowToolbar ? (
       <>
         <div
           className={cn(
@@ -403,43 +408,46 @@ function GenericNode({
             isOutdated={isOutdated && (dismissAll || isUserEdited)}
             isUserEdited={isUserEdited}
             hasBreakingChange={hasBreakingChange}
+            openDropdownOnRightClick={isRightClicked}
           />
         </div>
-        <div className="-z-10">
-          <Button
-            unstyled
-            onClick={() => {
-              toggleEditNameDescription();
-              setHasChangedNodeDescription(false);
-            }}
-            className={cn(
-              "nodrag absolute left-1/2 z-50 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md",
-              "transform transition-all duration-300 ease-out",
-              showNode
-                ? "top-2 translate-x-[10.4rem]"
-                : "top-0 translate-x-[6.4rem]",
-              editedNameDescription
-                ? "bg-accent-emerald"
-                : "bg-zinc-foreground",
-            )}
-            data-testid={
-              editedNameDescription
-                ? "save-name-description-button"
-                : "edit-name-description-button"
-            }
-          >
-            <ForwardedIconComponent
-              name={editedNameDescription ? "Check" : "PencilLine"}
-              strokeWidth={ICON_STROKE_WIDTH}
+        {!inspectionPanelVisible && (
+          <div className="-z-10">
+            <Button
+              unstyled
+              onClick={() => {
+                toggleEditNameDescription();
+                setHasChangedNodeDescription(false);
+              }}
               className={cn(
+                "nodrag absolute left-1/2 z-50 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md",
+                "transform transition-all duration-300 ease-out",
+                showNode
+                  ? "top-2 translate-x-[10.4rem]"
+                  : "top-0 translate-x-[6.4rem]",
                 editedNameDescription
-                  ? "text-accent-emerald-foreground"
-                  : "text-muted-foreground",
-                "icon-size",
+                  ? "bg-accent-emerald"
+                  : "bg-zinc-foreground",
               )}
-            />
-          </Button>
-        </div>
+              data-testid={
+                editedNameDescription
+                  ? "save-name-description-button"
+                  : "edit-name-description-button"
+              }
+            >
+              <ForwardedIconComponent
+                name={editedNameDescription ? "Check" : "PencilLine"}
+                strokeWidth={ICON_STROKE_WIDTH}
+                className={cn(
+                  editedNameDescription
+                    ? "text-accent-emerald-foreground"
+                    : "text-muted-foreground",
+                  "icon-size",
+                )}
+              />
+            </Button>
+          </div>
+        )}
       </>
     ) : (
       <></>
@@ -459,6 +467,8 @@ function GenericNode({
     hasChangedNodeDescription,
     toggleEditNameDescription,
     selectedNodesCount,
+    rightClickedNodeId,
+    inspectionPanelVisible,
   ]);
   useEffect(() => {
     if (hiddenOutputs && hiddenOutputs.length === 0) {
@@ -598,23 +608,28 @@ function GenericNode({
               getValidationStatus={getValidationStatus}
             />
           </div>
-          {showNode && (hasDescription || editNameDescription) && (
-            <div className="px-4 pb-3">
-              <MemoizedNodeDescription
-                description={data.node?.description}
-                charLimit={1000}
-                mdClassName={"dark:prose-invert"}
-                nodeId={data.id}
-                selected={selected}
-                editNameDescription={editNameDescription}
-                setEditNameDescription={set}
-                setHasChangedNodeDescription={setHasChangedNodeDescription}
-              />
-            </div>
-          )}
+          {showNode &&
+            (hasDescription || editNameDescription) &&
+            !inspectionPanelVisible && (
+              <div className="px-4 pb-3">
+                <MemoizedNodeDescription
+                  description={data.node?.description}
+                  charLimit={1000}
+                  mdClassName={"dark:prose-invert"}
+                  nodeId={data.id}
+                  selected={selected}
+                  editNameDescription={editNameDescription}
+                  setEditNameDescription={set}
+                  setHasChangedNodeDescription={setHasChangedNodeDescription}
+                />
+              </div>
+            )}
         </div>
         {showNode && (
-          <div className="nopan nodelete nodrag noflow relative cursor-auto">
+          <div
+            className="nopan nodelete nodrag noflow relative cursor-auto"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
             <>
               <MemoizedRenderInputParameters
                 data={data}

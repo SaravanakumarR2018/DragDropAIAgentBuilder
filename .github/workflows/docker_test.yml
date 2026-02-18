@@ -78,7 +78,11 @@ jobs:
             .
       - name: Test backend image
         run: |
+<<<<<<< HEAD
           expected_version=$(cat pyproject.toml | grep version | head -n 1 | cut -d '"' -f 2)
+=======
+          expected_version=$(cat src/backend/base/pyproject.toml | grep version | head -n 1 | cut -d '"' -f 2)
+>>>>>>> origin/langflow-main
           version=$(${{ env.CONTAINER_RUNTIME }} run --rm --entrypoint bash langflowai/langflow-backend:latest-dev -c "python -c 'from langflow.utils.version import get_version_info; print(get_version_info()[\"version\"])'")
           if [ "$expected_version" != "$version" ]; then
               echo "Expected version: $expected_version"

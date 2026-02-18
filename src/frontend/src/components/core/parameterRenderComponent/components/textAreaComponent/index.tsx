@@ -73,7 +73,8 @@ export default function TextAreaComponent({
   placeholder,
   isToolMode = false,
   nodeInformationMetadata,
-}: InputProps<string, TextAreaComponentType>): JSX.Element {
+  showParameter = true,
+}: InputProps<string, TextAreaComponentType>): JSX.Element | null {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -193,6 +194,10 @@ export default function TextAreaComponent({
       />
     </div>
   );
+
+  if (!showParameter) {
+    return null;
+  }
 
   return (
     <div className={cn("w-full", disabled && "pointer-events-none")}>

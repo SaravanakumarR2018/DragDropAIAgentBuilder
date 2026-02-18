@@ -27,6 +27,7 @@ from lfx.io import (
 from lfx.schema.data import Data
 from lfx.schema.dotdict import dotdict
 from lfx.utils.component_utils import set_current_fields, set_field_advanced, set_field_display
+from lfx.utils.ssrf_protection import SSRFProtectionError, validate_url_for_ssrf
 
 # Define fields for each mode
 MODE_FIELDS = {
@@ -44,7 +45,7 @@ DEFAULT_FIELDS = ["mode"]
 class APIRequestComponent(Component):
     display_name = "API Request"
     description = "Make HTTP requests using URL or cURL commands."
-    documentation: str = "https://docs.langflow.org/components-data#api-request"
+    documentation: str = "https://docs.langflow.org/api-request"
     icon = "Globe"
     name = "APIRequest"
 
@@ -145,8 +146,13 @@ class APIRequestComponent(Component):
         BoolInput(
             name="follow_redirects",
             display_name="Follow Redirects",
-            value=True,
-            info="Whether to follow http redirects.",
+            value=False,
+            info=(
+                "Whether to follow HTTP redirects. "
+                "WARNING: Enabling redirects may allow SSRF bypass attacks where a public URL "
+                "redirects to internal resources. Only enable if you trust the target server. "
+                "See OWASP SSRF Prevention Cheat Sheet for details."
+            ),
             advanced=True,
         ),
         BoolInput(
@@ -424,6 +430,14 @@ class APIRequestComponent(Component):
         save_to_file = self.save_to_file
         include_httpx_metadata = self.include_httpx_metadata
 
+        # Security warning when redirects are enabled
+        if follow_redirects:
+            self.log(
+                "Security Warning: HTTP redirects are enabled. This may allow SSRF bypass attacks "
+                "where a public URL redirects to internal resources (e.g., cloud metadata endpoints). "
+                "Only enable this if you trust the target server."
+            )
+
         # if self.mode == "cURL" and self.curl_input:
         #     self._build_config = self.parse_curl(self.curl_input, dotdict())
         #     # After parsing curl, get the normalized URL
@@ -436,6 +450,15 @@ class APIRequestComponent(Component):
         if not validators.url(url):
             msg = f"Invalid URL provided: {url}"
             raise ValueError(msg)
+
+        # SSRF Protection: Validate URL to prevent access to internal resources
+        # TODO: In next major version (2.0), remove warn_only=True to enforce blocking
+        try:
+            validate_url_for_ssrf(url, warn_only=True)
+        except SSRFProtectionError as e:
+            # This will only raise if SSRF protection is enabled and warn_only=False
+            msg = f"SSRF Protection: {e}"
+            raise ValueError(msg) from e
 
         # Process query parameters
         if isinstance(self.query_params, str):
@@ -470,11 +493,13 @@ class APIRequestComponent(Component):
                 return self.parse_curl(self.curl_input, build_config)
             return build_config
 
-        # print(f"Current mode: {field_value}")
         if field_value == "cURL":
             set_field_display(build_config, "curl_input", value=True)
             if build_config["curl_input"]["value"]:
-                build_config = self.parse_curl(build_config["curl_input"]["value"], build_config)
+                try:
+                    build_config = self.parse_curl(build_config["curl_input"]["value"], build_config)
+                except ValueError as e:
+                    self.log(f"Failed to parse cURL input: {e}")
         else:
             set_field_display(build_config, "curl_input", value=False)
 

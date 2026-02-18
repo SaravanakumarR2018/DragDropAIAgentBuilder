@@ -43,12 +43,15 @@ COPY ./pyproject.toml /app/pyproject.toml
 COPY ./src/backend/base/README.md /app/src/backend/base/README.md
 COPY ./src/backend/base/uv.lock /app/src/backend/base/uv.lock
 COPY ./src/backend/base/pyproject.toml /app/src/backend/base/pyproject.toml
-COPY ./src/lfx/README.md /app/src/lfx/README.md
+# Copy lfx metadata files since it's a workspace member
 COPY ./src/lfx/pyproject.toml /app/src/lfx/pyproject.toml
+COPY ./src/lfx/README.md /app/src/lfx/README.md
 
+# Install the project's dependencies using the lockfile and settings
+# We need to mount the root uv.lock and pyproject.toml to build the base with uv because we're still using uv workspaces
 RUN --mount=type=cache,target=/root/.cache/uv \
     RUSTFLAGS='--cfg reqwest_unstable' \
-    uv sync --frozen --no-install-project --no-editable --extra postgresql
+    cd src/backend/base && uv sync --frozen --no-install-project --no-dev --no-editable --extra postgresql
 
 COPY ./src /app/src
 
@@ -90,7 +93,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # RUNTIME
 # Setup user, utilities and copy the virtual environment only
 ################################
-FROM python:3.12.3-slim AS runtime
+FROM python:3.12.12-slim-trixie AS runtime
+
 
 RUN apt-get update \
     && apt-get upgrade -y \
@@ -108,8 +112,10 @@ COPY docker/supervisord.conf /etc/supervisor/supervisord.conf
 COPY docker/entrypoint.sh /usr/local/bin/langflow-entrypoint.sh
 RUN chmod +x /usr/local/bin/langflow-entrypoint.sh
 
-# Place executables in the environment at the front of the path
+COPY --from=builder --chown=1000 /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH"
+RUN /app/.venv/bin/pip install --upgrade playwright \
+    && /app/.venv/bin/playwright install
 
 LABEL org.opencontainers.image.title=langflow
 LABEL org.opencontainers.image.authors=['Langflow']

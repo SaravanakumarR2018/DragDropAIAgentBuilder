@@ -11,6 +11,7 @@ from fastapi import Depends, HTTPException, Request, Security, WebSocketExceptio
 from fastapi.security import APIKeyHeader, APIKeyQuery, OAuth2PasswordBearer
 from jose import JWTError, jwt
 from lfx.log.logger import logger
+from lfx.services.deps import injectable_session_scope
 from lfx.services.settings.service import SettingsService
 from sqlalchemy.exc import IntegrityError
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -145,7 +146,7 @@ async def get_current_user(
     token: Annotated[str, Security(oauth2_login)],
     query_param: Annotated[str, Security(api_key_query)],
     header_param: Annotated[str, Security(api_key_header)],
-    db: Annotated[AsyncSession, Depends(get_session)],
+    db: Annotated[AsyncSession, Depends(injectable_session_scope)],
 ) -> User:
     if token:
         return await get_current_user_by_jwt(token, db)
@@ -157,6 +158,27 @@ async def get_current_user(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="Invalid or missing API key",
     )
+
+async def get_current_user_from_access_token(
+    token: str | Coroutine | None,
+    db: AsyncSession,
+) -> User:
+    """Compatibility helper to resolve a user from an access token.
+
+    This simply delegates to the active auth service's
+    `get_current_user_from_access_token` implementation.
+
+    **For new code, prefer calling
+    `get_auth_service().get_current_user_from_access_token(...)` directly**
+    instead of importing this function.
+    """
+    try:
+        return await _auth_service().get_current_user_from_access_token(token, db)
+    except AuthenticationError as e:
+        raise _auth_error_to_http(e) from e
+
+
+WS_AUTH_REASON = "Missing or invalid credentials (cookie, token or API key)."
 
 
 async def get_current_user_by_jwt(
@@ -261,6 +283,49 @@ async def get_current_active_superuser(current_user: Annotated[User, Depends(get
     if not current_user.is_superuser:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="The user doesn't have enough privileges")
     return current_user
+
+async def get_current_user_for_sse(
+    request: Request,
+    db: AsyncSession = Depends(injectable_session_scope),
+) -> User | UserRead:
+    """Extracts credentials from request and delegates to auth service.
+
+    Accepts cookie (access_token_lf) or API key (x-api-key query param).
+    """
+    token = request.cookies.get("access_token_lf")
+    api_key = request.query_params.get("x-api-key") or request.headers.get("x-api-key")
+
+    try:
+        return await _auth_service().get_current_user_for_sse(token, api_key, db)
+    except AuthenticationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Missing or invalid credentials (cookie or API key).",
+        ) from e
+
+
+async def get_optional_user(
+    token: Annotated[str | None, Security(oauth2_login)],
+    query_param: Annotated[str | None, Security(api_key_query)],
+    header_param: Annotated[str | None, Security(api_key_header)],
+    db: AsyncSession = Depends(injectable_session_scope),
+) -> User | None:
+    """Get the current user if authenticated, otherwise return None.
+
+    This is useful for endpoints that need to behave differently for authenticated
+    vs unauthenticated users (e.g., returning different response types).
+
+    Returns:
+        User | None: The authenticated user if valid credentials are provided, None otherwise.
+    """
+    try:
+        user = await _auth_service().get_current_user(token, query_param, header_param, db)
+    except (AuthenticationError, HTTPException):
+        return None
+    else:
+        if user and user.is_active:
+            return user
+        return None    
 
 
 async def get_webhook_user(flow_id: str, request: Request) -> UserRead:
@@ -591,7 +656,7 @@ async def get_current_user_mcp(
     token: Annotated[str, Security(oauth2_login)],
     query_param: Annotated[str, Security(api_key_query)],
     header_param: Annotated[str, Security(api_key_header)],
-    db: Annotated[AsyncSession, Depends(get_session)],
+    db: Annotated[AsyncSession, Depends(injectable_session_scope)],
 ) -> User:
     """MCP-specific user authentication that always allows fallback to username lookup.
 
