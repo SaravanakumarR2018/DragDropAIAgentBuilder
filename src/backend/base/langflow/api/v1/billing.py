@@ -15,6 +15,7 @@ from langflow.services.paddle.subscriptions import (
     has_active_subscription,
     create_subscription as create_subscription_service,
 )
+from langflow.services.paddle.provisioning import get_paddle_prices
 
 router = APIRouter(tags=["Billing"], prefix="/billing")
 
@@ -153,3 +154,19 @@ async def create_subscription(
         raise HTTPException(status_code=500, detail="Internal server error")
 
     return result
+
+
+@router.get("/paddle-prices")
+async def list_paddle_prices():
+    """
+    Returns a mapping of plan_key -> paddle price_id
+    for Paddle products that have been provisioned.
+    """
+    try:
+        prices = await get_paddle_prices()
+        return prices
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        logger.exception("Error fetching Paddle prices")
+        raise HTTPException(status_code=500, detail="Internal server error")

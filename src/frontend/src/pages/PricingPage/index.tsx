@@ -1,7 +1,7 @@
 import type { SVGProps } from "react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import {useAuth} from "@clerk/clerk-react";
+import { useAuth } from "@clerk/clerk-react";
 import axios from "axios";
 import { getURL } from "../../controllers/API/helpers/constants";
 
@@ -9,7 +9,10 @@ const MIN_SEATS = 1;
 
 type PlanKey = "starter" | "pro" | "enterprise";
 
-const PLAN_KEY_MAP: Record<PlanKey, "starter_pack_monthly" | "pro_pack_monthly" | "enterprise_pack_monthly"> = {
+const PLAN_KEY_MAP: Record<
+  PlanKey,
+  "starter_pack_monthly" | "pro_pack_monthly" | "enterprise_pack_monthly"
+> = {
   starter: "starter_pack_monthly",
   pro: "pro_pack_monthly",
   enterprise: "enterprise_pack_monthly",
@@ -24,7 +27,7 @@ interface PlanConfig {
   features: string[];
 }
 
-const PLANS: PlanConfig[] = [
+const STATIC_PLANS: PlanConfig[] = [
   {
     key: "starter",
     name: "Starter Pack",
@@ -86,6 +89,28 @@ export default function PricingPage() {
     enterprise: 5,
   });
 
+  // 🔹 NEW: store Paddle price IDs
+  const [priceMap, setPriceMap] = useState<Record<string, string>>({});
+  const [loadingPrices, setLoadingPrices] = useState(true);
+
+  // 🔹 Fetch Paddle price IDs once
+  useEffect(() => {
+    const fetchPrices = async () => {
+      try {
+        const { data } = await axios.get(
+          getURL("GET_PADDLE_PRICES")
+        );
+        setPriceMap(data);
+      } catch (err) {
+        console.error("Failed to load Paddle price IDs:", err);
+      } finally {
+        setLoadingPrices(false);
+      }
+    };
+
+    fetchPrices();
+  }, []);
+
   const handleDecrement = (planKey: PlanKey) => {
     setSeatsByPlan((prev) => ({
       ...prev,
@@ -101,35 +126,44 @@ export default function PricingPage() {
   };
 
   const handleSelectPlan = async (plan: PlanConfig) => {
-    const token = await getToken();
-    const seats = seatsByPlan[plan.key];
+    if (loadingPrices) {
+      console.warn("Prices still loading...");
+      return;
+    }
 
+    const seats = seatsByPlan[plan.key];
     setSelectedPlan(plan.key);
 
-    const payload = {
-      plan_key: PLAN_KEY_MAP[plan.key],
-      seats,
-    };
+    const planKey = PLAN_KEY_MAP[plan.key];
+    const priceId = priceMap[planKey];
 
-    try {
-      const response = await axios.post(
-        getURL("CREATE_SUBSCRIPTION"),
-        payload,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      console.log("Subscription created successfully:", response.data);
-      // Handle successful subscription creation
-      // e.g., redirect to success page or show confirmation
-    } catch (error) {
-      console.error("Failed to create subscription:", error);
-      // Handle error - show error message to user
+    if (!priceId) {
+      console.error("Missing Paddle price ID for:", planKey);
+      return;
     }
+
+    if (!window.Paddle) {
+      console.error("Paddle is not initialized");
+      return;
+    }
+
+    window.Paddle.Checkout.open({
+      items: [
+        {
+          priceId,
+          quantity: seats,
+        },
+      ],
+      settings: {
+        allowLogout: false,
+      },
+      customData: {
+        plan_key: planKey,
+        seats,
+      },
+    });
+
+    console.log("Opened Paddle checkout with price:", priceId);
   };
 
   return (
@@ -141,23 +175,22 @@ export default function PricingPage() {
               Simple, Scalable Pricing
             </h1>
             <p className="mt-3 text-white/70">
-              Choose the plan that matches your team size and scale with
-              confidence.
+              Choose the plan that matches your team size and scale with confidence.
             </p>
           </div>
 
           <div className="mt-10 grid gap-6 md:grid-cols-3">
-            {PLANS.map((plan) => {
+            {STATIC_PLANS.map((plan) => {
               const seats = seatsByPlan[plan.key];
               const total = useMemo(
                 () => seats * plan.pricePerSeat,
-                [seats, plan.pricePerSeat],
+                [seats, plan.pricePerSeat]
               );
 
               return (
                 <div
                   key={plan.key}
-                  className={`flex h-full flex-col rounded-xl border p-6 ${
+                  className={`flex flex-col rounded-xl border p-6 ${
                     selectedPlan === plan.key
                       ? "border-cyan-400/50 bg-[#11161d]"
                       : "border-white/10 bg-[#0f1217]"
@@ -175,27 +208,23 @@ export default function PricingPage() {
                   )}
 
                   <div className="mt-5 rounded-lg border border-white/10 bg-black/20 p-4">
-                    <div className="text-xs uppercase tracking-wide text-white/60">
-                      Seats
-                    </div>
+                    <div className="text-xs uppercase text-white/60">Seats</div>
 
                     <div className="mt-2 flex items-center gap-3">
                       <button
                         type="button"
                         onClick={() => handleDecrement(plan.key)}
-                        className="h-8 w-8 rounded-md border border-white/20 text-lg leading-none text-white hover:bg-white/10"
+                        className="h-8 w-8 rounded-md border border-white/20"
                       >
                         -
                       </button>
 
-                      <span className="min-w-8 text-center text-xl font-semibold">
-                        {seats}
-                      </span>
+                      <span className="text-xl font-semibold">{seats}</span>
 
                       <button
                         type="button"
                         onClick={() => handleIncrement(plan.key)}
-                        className="h-8 w-8 rounded-md border border-white/20 text-lg leading-none text-white hover:bg-white/10"
+                        className="h-8 w-8 rounded-md border border-white/20"
                       >
                         +
                       </button>
@@ -211,10 +240,7 @@ export default function PricingPage() {
 
                   <ul className="mt-4 space-y-2 text-sm text-white/80">
                     {plan.features.map((feature) => (
-                      <li
-                        key={feature}
-                        className="flex items-center gap-2"
-                      >
+                      <li key={feature} className="flex items-center gap-2">
                         <CheckIcon className="h-4 w-4" />
                         {feature}
                       </li>
@@ -224,7 +250,7 @@ export default function PricingPage() {
                   <button
                     type="button"
                     onClick={() => handleSelectPlan(plan)}
-                    className="mt-6 rounded-lg border border-cyan-300/40 bg-cyan-950/50 px-4 py-2 text-sm text-cyan-100 hover:bg-cyan-900/60"
+                    className="mt-6 rounded-lg border border-cyan-300/40 px-4 py-2 text-sm"
                   >
                     Select {plan.name}
                   </button>
@@ -237,7 +263,7 @@ export default function PricingPage() {
             <button
               type="button"
               onClick={() => navigate("/organization")}
-              className="rounded-lg border border-white/15 px-4 py-2 text-sm text-white/90 hover:bg-white/10"
+              className="rounded-lg border border-white/15 px-4 py-2 text-sm"
             >
               Back to organization
             </button>

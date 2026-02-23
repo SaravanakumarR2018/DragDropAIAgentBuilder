@@ -15,6 +15,7 @@ from paddle_billing.Entities.Shared import CustomData
 from paddle_billing.Resources.Customers.Operations import CreateCustomer, UpdateCustomer
 from paddle_billing.Resources.Subscriptions.Operations import ListSubscriptions
 from paddle_billing.Resources.Transactions.Operations import CreateTransaction
+from paddle_billing.Resources.Transactions.Operations.Create import TransactionCreateItem
 
 from langflow.services.auth.clerk_utils import (
     get_org_id_from_clerk_payload,
@@ -337,15 +338,9 @@ async def _resolve_price_id_for_plan(*, client, plan_key: str) -> str | None:
     prices = await asyncio.to_thread(lambda: list(client.prices.list()))
 
     for price in prices:
-        custom_data = getattr(price, "custom_data", None)
-        if not custom_data:
-            continue
-
-        try:
-            if custom_data.get("plan_key") == plan_key:
-                return price.id
-        except Exception:
-            continue
+        custom_data = _normalize_custom_data(getattr(price, "custom_data", None))
+        if custom_data.get("plan_key") == plan_key:
+            return price.id
 
     return None
 
@@ -357,42 +352,43 @@ async def create_subscription(
     plan_key: str,
     seats: int,
 ) -> dict:
-    """
-    Generate a Paddle Checkout link for subscription purchase.
-    The actual subscription will be created by Paddle once the
-    user completes the checkout.
-    """
+
     client = get_paddle_client()
 
-    # Find the price_id for the given plan_key
     price_id = await _resolve_price_id_for_plan(client=client, plan_key=plan_key)
     if not price_id:
         raise ValueError(f"Invalid plan key: {plan_key}")
 
-    # Create a Checkout Transaction
     try:
         transaction = await asyncio.to_thread(
             client.transactions.create,
             CreateTransaction(
-                price_id=price_id,
-                recurring=True,
-                quantity=seats,
-                customer_email=get_email_from_clerk_payload(),
-                custom_data=CustomData(
-                    {
-                        "org_id": org_id,
-                        "clerk_user_id": clerk_user_id,
-                        "plan_key": plan_key,
-                        "seats": seats,
-                    }
-                ),
+                items=[
+                    TransactionCreateItem(
+                        price_id=price_id,
+                        quantity=seats,
+                    )
+                ],
+                custom_data=CustomData({
+                    "org_id": org_id,
+                    "clerk_user_id": clerk_user_id,
+                    "plan_key": plan_key,
+                    "seats": seats,
+                }),
             ),
         )
-    except Exception as exc:
-        logger.exception("Paddle checkout creation failed")
-        raise ValueError("Failed to initiate Paddle checkout") from exc
+        logger.info(f"Created Paddle transaction for subscription: {transaction}")
 
-    checkout_url = getattr(transaction, "checkout_url", None)
+    except Exception as exc:
+        logger.exception(f"Paddle checkout creation failed: {exc}")
+        raise ValueError("Failed to initiate Paddle checkout") from exc
+    
+    checkout_url = (
+        transaction.checkout.url
+        if transaction.checkout and transaction.checkout.url
+        else None
+    )
+
     if not checkout_url:
         raise ValueError("Failed to get Paddle checkout URL")
 

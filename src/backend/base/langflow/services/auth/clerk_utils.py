@@ -414,6 +414,15 @@ async def _ensure_admin_superuser(user: User) -> None:
 
 async def clerk_token_middleware(request: Request, call_next):
     """Middleware to handle Clerk JWT tokens and Langflow API keys."""
+    # Log incoming request summary (method, url, client, header keys)
+    try:
+        client_host = request.client.host if getattr(request, "client", None) else None
+    except Exception:
+        client_host = None
+    logger.info(
+        f"[ClerkMiddleware] Incoming request: method={request.method} url={request.url} client={client_host} headers={list(request.headers.keys())}"
+    )
+
     settings = get_settings_service()
     if not settings.auth_settings.CLERK_AUTH_ENABLED:
         return await call_next(request)
