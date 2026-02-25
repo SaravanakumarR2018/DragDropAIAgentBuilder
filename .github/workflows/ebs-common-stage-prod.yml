@@ -146,6 +146,17 @@ jobs:
           else
             echo "PADDLE_ENVIRONMENT=${PADDLE_ENVIRONMENT}" >> "$ENV_FILE"
           fi
+                    if grep -q '^VITE_PADDLE_CLIENT_KEY=' "$ENV_FILE"; then
+            sed -i "s|^VITE_PADDLE_CLIENT_KEY=.*|VITE_PADDLE_CLIENT_KEY=${PADDLE_CLIENT_KEY}|" "$ENV_FILE"
+          else
+            echo "VITE_PADDLE_CLIENT_KEY=${PADDLE_CLIENT_KEY}" >> "$ENV_FILE"
+          fi
+
+          if grep -q '^VITE_PADDLE_ENVIRONMENT=' "$ENV_FILE"; then
+            sed -i "s|^VITE_PADDLE_ENVIRONMENT=.*|VITE_PADDLE_ENVIRONMENT=${PADDLE_ENVIRONMENT}|" "$ENV_FILE"
+          else
+            echo "VITE_PADDLE_ENVIRONMENT=${PADDLE_ENVIRONMENT}" >> "$ENV_FILE"
+          fi
 
       - name: Prepare Clerk API key
         env:
