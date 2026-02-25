@@ -13,7 +13,6 @@ from langflow.services.deps import get_settings_service
 from langflow.services.paddle.subscriptions import (
     ensure_paddle_customer_for_user,
     has_active_subscription,
-    create_subscription as create_subscription_service,
 )
 from langflow.services.paddle.provisioning import get_paddle_prices
 
@@ -113,49 +112,6 @@ async def get_org_access(
         "reason": "subscription_inactive",
     }
 
-
-@router.post("/create-subscription")
-async def create_subscription(
-    payload: CreateSubscriptionRequest,
-    current_user: CurrentActiveUser,
-) -> dict:
-    """
-    Generate a Paddle checkout link to create a subscription.
-    The actual subscription is created by Paddle after payment.
-    """
-    from langflow.services.auth.clerk_utils import (
-        get_org_id_from_clerk_payload,
-        get_clerk_user_id_from_payload,
-    )
-
-    settings = get_settings_service()
-    if not settings.auth_settings.CLERK_AUTH_ENABLED:
-        raise HTTPException(status_code=400, detail="Clerk auth not enabled")
-
-    logger.info(
-        f"Generating Paddle checkout for user {current_user.id} "
-        f"plan={payload.plan_key}, seats={payload.seats}"
-    )
-
-    org_id = get_org_id_from_clerk_payload()
-    clerk_user_id = get_clerk_user_id_from_payload()
-
-    try:
-        result = await create_subscription_service(
-            org_id=org_id,
-            clerk_user_id=clerk_user_id,
-            plan_key=payload.plan_key,
-            seats=payload.seats,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    except Exception as exc:
-        logger.exception("Failed generating Paddle subscription checkout")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-    return result
-
-
 @router.get("/paddle-prices")
 async def list_paddle_prices():
     """
@@ -168,5 +124,5 @@ async def list_paddle_prices():
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except Exception as exc:
-        logger.exception("Error fetching Paddle prices")
+        logger.exception(f"Error fetching Paddle prices {exc}")
         raise HTTPException(status_code=500, detail="Internal server error")

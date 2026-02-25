@@ -5,6 +5,11 @@ import router from "./routes";
 import { useDarkStore } from "./stores/darkStore";
 import { initializePaddle } from "@paddle/paddle-js";
 
+const PADDLE_ENVIRONMENT = (import.meta.env.VITE_PADDLE_ENVIRONMENT)=="staging" ? "sandbox" : "production";
+const PADDLE_TOKEN = import.meta.env.VITE_PADDLE_CLIENT_KEY;
+console.log("Paddle Environment:", PADDLE_ENVIRONMENT);
+console.log("Paddle Token:", PADDLE_TOKEN);
+console.log("paddle token: ", import.meta.env.VITE_PADDLE_CLIENT_KEY);
 export default function App() {
   const dark = useDarkStore((state) => state.dark);
 
@@ -20,7 +25,8 @@ export default function App() {
 
   useEffect(() => {
   initializePaddle({
-    token: import.meta.env.VITE_PADDLE_CLIENT_TOKEN!,
+    environment: PADDLE_ENVIRONMENT,
+    token: PADDLE_TOKEN,
     eventCallback: (event) => {
       console.log("Paddle event:", event);
 

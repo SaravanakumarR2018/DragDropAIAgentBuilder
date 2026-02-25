@@ -6,6 +6,7 @@ import asyncio
 from dataclasses import dataclass
 from typing import Any
 
+from langflow.services.paddle.subscriptions import _normalize_custom_data
 from langflow.services.paddle.client import get_paddle_client
 from lfx.log.logger import logger
 from paddle_billing import Client
@@ -192,30 +193,32 @@ async def get_paddle_prices(
     *,
     client: Client | None = None,
 ) -> dict[str, str]:
-    """Fetch all Paddle prices and map them by plan_key.
-    
-    Returns a mapping of plan_key -> paddle price_id for provisioned products.
-    Raises ValueError if no prices are found.
-    """
+
     paddle_client = client or get_paddle_client()
-    
+
     try:
-        prices = await asyncio.to_thread(lambda: list(paddle_client.prices.list()))
+        prices = await asyncio.to_thread(
+            lambda: list(paddle_client.prices.list())
+        )
     except Exception as exc:
-        logger.exception("Failed to fetch Paddle prices")
+        logger.exception(f"Failed to fetch Paddle prices: {exc}")
         raise ValueError("Failed to fetch Paddle prices") from exc
-    
-    # Build mapping from plan_key to price_id
+
     price_map: dict[str, str] = {}
+
     for price in prices:
-        custom_data = getattr(price, "custom_data", {}) or {}
+        custom_data = _normalize_custom_data(
+            getattr(price, "custom_data", None)
+        )
+
         plan_key = custom_data.get("plan_key")
+
         if isinstance(plan_key, str) and price.id:
             price_map[plan_key] = price.id
-    
+
     if not price_map:
         raise ValueError(
             "No Paddle price IDs found — make sure plans are provisioned"
         )
-    
+
     return price_map

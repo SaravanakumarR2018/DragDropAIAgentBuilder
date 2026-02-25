@@ -1,11 +1,16 @@
-import type { SVGProps } from "react";
-import { useMemo, useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth, useUser } from "@clerk/clerk-react";
 import axios from "axios";
+import type { SVGProps } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { getURL } from "../../controllers/API/helpers/constants";
 
 const MIN_SEATS = 1;
+
+const ENTERPRISE_HARDCODED = {
+  planKey: "enterprise_pack_monthly",
+  priceId: "pri_enterprise_pack_monthly",
+} as const;
 
 type PlanKey = "starter" | "pro" | "enterprise";
 
@@ -80,7 +85,8 @@ function CheckIcon(props: SVGProps<SVGSVGElement>) {
 
 export default function PricingPage() {
   const navigate = useNavigate();
-  const { getToken } = useAuth();
+  const { user } = useUser();
+  const email = user?.primaryEmailAddress?.emailAddress;
 
   const [selectedPlan, setSelectedPlan] = useState<PlanKey>("starter");
   const [seatsByPlan, setSeatsByPlan] = useState<Record<PlanKey, number>>({
@@ -89,18 +95,14 @@ export default function PricingPage() {
     enterprise: 5,
   });
 
-  // 🔹 NEW: store Paddle price IDs
   const [priceMap, setPriceMap] = useState<Record<string, string>>({});
   const [loadingPrices, setLoadingPrices] = useState(true);
 
-  // 🔹 Fetch Paddle price IDs once
   useEffect(() => {
     const fetchPrices = async () => {
       try {
-        const { data } = await axios.get(
-          getURL("GET_PADDLE_PRICES")
-        );
-        setPriceMap(data);
+        const { data } = await axios.get(getURL("GET_PADDLE_PRICES"));
+        setPriceMap(data ?? {});
       } catch (err) {
         console.error("Failed to load Paddle price IDs:", err);
       } finally {
@@ -125,57 +127,67 @@ export default function PricingPage() {
     }));
   };
 
-  const handleSelectPlan = async (plan: PlanConfig) => {
-    if (loadingPrices) {
-      console.warn("Prices still loading...");
-      return;
-    }
+const handleSelectPlan = async (plan: PlanConfig) => {
+  if (loadingPrices) {
+    console.warn("Paddle prices are still loading. Please try again.");
+    return;
+  }
 
-    const seats = seatsByPlan[plan.key];
-    setSelectedPlan(plan.key);
+  const seats = seatsByPlan[plan.key];
+  setSelectedPlan(plan.key);
 
-    const planKey = PLAN_KEY_MAP[plan.key];
-    const priceId = priceMap[planKey];
+  const planKey = PLAN_KEY_MAP[plan.key];
 
-    if (!priceId) {
-      console.error("Missing Paddle price ID for:", planKey);
-      return;
-    }
+  const priceId =
+    plan.key === "enterprise"
+      ? ENTERPRISE_HARDCODED.priceId
+      : priceMap[planKey];
 
-    if (!window.Paddle) {
-      console.error("Paddle is not initialized");
-      return;
-    }
+  if (!priceId) {
+    console.error("Missing Paddle price ID for:", planKey);
+    return;
+  }
 
-    window.Paddle.Checkout.open({
-      items: [
-        {
-          priceId,
-          quantity: seats,
-        },
-      ],
-      settings: {
-        allowLogout: false,
+  if (!window.Paddle) {
+    console.error("Paddle is not initialized");
+    return;
+  }
+  if (!email) {
+    console.error("User email not available");
+    return;
+  }
+
+  window.Paddle.Checkout.open({
+    items: [
+      {
+        priceId,
+        quantity: seats,
       },
-      customData: {
-        plan_key: planKey,
-        seats,
-      },
-    });
+    ],
+    customer: {
+      email
+    },    
+    settings: {
+      allowLogout: false,
+    },
+    customData: {
+      plan_key: planKey,
+      seats,
+    },
+  });
 
-    console.log("Opened Paddle checkout with price:", priceId);
-  };
+  console.log("Opened Paddle checkout for:", planKey);
+};
 
   return (
     <div className="min-h-screen bg-[#0f1217] px-4 py-14 text-white">
       <div className="mx-auto max-w-7xl">
         <div className="rounded-2xl border border-white/10 bg-[#0f1217] p-8">
           <div className="text-center">
-            <h1 className="text-2xl font-semibold">
-              Simple, Scalable Pricing
-            </h1>
+            <h1 className="text-2xl font-semibold">Simple, Scalable Pricing</h1>
             <p className="mt-3 text-white/70">
-              Choose the plan that matches your team size and scale with confidence.
+              Choose the plan that matches your team size and scale with
+              confidence.
             </p>
           </div>
 
@@ -184,7 +196,7 @@ export default function PricingPage() {
               const seats = seatsByPlan[plan.key];
               const total = useMemo(
                 () => seats * plan.pricePerSeat,
-                [seats, plan.pricePerSeat]
+                [seats, plan.pricePerSeat],
               );
 
               return (
