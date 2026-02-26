@@ -10,6 +10,8 @@ DOCKER_COMPOSE=docker_example/docker-compose.yml
 
 VITE_CLERK_AUTH_ENABLED ?= false
 VITE_CLERK_PUBLISHABLE_KEY ?=
+VITE_PADDLE_CLIENT_KEY ?=
+VITE_PADDLE_ENVIRONMENT ?=
 PYTHON_REQUIRED=$(shell grep '^requires-python[[:space:]]*=' pyproject.toml | sed -n 's/.*"\([^"]*\)".*/\1/p')
 RED=\033[0;31m
 NC=\033[0m # No Color
@@ -341,6 +343,8 @@ dockerfile_build:
 		-f ${DOCKERFILE} \
 		--build-arg VITE_CLERK_AUTH_ENABLED=${VITE_CLERK_AUTH_ENABLED} \
 		--build-arg VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY} \
+		--build-arg VITE_PADDLE_CLIENT_KEY=${VITE_PADDLE_CLIENT_KEY} \
+		--build-arg VITE_PADDLE_ENVIRONMENT=${VITE_PADDLE_ENVIRONMENT} \
 		--build-arg VITE_AUTO_LOGIN=$(VITE_AUTO_LOGIN) \
 		-t $(TAG) .
 
