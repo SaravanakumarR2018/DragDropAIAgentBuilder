@@ -269,7 +269,7 @@ export default function PricingPage() {
            <button
               type="button"
               onClick={() => {
-                navigate("/flows?pricingBypass=1");
+                navigate("/flows?pricing_bypass=1");
               }}
               className="mr-3 rounded-lg border border-cyan-300/40 px-4 py-2 text-sm"
             >
