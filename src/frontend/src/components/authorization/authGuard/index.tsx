@@ -38,13 +38,26 @@ export const ProtectedRoute = ({ children }) => {
   const isRootPage = currentPath === "/";
   const isFlowsPage = currentPath.includes("/flows");
   const isPricingPage = currentPath.includes("/pricing");
+  const hasPricingBypassParam =
+    new URLSearchParams(currentSearch).get("pricing_bypass") === "1";
+  const hasPricingBypassSession =
+    sessionStorage.getItem("pricingBypass") === "1";
   const isPricingBypass =
     isFlowsPage &&
-    new URLSearchParams(currentSearch).get("pricing_bypass") === "1";
+    (hasPricingBypassParam || hasPricingBypassSession) &&
+    isSignedIn === true &&
+    isOrgSelected;
 
   // 🔹 Billing state
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
   const [isCheckingAccess, setIsCheckingAccess] = useState(false);
+
+  useEffect(() => {
+    if (!isFlowsPage || !isPricingBypass) return;
+
+    // One-time temporary bypass token from Pricing page
+    sessionStorage.removeItem("pricingBypass");
+  }, [isFlowsPage, isPricingBypass]);
 
   // 🔹 Billing check for /flows
   useEffect(() => {

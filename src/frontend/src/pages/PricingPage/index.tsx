@@ -268,7 +268,10 @@ export default function PricingPage() {
           <div className="mt-8 flex justify-center">
             <button
               type="button"
-              onClick={() => navigate("/flows?pricing_bypass=1")}
+              onClick={() => {
+                sessionStorage.setItem("pricingBypass", "1");
+                navigate("/flows");
+              }}
               className="mr-3 rounded-lg border border-cyan-300/40 px-4 py-2 text-sm"
             >
               Temporary: Go to flows
