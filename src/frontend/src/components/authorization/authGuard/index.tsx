@@ -38,25 +38,13 @@ export const ProtectedRoute = ({ children }) => {
   const isRootPage = currentPath === "/";
   const isFlowsPage = currentPath.includes("/flows");
   const isPricingPage = currentPath.includes("/pricing");
-  const pricingBypassSearch = new URLSearchParams(currentSearch);
-  const hasPricingBypassParam =
-    pricingBypassSearch.get("pricing_bypass") === "1" ||
-    pricingBypassSearch.get("pricingBypass") === "1";
-  const hasPricingBypassSession =
-    sessionStorage.getItem("pricingBypass") === "1";
   const isPricingBypass =
-      isFlowsPage && (hasPricingBypassParam || hasPricingBypassSession);
+    isFlowsPage &&
+    new URLSearchParams(currentSearch).get("pricing_bypass") === "1";
 
   // 🔹 Billing state
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
   const [isCheckingAccess, setIsCheckingAccess] = useState(false);
-
-  useEffect(() => {
-    if (!isFlowsPage || !isPricingBypass) return;
-
-    // One-time temporary bypass token from Pricing page
-    sessionStorage.removeItem("pricingBypass");
-  }, [isFlowsPage, isPricingBypass]);
 
   // 🔹 Billing check for /flows
   useEffect(() => {
@@ -145,17 +133,16 @@ export const ProtectedRoute = ({ children }) => {
       return null;
     }
 
+    if (isSignedIn && !isOrgSelected) {
+      return <CustomNavigate to="/organization" replace />;
+    }
+
     if (isPricingBypass) {
       // Temporary bypass from pricing placeholder until checkout is implemented
-     } else {
-      if (isSignedIn && !isOrgSelected) {
-        return <CustomNavigate to="/organization" replace />;
-      }
-
-      if (isSignedIn && hasAccess === null) {
-        return null;
-      }
+    } else if (isSignedIn && hasAccess === null) {
+      return null;
     }
+
     if (isCheckingAccess) {
       return null;
     }
