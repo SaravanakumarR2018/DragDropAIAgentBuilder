@@ -1,16 +1,11 @@
-import { useAuth, useUser } from "@clerk/clerk-react";
+import { useUser } from "@clerk/clerk-react";
 import axios from "axios";
 import type { SVGProps } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getURL } from "../../controllers/API/helpers/constants";
 
 const MIN_SEATS = 1;
-
-const ENTERPRISE_HARDCODED = {
-  planKey: "enterprise_pack_monthly",
-  priceId: "pri_enterprise_pack_monthly",
-} as const;
 
 type PlanKey = "starter" | "pro" | "enterprise";
 
@@ -87,6 +82,8 @@ export default function PricingPage() {
   const navigate = useNavigate();
   const { user } = useUser();
   const email = user?.primaryEmailAddress?.emailAddress;
+  const [showEnterpriseContactMessage, setShowEnterpriseContactMessage] =
+    useState(false);
 
   const [selectedPlan, setSelectedPlan] = useState<PlanKey>("starter");
   const [seatsByPlan, setSeatsByPlan] = useState<Record<PlanKey, number>>({
@@ -127,57 +124,57 @@ export default function PricingPage() {
     }));
   };
 
-const handleSelectPlan = async (plan: PlanConfig) => {
-  if (loadingPrices) {
-    console.warn("Paddle prices are still loading. Please try again.");
-    return;
-  }
+  const handleSelectPlan = async (plan: PlanConfig) => {
+    const seats = seatsByPlan[plan.key];
+    setSelectedPlan(plan.key);
+    setShowEnterpriseContactMessage(false);
 
-  const seats = seatsByPlan[plan.key];
-  setSelectedPlan(plan.key);
+    if (plan.key === "enterprise") {
+      setShowEnterpriseContactMessage(true);
+      return;
+    }
 
-  const planKey = PLAN_KEY_MAP[plan.key];
+    if (loadingPrices) {
+      console.warn("Paddle prices are still loading. Please try again.");
+      return;
+    }
 
-  const priceId =
-    plan.key === "enterprise"
-      ? ENTERPRISE_HARDCODED.priceId
-      : priceMap[planKey];
+    const planKey = PLAN_KEY_MAP[plan.key];
+    const priceId = priceMap[planKey];
 
-  if (!priceId) {
-    console.error("Missing Paddle price ID for:", planKey);
-    return;
-  }
+    if (!priceId) {
+      console.error("Missing Paddle price ID for:", planKey);
+      return;
+    }
 
-  if (!window.Paddle) {
-    console.error("Paddle is not initialized");
-    return;
-  }
-  if (!email) {
-    console.error("User email not available");
-    return;
-  }
+    if (!window.Paddle) {
+      console.error("Paddle is not initialized");
+      return;
+    }
+    if (!email) {
+      console.error("User email not available");
+      return;
+    }
 
-  window.Paddle.Checkout.open({
-    items: [
-      {
-        priceId,
-        quantity: seats,
+    window.Paddle.Checkout.open({
+      items: [
+        {
+          priceId,
+          quantity: seats,
+        },
+      ],
+      customer: {
+        email,
       },
-    ],
-    customer: {
-      email
-    },    
-    settings: {
-      allowLogout: false,
-    },
-    customData: {
-      plan_key: planKey,
-      seats,
-    },
-  });
-
-  console.log("Opened Paddle checkout for:", planKey);
-};
+      settings: {
+        allowLogout: false,
+      },
+      customData: {
+        plan_key: planKey,
+        seats,
+      },
+    });
+  };
 
   return (
     <div className="min-h-screen bg-[#0f1217] px-4 py-14 text-white">
@@ -194,10 +191,7 @@ const handleSelectPlan = async (plan: PlanConfig) => {
           <div className="mt-10 grid gap-6 md:grid-cols-3">
             {STATIC_PLANS.map((plan) => {
               const seats = seatsByPlan[plan.key];
-              const total = useMemo(
-                () => seats * plan.pricePerSeat,
-                [seats, plan.pricePerSeat],
-              );
+              const total = seats * plan.pricePerSeat;
 
               return (
                 <div
@@ -274,12 +268,25 @@ const handleSelectPlan = async (plan: PlanConfig) => {
           <div className="mt-8 flex justify-center">
             <button
               type="button"
+              onClick={() => navigate("/flows?pricing_bypass=1")}
+              className="mr-3 rounded-lg border border-cyan-300/40 px-4 py-2 text-sm"
+            >
+              Temporary: Go to flows
+            </button>
+            <button
+              type="button"
               onClick={() => navigate("/organization")}
               className="rounded-lg border border-white/15 px-4 py-2 text-sm"
             >
               Back to organization
             </button>
           </div>
+
+          {showEnterpriseContactMessage && (
+            <p className="mt-4 text-center text-sm text-cyan-300">
+              For Enterprise plans, please contact us.
+            </p>
+          )}
         </div>
       </div>
     </div>
