@@ -7,9 +7,6 @@ import { initializePaddle } from "@paddle/paddle-js";
 
 const PADDLE_ENVIRONMENT = (import.meta.env.VITE_PADDLE_ENVIRONMENT)=="staging" ? "sandbox" : "production";
 const PADDLE_TOKEN = import.meta.env.VITE_PADDLE_CLIENT_KEY;
-console.log("Paddle Environment:", PADDLE_ENVIRONMENT);
-console.log("Paddle Token:", PADDLE_TOKEN);
-console.log("paddle token: ", import.meta.env.VITE_PADDLE_CLIENT_KEY);
 export default function App() {
   const dark = useDarkStore((state) => state.dark);
 
