@@ -152,7 +152,8 @@ export async function backendLogin(username: string,token:string) {
 function useIsOrgSelected(): boolean {
   const storeFlag = authStore((s) => s.isOrgSelected);
   const sessionFlag = sessionStorage.getItem("isOrgSelected") === "true";
-  return storeFlag || sessionFlag;
+  const localFlag = localStorage.getItem("isOrgSelected") === "true";
+  return storeFlag || sessionFlag || localFlag;
 }
 
 export function ClerkAuthAdapter() {
@@ -370,7 +371,9 @@ export function ClerkAuthAdapter() {
     const unsubscribe = clerk.addListener(async ({ session }) => {
       console.debug("[ClerkAuthAdapter] Token update event received");
       const token = await session?.getToken();
-      const orgSelected = sessionStorage.getItem("isOrgSelected") === "true";
+      const orgSelected =
+        sessionStorage.getItem("isOrgSelected") === "true" ||
+        localStorage.getItem("isOrgSelected") === "true";
 
       if (!orgSelected) {
         console.debug("[ClerkAuthAdapter] Skipping backend sync (org not selected)");
