@@ -183,6 +183,31 @@ export function ClerkAuthAdapter() {
     activeOrgId,
   });
 
+  // Sync selected-org state from Clerk when an active organization is present.
+  // This covers redirects from onboarding/pricing where browser storage may be stale.
+  useEffect(() => {
+    if (!IS_CLERK_AUTH || !isSignedIn || !isOrgLoaded || !organization?.id) {
+      return;
+    }
+
+    const hasSessionFlag = sessionStorage.getItem("isOrgSelected") === "true";
+    const hasLocalFlag = localStorage.getItem("isOrgSelected") === "true";
+    const storedOrgId = readStoredActiveOrgId();
+
+    if (!hasSessionFlag) {
+      sessionStorage.setItem("isOrgSelected", "true");
+    }
+    if (!hasLocalFlag) {
+      localStorage.setItem("isOrgSelected", "true");
+    }
+    if (storedOrgId !== organization.id) {
+      persistActiveOrgId(organization.id);
+    }
+    if (!isOrgSelected) {
+      authStore.getState().setIsOrgSelected(true);
+    }
+  }, [isOrgLoaded, isOrgSelected, isSignedIn, organization?.id]);
+
   // ✅ Redirect to /organization if signed in but org not selected
   useEffect(() => {
     if (
