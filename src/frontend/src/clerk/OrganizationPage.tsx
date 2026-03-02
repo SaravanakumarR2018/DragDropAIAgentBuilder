@@ -70,6 +70,12 @@ export default function OrganizationSwitcherPage() {
   const hasOrganizations = organizationMemberships.length > 0;
   const shouldShowEnterpriseEmptyState = isEnterpriseUser && !hasOrganizations;
 
+
+  const shouldForceLogout = (error: any) => {
+    const status = error?.response?.status;
+    return status === 401 || status === 403;
+  };
+
   useEffect(() => {
     if (!organization?.id || !isOrgSelectedManually || bootstrapped.current)
       return;
@@ -122,7 +128,14 @@ export default function OrganizationSwitcherPage() {
       } catch (err) {
         if (!justLoggedIn.current) {
           console.error("[OrgSwitcherPage] Error during bootstrap", err);
-          await logout();
+
+          if (shouldForceLogout(err)) {
+            await logout();
+            return;
+          }
+
+          bootstrapped.current = false;
+          console.warn("[OrgSwitcherPage] Transient bootstrap failure, keeping user signed in");
         } else {
           console.warn(
             "[OrgSwitcherPage] Ignoring error after successful login",
