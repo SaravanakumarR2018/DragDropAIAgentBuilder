@@ -81,6 +81,25 @@ export const useGetAutoLogin: useQueryFunctionType<undefined, undefined> = (
       (!isAuthenticated && autoLogin !== undefined && autoLogin);
 
     if (manualLoginNotAuthenticated) {
+      if (IS_CLERK_AUTH) {
+        const retryCount = retryCountRef.current;
+        const delay = Math.min(
+          AUTO_LOGIN_RETRY_DELAY * 2 ** retryCount,
+          AUTO_LOGIN_MAX_RETRY_DELAY,
+        );
+
+        retryCountRef.current += 1;
+
+        if (retryTimerRef.current) {
+          clearTimeout(retryTimerRef.current);
+        }
+
+        retryTimerRef.current = setTimeout(() => {
+          getAutoLoginFn();
+        }, delay);
+        return;
+      }
+
       await mutationLogout();
       const currentPath = window.location.pathname;
       const isHomePath = currentPath === "/" || currentPath === "/flows";
