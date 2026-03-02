@@ -81,7 +81,9 @@ export default function OrganizationSwitcherPage() {
     (async () => {
       console.log("[OrgSwitcherPage] Starting bootstrap flow...");
 
-      const orgToken = await getToken();
+      const orgToken = await getToken({
+        organizationId: activeOrgId,
+      });
       if (!orgToken) throw new Error("Missing Clerk org token");
 
       const username =

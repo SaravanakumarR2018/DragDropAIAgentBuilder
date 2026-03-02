@@ -168,6 +168,9 @@ export function ClerkAuthAdapter() {
   const prevTokenRef = useRef<string | null>(null);
   const autoJoinAttemptedRef = useRef(false);
   const hasRequestedUserRef = useRef(false);
+  const tokenSyncInFlightRef = useRef(false);
+  const lastTokenSyncAtRef = useRef(0);
+  const nextTokenSyncAllowedAtRef = useRef(0);
 
   const isOrgSelected = useIsOrgSelected();
   const currentPath = location.pathname;
@@ -248,7 +251,9 @@ export function ClerkAuthAdapter() {
 
     (async () => {
       try {
-        const token = await getToken();
+        const token = await getToken({
+          organizationId: targetOrgId,
+        });
 
         if (!token) {
           console.warn("[ClerkAuthAdapter] Unable to fetch Clerk token for auto-join");
@@ -383,45 +388,80 @@ export function ClerkAuthAdapter() {
       return;
     }
 
+    if (currentPath.startsWith("/pricing")) {
+      return;
+    }
+
     if (userData || hasRequestedUserRef.current) {
       return;
     }
 
     hasRequestedUserRef.current = true;
     getUser();
-  }, [getUser, isOrgSelected, isSignedIn, userData]);
+  }, [currentPath, getUser, isOrgSelected, isSignedIn, userData]);
 
   // ✅ Clerk token listener: backend sync ONLY after org is selected
   useEffect(() => {
     const unsubscribe = clerk.addListener(async ({ session }) => {
       console.debug("[ClerkAuthAdapter] Token update event received");
-      const token = await session?.getToken();
       const orgSelected =
         sessionStorage.getItem("isOrgSelected") === "true" ||
         localStorage.getItem("isOrgSelected") === "true";
+      const activeOrgId = organization?.id;
 
-      if (!orgSelected) {
-        console.debug("[ClerkAuthAdapter] Skipping backend sync (org not selected)");
-        prevTokenRef.current = token ?? null;
+      if (!orgSelected || !activeOrgId) {
+        console.debug("[ClerkAuthAdapter] Skipping backend sync (org not selected/loaded)");
         return;
       }
 
-      const prevToken = prevTokenRef.current;
-      const currentRefreshToken = cookie.get(LANGFLOW_REFRESH_TOKEN);
-
-      if (prevToken === null) {
-        prevTokenRef.current = token ?? null;
+      if (tokenSyncInFlightRef.current) {
         return;
       }
-      console.debug("[ClerkAuthAdapter] Is Token Same:", token === currentRefreshToken);
-      if (token && token !== prevToken) {
-        prevTokenRef.current = token;
-        login(token, "login", currentRefreshToken);
+
+      const now = Date.now();
+      if (now < nextTokenSyncAllowedAtRef.current) {
+        return;
+      }
+      if (now - lastTokenSyncAtRef.current < 1500) {
+        return;
+      }
+
+      tokenSyncInFlightRef.current = true;
+
+      try {
+        const token = await session?.getToken({
+          organizationId: activeOrgId,
+        });
+
+        const prevToken = prevTokenRef.current;
+        const currentRefreshToken = cookie.get(LANGFLOW_REFRESH_TOKEN);
+
+        if (prevToken === null) {
+          prevTokenRef.current = token ?? null;
+          return;
+        }
+        console.debug("[ClerkAuthAdapter] Is Token Same:", token === currentRefreshToken);
+        if (token && token !== prevToken) {
+          prevTokenRef.current = token;
+          login(token, "login", currentRefreshToken);
+        }
+      } catch (error: any) {
+        const clerkErrorCode = error?.errors?.[0]?.code ?? error?.code;
+        if (clerkErrorCode === "too_many_requests") {
+          nextTokenSyncAllowedAtRef.current = Date.now() + 5000;
+          console.warn("[ClerkAuthAdapter] Token sync throttled by Clerk (429)");
+          return;
+        }
+        console.error("[ClerkAuthAdapter] Token sync failed", error);
+        return;
+      } finally {
+        lastTokenSyncAtRef.current = Date.now();
+        tokenSyncInFlightRef.current = false;
       }
     });
 
     return () => unsubscribe?.();
-  }, [clerk]);
+  }, [clerk, login, organization?.id]);
 
   return null;
 }
