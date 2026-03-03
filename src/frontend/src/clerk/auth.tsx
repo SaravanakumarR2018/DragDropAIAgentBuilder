@@ -248,7 +248,10 @@ export function ClerkAuthAdapter() {
 
     (async () => {
       try {
-        const token = await getToken();
+        const token = await getToken({
+          skipCache: true,
+          organizationId: targetOrgId,
+        });
 
         if (!token) {
           console.warn("[ClerkAuthAdapter] Unable to fetch Clerk token for auto-join");
@@ -382,6 +385,9 @@ export function ClerkAuthAdapter() {
     if (!isSignedIn || !isOrgSelected) {
       return;
     }
+    if (currentPath.startsWith("/pricing")) {
+      return;
+    }
 
     if (userData || hasRequestedUserRef.current) {
       return;
@@ -389,22 +395,26 @@ export function ClerkAuthAdapter() {
 
     hasRequestedUserRef.current = true;
     getUser();
-  }, [getUser, isOrgSelected, isSignedIn, userData]);
+  }, [currentPath, getUser, isOrgSelected, isSignedIn, userData]);
 
   // ✅ Clerk token listener: backend sync ONLY after org is selected
   useEffect(() => {
     const unsubscribe = clerk.addListener(async ({ session }) => {
       console.debug("[ClerkAuthAdapter] Token update event received");
-      const token = await session?.getToken();
       const orgSelected =
         sessionStorage.getItem("isOrgSelected") === "true" ||
         localStorage.getItem("isOrgSelected") === "true";
+      const activeOrgId = organization?.id;
 
-      if (!orgSelected) {
-        console.debug("[ClerkAuthAdapter] Skipping backend sync (org not selected)");
-        prevTokenRef.current = token ?? null;
+      if (!orgSelected || !activeOrgId) {
+        console.debug("[ClerkAuthAdapter] Skipping backend sync (org not selected/loaded)");
         return;
       }
+
+      const token = await session?.getToken({
+        skipCache: true,
+        organizationId: activeOrgId,
+      });
 
       const prevToken = prevTokenRef.current;
       const currentRefreshToken = cookie.get(LANGFLOW_REFRESH_TOKEN);
@@ -421,7 +431,7 @@ export function ClerkAuthAdapter() {
     });
 
     return () => unsubscribe?.();
-  }, [clerk]);
+  }, [clerk, login, organization?.id]);
 
   return null;
 }
