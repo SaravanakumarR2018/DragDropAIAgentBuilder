@@ -397,41 +397,79 @@ export function ClerkAuthAdapter() {
     getUser();
   }, [currentPath, getUser, isOrgSelected, isSignedIn, userData]);
 
-  // ✅ Clerk token listener: backend sync ONLY after org is selected
+  // ✅ Keep org-scoped token in sync whenever user is signed in and Clerk has an active org
   useEffect(() => {
+    if (!IS_CLERK_AUTH || !isSignedIn || !isOrgLoaded || !organization?.id) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    (async () => {
+      try {
+        const token = await getToken({
+          organizationId: organization.id,
+        });
+
+        if (!token || isCancelled || token === prevTokenRef.current) {
+          return;
+        }
+
+        prevTokenRef.current = token;
+        login(token, "login", cookie.get(LANGFLOW_REFRESH_TOKEN));
+        persistActiveOrgId(organization.id);
+        sessionStorage.setItem("isOrgSelected", "true");
+        authStore.getState().setIsOrgSelected(true);
+        console.debug("[ClerkAuthAdapter] Synced org-scoped token", organization.id);
+      } catch (error) {
+        console.error("[ClerkAuthAdapter] Failed to sync org-scoped token", error);
+      }
+    })();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [getToken, isOrgLoaded, isSignedIn, login, organization?.id]);
+
+  useEffect(() => {
+    if (!IS_CLERK_AUTH || !isSignedIn || !isOrgLoaded) {
+      return;
+    }
+
     const unsubscribe = clerk.addListener(async ({ session }) => {
       console.debug("[ClerkAuthAdapter] Token update event received");
-      const orgSelected =
-        sessionStorage.getItem("isOrgSelected") === "true" ||
-        localStorage.getItem("isOrgSelected") === "true";
-      const activeOrgId = organization?.id;
+      try {
+        const activeOrgId = organization?.id ?? readStoredActiveOrgId();
 
-      if (!orgSelected || !activeOrgId) {
-        console.debug("[ClerkAuthAdapter] Skipping backend sync (org not selected/loaded)");
-        return;
-      }
+        if (!activeOrgId) {
+          return;
+        }
 
-      const token = await session?.getToken({
-        skipCache: true,
-        organizationId: activeOrgId,
-      });
+        const token = await session?.getToken({
+          organizationId: activeOrgId,
+        });
 
-      const prevToken = prevTokenRef.current;
-      const currentRefreshToken = cookie.get(LANGFLOW_REFRESH_TOKEN);
+        const currentRefreshToken = cookie.get(LANGFLOW_REFRESH_TOKEN);
+        console.debug("[ClerkAuthAdapter] Is Token Same:", token === currentRefreshToken);
 
-      if (prevToken === null) {
-        prevTokenRef.current = token ?? null;
-        return;
-      }
-      console.debug("[ClerkAuthAdapter] Is Token Same:", token === currentRefreshToken);
-      if (token && token !== prevToken) {
+        if (!token || token === prevTokenRef.current) {
+          return;
+        }
+
         prevTokenRef.current = token;
-        login(token, "login", currentRefreshToken);
+        login(token, "login", cookie.get(LANGFLOW_REFRESH_TOKEN));
+        persistActiveOrgId(activeOrgId);
+        sessionStorage.setItem("isOrgSelected", "true");
+        authStore.getState().setIsOrgSelected(true);
+        console.debug("[ClerkAuthAdapter] Synced token from Clerk session update", activeOrgId);
+      } catch (error) {
+        console.error("[ClerkAuthAdapter] Failed Clerk session token sync", error);
       }
     });
 
     return () => unsubscribe?.();
-  }, [clerk, login, organization?.id]);
+  }, [clerk, isOrgLoaded, isSignedIn, login, organization?.id]);
+
 
   return null;
 }
