@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import time
 from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 from langflow.services.paddle.subscriptions import _normalize_custom_data
@@ -20,6 +24,12 @@ from paddle_billing.Resources.Prices.Operations import CreatePrice
 from paddle_billing.Resources.Products.Operations import CreateProduct
 
 
+
+PRICE_MAP_CACHE_TTL_SECONDS = 60 * 60
+_cached_price_map: dict[str, str] | None = None
+_cached_price_map_expires_at = 0.0
+
+
 @dataclass(frozen=True)
 class PlanDefinition:
     key: str
@@ -28,20 +38,28 @@ class PlanDefinition:
     trial_days: int | None = None
 
 
-PLANS: tuple[PlanDefinition, ...] = (
-    PlanDefinition(
-        key="starter_pack_monthly",
-        name="Starter",
-        monthly_price_usd="2000",
-        trial_days=7,
-    ),
-    PlanDefinition(
-        key="pro_pack_monthly",
-        name="Pro",
-        monthly_price_usd="5000",
-        trial_days=None,
-    ),
-)
+@lru_cache(maxsize=1)
+def _load_plan_config() -> dict[str, Any]:
+    config_path = Path(__file__).resolve().parents[5] / "common" / "plan_config.json"
+    with config_path.open(encoding="utf-8") as config_file:
+        return json.load(config_file)
+
+
+def _get_paddle_plans() -> tuple[PlanDefinition, ...]:
+    plans = []
+    for plan in _load_plan_config().get("plans", []):
+        paddle = plan.get("paddle", {})
+        if not paddle.get("enabled"):
+            continue
+        plans.append(
+            PlanDefinition(
+                key=str(paddle["plan_key"]),
+                name=str(plan["name"]).replace(" Pack", ""),
+                monthly_price_usd=str(paddle["monthly_price_usd_cents"]),
+                trial_days=paddle.get("trial_days"),
+            )
+        )
+    return tuple(plans)
 
 
 def provision_paddle_plans() -> None:
@@ -57,7 +75,7 @@ def provision_paddle_plans() -> None:
     products = list(client.products.list())
     prices = list(client.prices.list())
 
-    for plan in PLANS:
+    for plan in _get_paddle_plans():
         product = _find_existing_product(plan, products)
         if _find_existing_price(plan, prices, product):
             logger.info("Paddle plan %s already provisioned; skipping.", plan.key)
@@ -193,6 +211,10 @@ async def get_paddle_prices(
     *,
     client: Client | None = None,
 ) -> dict[str, str]:
+    global _cached_price_map, _cached_price_map_expires_at
+
+    if client is None and _cached_price_map and time.time() < _cached_price_map_expires_at:
+        return _cached_price_map
 
     paddle_client = client or get_paddle_client()
 
@@ -220,5 +242,9 @@ async def get_paddle_prices(
         raise ValueError(
             "No Paddle price IDs found — make sure plans are provisioned"
         )
+
+    if client is None:
+        _cached_price_map = price_map
+        _cached_price_map_expires_at = time.time() + PRICE_MAP_CACHE_TTL_SECONDS
 
     return price_map
