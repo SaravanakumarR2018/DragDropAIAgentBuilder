@@ -1,8 +1,8 @@
 import uuid
-from datetime import datetime, timedelta, timezone
 from contextvars import ContextVar, Token
+from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
-from uuid import UUID, NAMESPACE_URL, uuid5
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 import httpx
 from fastapi import HTTPException, Request, status
@@ -12,20 +12,20 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.status import HTTP_401_UNAUTHORIZED
 
 from langflow.logging.logger import logger
+from langflow.services.auth.clerk_metadata_constants import (
+    CLERK_JWT_EMAIL_KEY,
+    CLERK_JWT_ORG_KEY,
+    CLERK_JWT_SUB_KEY,
+    CLERK_JWT_UUID_KEY,
+    ORG_ID_KEY,
+    ORGANISATION_CREATED_BY_KEY,
+    PADDLE_CUSTOMER_ID_KEY,
+    PADDLE_SUBSCRIPTION_ID_KEY,
+)
 from langflow.services.database.constants import DUMMY_USER_NAMESPACE_TEMPLATE
 from langflow.services.database.models.user import User
 from langflow.services.database.models.user.crud import get_user_by_id
 from langflow.services.deps import get_settings_service
-from langflow.services.auth.clerk_metadata_constants import (
-    CLERK_JWT_SUB_KEY,
-    CLERK_JWT_EMAIL_KEY,
-    CLERK_JWT_ORG_KEY,
-    CLERK_JWT_UUID_KEY,
-    PADDLE_CUSTOMER_ID_KEY,
-    PADDLE_SUBSCRIPTION_ID_KEY,
-    ORGANISATION_CREATED_BY_KEY,
-    ORG_ID_KEY,
-)
 
 # Context variable to store decoded clerk claims per request
 auth_header_ctx: ContextVar[dict | None] = ContextVar("auth_header_ctx", default=None)
@@ -63,7 +63,8 @@ class ClerkPublicMetadataManager:
         secret_key = settings_service.settings.clerk_api_key
         secret_key = secret_key.strip()
         if not secret_key:
-            raise RuntimeError("CLERK_API_KEY not configured")
+            msg = "CLERK_API_KEY not configured"
+            raise RuntimeError(msg)
         return {
             "Authorization": f"Bearer {secret_key}",
             "Content-Type": "application/json",
@@ -103,7 +104,7 @@ class ClerkPublicMetadataManager:
         merged = self.merge_metadata(existing, updates)
         await self.set_public_metadata(merged)
         return merged
-    
+
 
 async def update_clerk_organization(
     *,
@@ -112,7 +113,7 @@ async def update_clerk_organization(
     max_allowed_members: int | None = None,
 ) -> None:
     """Update a Clerk organization's public metadata and/or seat limit."""
-    logger.info(f"Updating Clerk organization {org_id}: public_metadata={public_metadata}, max_allowed_members={max_allowed_members}")
+    logger.info(f"Updating Clerk organization {org_id}: public_metadata={public_metadata}, max_allowed_members={max_allowed_members}") #noqa: E501
     manager = ClerkPublicMetadataManager.for_organization(org_id)
 
     if public_metadata is not None:
@@ -169,8 +170,7 @@ def get_email_from_clerk_payload() -> str:
 
 
 async def get_paddle_customer_id_from_clerk_payload() -> str | None:
-    """
-    Retrieve paddle_customer_id directly from Clerk JWT public metadata.
+    """Retrieve paddle_customer_id directly from Clerk JWT public metadata.
 
     Assumes the JWT template includes:
     {
@@ -414,15 +414,6 @@ async def _ensure_admin_superuser(user: User) -> None:
 
 async def clerk_token_middleware(request: Request, call_next):
     """Middleware to handle Clerk JWT tokens and Langflow API keys."""
-    # Log incoming request summary (method, url, client, header keys)
-    try:
-        client_host = request.client.host if getattr(request, "client", None) else None
-    except Exception:
-        client_host = None
-    logger.info(
-        f"[ClerkMiddleware] Incoming request: method={request.method} url={request.url} client={client_host} headers={list(request.headers.keys())}"
-    )
-
     settings = get_settings_service()
     if not settings.auth_settings.CLERK_AUTH_ENABLED:
         return await call_next(request)

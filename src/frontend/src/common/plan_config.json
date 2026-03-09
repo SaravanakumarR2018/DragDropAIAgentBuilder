@@ -1,0 +1,55 @@
+{
+  "plans": [
+    {
+      "key": "starter",
+      "name": "Starter Pack",
+      "paddle": {
+        "enabled": true,
+        "plan_key": "starter_pack_monthly",
+        "monthly_price_usd_cents": 2000,
+        "trial_days": 7
+      },
+      "default_seats": 1,
+      "features": [
+        "Shared database",
+        "Standard rate limits",
+        "Core visual builder features",
+        "Community support"
+      ]
+    },
+    {
+      "key": "pro",
+      "name": "Pro Pack",
+      "paddle": {
+        "enabled": true,
+        "plan_key": "pro_pack_monthly",
+        "monthly_price_usd_cents": 5000,
+        "trial_days": null
+      },
+      "default_seats": 1,
+      "features": [
+        "Separate database",
+        "Highly enabled rate limits",
+        "Team collaboration tools",
+        "Priority email support"
+      ]
+    },
+    {
+      "key": "enterprise",
+      "name": "Enterprise Pack",
+      "paddle": {
+        "enabled": false,
+        "plan_key": "enterprise_pack_monthly",
+        "monthly_price_usd_cents": 12000,
+        "trial_days": null
+      },
+      "default_seats": 5,
+      "features": [
+        "Dedicated environments",
+        "Custom security & compliance",
+        "SSO and role-based access",
+        "Premium SLA & support"
+      ]
+    }
+  ]
+}

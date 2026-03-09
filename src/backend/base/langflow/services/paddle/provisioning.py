@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import time
 from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
-from langflow.services.paddle.subscriptions import _normalize_custom_data
-from langflow.services.paddle.client import get_paddle_client
 from lfx.log.logger import logger
-from paddle_billing import Client
+from paddle_billing import Client  #noqa: TCH002
 from paddle_billing.Entities.Shared.CurrencyCode import CurrencyCode
 from paddle_billing.Entities.Shared.Duration import Duration
 from paddle_billing.Entities.Shared.Interval import Interval
@@ -18,6 +20,10 @@ from paddle_billing.Entities.Shared.TaxCategory import TaxCategory
 from paddle_billing.Entities.Shared.TaxMode import TaxMode
 from paddle_billing.Resources.Prices.Operations import CreatePrice
 from paddle_billing.Resources.Products.Operations import CreateProduct
+
+from langflow.services.paddle.client import get_paddle_client
+from langflow.services.paddle.subscriptions import _normalize_custom_data
+
 
 
 @dataclass(frozen=True)
@@ -28,20 +34,28 @@ class PlanDefinition:
     trial_days: int | None = None
 
 
-PLANS: tuple[PlanDefinition, ...] = (
-    PlanDefinition(
-        key="starter_pack_monthly",
-        name="Starter",
-        monthly_price_usd="2000",
-        trial_days=7,
-    ),
-    PlanDefinition(
-        key="pro_pack_monthly",
-        name="Pro",
-        monthly_price_usd="5000",
-        trial_days=None,
-    ),
-)
+@lru_cache(maxsize=1)
+def _load_plan_config() -> dict[str, Any]:
+    config_path = Path(__file__).resolve().parents[5] / "frontend" / "src" / "common" / "plan_config.json"
+    with config_path.open(encoding="utf-8") as config_file:
+        return json.load(config_file)
+
+
+def _get_paddle_plans() -> tuple[PlanDefinition, ...]:
+    plans = []
+    for plan in _load_plan_config().get("plans", []):
+        paddle = plan.get("paddle", {})
+        if not paddle.get("enabled"):
+            continue
+        plans.append(
+            PlanDefinition(
+                key=str(paddle["plan_key"]),
+                name=str(plan["name"]).replace(" Pack", ""),
+                monthly_price_usd=str(paddle["monthly_price_usd_cents"]),
+                trial_days=paddle.get("trial_days"),
+            )
+        )
+    return tuple(plans)
 
 
 def provision_paddle_plans() -> None:
@@ -57,7 +71,7 @@ def provision_paddle_plans() -> None:
     products = list(client.products.list())
     prices = list(client.prices.list())
 
-    for plan in PLANS:
+    for plan in _get_paddle_plans():
         product = _find_existing_product(plan, products)
         if _find_existing_price(plan, prices, product):
             logger.info("Paddle plan %s already provisioned; skipping.", plan.key)
@@ -202,7 +216,8 @@ async def get_paddle_prices(
         )
     except Exception as exc:
         logger.exception(f"Failed to fetch Paddle prices: {exc}")
-        raise ValueError("Failed to fetch Paddle prices") from exc
+        msg="Failed to fetch Paddle prices"
+        raise ValueError(msg) from exc
 
     price_map: dict[str, str] = {}
 
@@ -217,8 +232,7 @@ async def get_paddle_prices(
             price_map[plan_key] = price.id
 
     if not price_map:
-        raise ValueError(
-            "No Paddle price IDs found — make sure plans are provisioned"
-        )
+        msg="No Paddle price IDs found — make sure plans are provisioned"
+        raise ValueError(msg)
 
     return price_map

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
-from typing import Literal
 from lfx.log.logger import logger
+from pydantic import BaseModel
+
 from langflow.api.utils import CurrentActiveUser
 from langflow.services.auth.clerk_utils import (
     get_clerk_user_id_from_payload,
@@ -10,25 +10,17 @@ from langflow.services.auth.clerk_utils import (
     get_paddle_subscription_id_from_clerk_payload,
 )
 from langflow.services.deps import get_settings_service
+from langflow.services.paddle.provisioning import get_paddle_prices
 from langflow.services.paddle.subscriptions import (
     ensure_paddle_customer_for_user,
     has_active_subscription,
 )
-from langflow.services.paddle.provisioning import get_paddle_prices
 
 router = APIRouter(tags=["Billing"], prefix="/billing")
 
 
 class EnsurePaddleCustomerRequest(BaseModel):
     email: str | None = None
-
-class CreateSubscriptionRequest(BaseModel):
-    plan_key: Literal[
-        "starter_pack_monthly",
-        "pro_pack_monthly",
-        "enterprise_pack_monthly",
-    ]
-    seats: int = Field(gt=0)
 
 @router.post("/ensure-paddle-customer")
 async def ensure_paddle_customer(
@@ -114,15 +106,11 @@ async def get_org_access(
 
 @router.get("/paddle-prices")
 async def list_paddle_prices():
-    """
-    Returns a mapping of plan_key -> paddle price_id
-    for Paddle products that have been provisioned.
-    """
+    """Return a mapping of plan_key -> Paddle price_id."""
     try:
-        prices = await get_paddle_prices()
-        return prices
+        return await get_paddle_prices()
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
-    except Exception as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) # noqa: B904
+    except Exception as exc: #noqa: BLE001
         logger.exception(f"Error fetching Paddle prices {exc}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(status_code=500, detail="Internal server error") #noqa: B904

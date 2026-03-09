@@ -4,19 +4,59 @@ import type { SVGProps } from "react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getURL } from "../../controllers/API/helpers/constants";
+import planConfigData from "../../common/plan_config.json";
 
 const MIN_SEATS = 1;
+const PADDLE_PRICE_CACHE_KEY = "pricing_page_paddle_prices";
+const PADDLE_PRICE_CACHE_TTL_MS = 60 * 60 * 1000;
 
 type PlanKey = "starter" | "pro" | "enterprise";
 
-const PLAN_KEY_MAP: Record<
-  PlanKey,
-  "starter_pack_monthly" | "pro_pack_monthly" | "enterprise_pack_monthly"
-> = {
-  starter: "starter_pack_monthly",
-  pro: "pro_pack_monthly",
-  enterprise: "enterprise_pack_monthly",
-};
+interface SharedPlanConfig {
+  key: PlanKey;
+  name: string;
+  default_seats: number;
+  features: string[];
+  paddle: {
+    enabled: boolean;
+    plan_key: "starter_pack_monthly" | "pro_pack_monthly" | "enterprise_pack_monthly";
+    monthly_price_usd_cents: number;
+    trial_days: number | null;
+  };
+}
+
+interface CachedPriceMap {
+  fetchedAt: number;
+  prices: Record<string, string>;
+}
+
+function getCachedPriceMap(): Record<string, string> | null {
+  try {
+    const raw = window.localStorage.getItem(PADDLE_PRICE_CACHE_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as CachedPriceMap;
+    const isExpired = Date.now() - parsed.fetchedAt > PADDLE_PRICE_CACHE_TTL_MS;
+
+    if (isExpired) {
+      window.localStorage.removeItem(PADDLE_PRICE_CACHE_KEY);
+      return null;
+    }
+
+    return parsed.prices ?? null;
+  } catch {
+    window.localStorage.removeItem(PADDLE_PRICE_CACHE_KEY);
+    return null;
+  }
+}
+
+function setCachedPriceMap(prices: Record<string, string>): void {
+  const payload: CachedPriceMap = {
+    fetchedAt: Date.now(),
+    prices,
+  };
+  window.localStorage.setItem(PADDLE_PRICE_CACHE_KEY, JSON.stringify(payload));
+}
 
 interface PlanConfig {
   key: PlanKey;
@@ -25,47 +65,20 @@ interface PlanConfig {
   hasTrial: boolean;
   trialDays?: number;
   features: string[];
+  paddlePlanKey: "starter_pack_monthly" | "pro_pack_monthly" | "enterprise_pack_monthly";
+  defaultSeats: number;
 }
 
-const STATIC_PLANS: PlanConfig[] = [
-  {
-    key: "starter",
-    name: "Starter Pack",
-    pricePerSeat: 20,
-    hasTrial: true,
-    trialDays: 7,
-    features: [
-      "Shared database",
-      "Standard rate limits",
-      "Core visual builder features",
-      "Community support",
-    ],
-  },
-  {
-    key: "pro",
-    name: "Pro Pack",
-    pricePerSeat: 50,
-    hasTrial: false,
-    features: [
-      "Separate database",
-      "Highly enabled rate limits",
-      "Team collaboration tools",
-      "Priority email support",
-    ],
-  },
-  {
-    key: "enterprise",
-    name: "Enterprise Pack",
-    pricePerSeat: 120,
-    hasTrial: false,
-    features: [
-      "Dedicated environments",
-      "Custom security & compliance",
-      "SSO and role-based access",
-      "Premium SLA & support",
-    ],
-  },
-];
+const STATIC_PLANS: PlanConfig[] = (planConfigData.plans as SharedPlanConfig[]).map((plan) => ({
+  key: plan.key,
+  name: plan.name,
+  pricePerSeat: plan.paddle.monthly_price_usd_cents / 100,
+  hasTrial: plan.paddle.trial_days !== null,
+  trialDays: plan.paddle.trial_days ?? undefined,
+  features: plan.features,
+  paddlePlanKey: plan.paddle.plan_key,
+  defaultSeats: plan.default_seats,
+}));
 
 function CheckIcon(props: SVGProps<SVGSVGElement>) {
   return (
@@ -87,9 +100,10 @@ export default function PricingPage() {
 
   const [selectedPlan, setSelectedPlan] = useState<PlanKey>("starter");
   const [seatsByPlan, setSeatsByPlan] = useState<Record<PlanKey, number>>({
-    starter: 1,
-    pro: 1,
-    enterprise: 5,
+    starter: STATIC_PLANS.find((plan) => plan.key === "starter")?.defaultSeats ?? 1,
+    pro: STATIC_PLANS.find((plan) => plan.key === "pro")?.defaultSeats ?? 1,
+    enterprise:
+      STATIC_PLANS.find((plan) => plan.key === "enterprise")?.defaultSeats ?? 5,
   });
 
   const [priceMap, setPriceMap] = useState<Record<string, string>>({});
@@ -97,9 +111,18 @@ export default function PricingPage() {
 
   useEffect(() => {
     const fetchPrices = async () => {
+      const cachedPrices = getCachedPriceMap();
+      if (cachedPrices) {
+        setPriceMap(cachedPrices);
+        setLoadingPrices(false);
+        return;
+      }
+
       try {
         const { data } = await axios.get(getURL("GET_PADDLE_PRICES"));
-        setPriceMap(data ?? {});
+        const freshPrices = data ?? {};
+        setPriceMap(freshPrices);
+        setCachedPriceMap(freshPrices);
       } catch (err) {
         console.error("Failed to load Paddle price IDs:", err);
       } finally {
@@ -139,7 +162,7 @@ export default function PricingPage() {
       return;
     }
 
-    const planKey = PLAN_KEY_MAP[plan.key];
+    const planKey = plan.paddlePlanKey;
     const priceId = priceMap[planKey];
 
     if (!priceId) {

@@ -32,7 +32,6 @@ export const URLs = {
   MCP_SERVERS: `mcp/servers`,
   KNOWLEDGE_BASES: `knowledge_bases`,
   BILLING_ACCESS: `billing/org-access`,
-  CREATE_SUBSCRIPTION: `billing/create-subscription`,
   GET_PADDLE_PRICES: `billing/paddle-prices`,
 } as const;
 
