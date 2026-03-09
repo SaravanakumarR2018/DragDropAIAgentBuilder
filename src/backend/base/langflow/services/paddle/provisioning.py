@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -21,6 +22,12 @@ from paddle_billing.Entities.Shared.TaxCategory import TaxCategory
 from paddle_billing.Entities.Shared.TaxMode import TaxMode
 from paddle_billing.Resources.Prices.Operations import CreatePrice
 from paddle_billing.Resources.Products.Operations import CreateProduct
+
+
+
+PRICE_MAP_CACHE_TTL_SECONDS = 60 * 60
+_cached_price_map: dict[str, str] | None = None
+_cached_price_map_expires_at = 0.0
 
 
 @dataclass(frozen=True)
@@ -204,6 +211,10 @@ async def get_paddle_prices(
     *,
     client: Client | None = None,
 ) -> dict[str, str]:
+    global _cached_price_map, _cached_price_map_expires_at
+
+    if client is None and _cached_price_map and time.time() < _cached_price_map_expires_at:
+        return _cached_price_map
 
     paddle_client = client or get_paddle_client()
 
@@ -231,5 +242,9 @@ async def get_paddle_prices(
         raise ValueError(
             "No Paddle price IDs found — make sure plans are provisioned"
         )
+
+    if client is None:
+        _cached_price_map = price_map
+        _cached_price_map_expires_at = time.time() + PRICE_MAP_CACHE_TTL_SECONDS
 
     return price_map
