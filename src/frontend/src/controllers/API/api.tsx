@@ -51,10 +51,14 @@ function ApiInterceptor() {
       request: (url, config) => {
         // Browser automatically sends cookies with requests (including HttpOnly cookies)
         // No need to manually add Authorization header from cookies
+        const token = customGetAccessToken();
 
         if (!isExternalURL(url)) {
           for (const [key, value] of Object.entries(customHeaders)) {
             config.headers[key] = value;
+          }
+          if (token && !config.headers.Authorization) {
+            config.headers.Authorization = `Bearer ${token}`;
           }
         }
 
@@ -162,6 +166,10 @@ function ApiInterceptor() {
         if (urlIsFromCurrentOrigin) {
           for (const [key, value] of Object.entries(customHeaders)) {
             config.headers[key] = value;
+          }
+          const token = accessToken ?? customGetAccessToken();
+          if (token && !config.headers.Authorization) {
+            config.headers.Authorization = `Bearer ${token}`;
           }
         }
 
