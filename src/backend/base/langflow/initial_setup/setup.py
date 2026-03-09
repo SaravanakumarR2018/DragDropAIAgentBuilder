@@ -1100,7 +1100,7 @@ async def create_or_update_starter_projects(
         # this is intended to be used to skip all startup project logic.
         return
 
-    async with session_scope(use_organisation=False) as session:
+    async with session_scope(use_organisation=use_organisation) as session:
         new_folder = await get_or_create_starter_folder(session)
         starter_projects = await load_starter_projects()
 
