@@ -23,8 +23,6 @@ import useFlowsManagerStore from "@/stores/flowsManagerStore";
 import { useShortcutsStore } from "@/stores/shortcuts";
 import { swatchColors } from "@/utils/styleUtils";
 import { cn, getNumberFromString } from "@/utils/utils";
-import { useHotkeys } from "react-hotkeys-hook";
-import { useShallow } from "zustand/react/shallow";
 import "./flowMenuResponsive.css";
 
 export const MenuBar = memo((): JSX.Element => {
@@ -36,7 +34,6 @@ export const MenuBar = memo((): JSX.Element => {
   const saveFlow = useSaveFlow();
   const autoSaving = useFlowsManagerStore((state) => state.autoSaving);
   const {
-    isFlowLocked,
     currentFlowName,
     currentFlowId,
     currentFlowFolderId,
@@ -44,7 +41,6 @@ export const MenuBar = memo((): JSX.Element => {
     currentFlowGradient,
   } = useFlowStore(
     useShallow((state) => ({
-      isFlowLocked: state.currentFlow?.locked,
       currentFlowName: state.currentFlow?.name,
       currentFlowId: state.currentFlow?.id,
       currentFlowFolderId: state.currentFlow?.folder_id,
@@ -77,6 +73,7 @@ export const MenuBar = memo((): JSX.Element => {
   );
 
   const handleSave = () => {
+    if (!onFlowPage) return;
     saveFlow().then(() => {
       setSuccessData({ title: "Saved successfully" });
     });

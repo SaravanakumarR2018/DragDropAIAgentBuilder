@@ -71,25 +71,46 @@ export function AuthBroadcastListener() {
       console.debug("[AuthBroadcast] Clearing auth state...");
       await logout();
 
-      // 5. Always redirect tabs to the public landing page (/) for a consistent post-logout state
-      console.debug("[AuthBroadcast] Redirecting to / (public landing)...");
-      navigate("/", { replace: true });
+      // 5. For root path "/", stay on the page (just update auth state)
+      if (isOnRootPath) {
+        console.debug("[AuthBroadcast] On root path, staying at / (UI will update to show Login/Book Demo)");
+        // Sign out from Clerk in background (best effort, don't block)
+        // If this fails, the login page will detect and clean up stale session
+        if (IS_CLERK_AUTH && signOut) {
+          signOut().catch((error) => {
+            console.debug("[AuthBroadcast] Clerk signOut failed (will be cleaned up on next login):", error);
+          });
+          console.debug("[AuthBroadcast] Clerk signOut initiated (background)");
+        }
+        console.log("[AuthBroadcast] Cross-tab logout completed - staying at /");
+        return;
+      }
 
-      // Sign out from Clerk in background (best effort, don't block)
-      // If this fails, the landing page will detect and clean up stale session
+      // 6. For protected pages, redirect IMMEDIATELY (don't wait for Clerk)
       if (IS_CLERK_AUTH && signOut) {
+        console.debug("[AuthBroadcast] Redirecting to /login immediately...");
+        // Navigate first (instant)
+        navigate("/login", { replace: true });
+        // Then sign out from Clerk in background (best effort)
+        // If this fails, the login page will detect and clean up stale session
         signOut().catch((error) => {
           console.debug("[AuthBroadcast] Clerk signOut failed (will be cleaned up on next login):", error);
         });
         console.debug("[AuthBroadcast] Clerk signOut initiated (background)");
+        return;
       }
 
-      console.log("[AuthBroadcast] Cross-tab logout completed - redirected to /");
-      return;
+      // 7. Redirect to login (for non-Clerk auth)
+      console.debug("[AuthBroadcast] Redirecting to login...");
+      navigate("/login", { replace: true });
+
+      console.log("[AuthBroadcast] Cross-tab logout completed successfully");
     } catch (error) {
       console.error("[AuthBroadcast] Error during cross-tab logout:", error);
-      // Force redirect even if cleanup fails
-      navigate("/", { replace: true });
+      // Force redirect even if cleanup fails (but not for root path)
+      if (!isOnRootPath) {
+        navigate("/login", { replace: true });
+      }
     }
   }, [location.pathname, queryClient, logout, navigate, signOut]);
 

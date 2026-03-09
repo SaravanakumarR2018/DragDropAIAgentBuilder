@@ -1,5 +1,10 @@
-import { useState , useEffect } from "react";
-import { lazyLoadAce } from "@/utils/lazyLoadAce";
+import "ace-builds/src-noconflict/ace";
+import "ace-builds/src-noconflict/ext-language_tools";
+import "ace-builds/src-noconflict/mode-python";
+import "ace-builds/src-noconflict/theme-github";
+import "ace-builds/src-noconflict/theme-twilight";
+// import "ace-builds/webpack-resolver";
+import { useState } from "react";
 import IconComponent from "../../components/common/genericIconComponent";
 import { Button } from "../../components/ui/button";
 import BaseModal from "../baseModal";
@@ -19,7 +24,6 @@ export default function TextModal({
   const [open, setOpen] = useState(false);
   const [internalValue, setInternalValue] = useState(value);
 
-  useEffect(() => {if (open) {lazyLoadAce();}}, [open]);
   const handleEscapeKeyDown = (event: KeyboardEvent) => {
     setOpen(false);
     event.stopPropagation();

@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { StickToBottom } from "use-stick-to-bottom";
 import LangflowLogo from "@/assets/LangflowLogo.svg?react";
-import VisualaiLogo from "@/assets/visualailogo.png"
+import { SafariScrollFix } from "@/components/common/safari-scroll-fix";
 import { TextEffectPerChar } from "@/components/ui/textAnimation";
 import CustomChatInput from "@/customization/components/custom-chat-input";
 import { ENABLE_IMAGE_ON_PLAYGROUND } from "@/customization/feature-flags";
@@ -174,11 +174,10 @@ export default function ChatView({
       onDragEnter={dragEnter}
       onDragLeave={dragLeave}
       onDrop={onDrop}
-      resize="smooth"
+      resize="instant"
       initial="instant"
-      mass={1}
     >
-      <StickToBottom.Content className="flex flex-col min-h-full">
+      <StickToBottom.Content className="flex flex-col min-h-full ">
         <div className="flex flex-col flex-grow place-self-center w-5/6 max-w-[768px]">
           {chatHistory &&
             (isBuilding || chatHistory?.length > 0 ? (
@@ -195,7 +194,10 @@ export default function ChatView({
             ) : (
               <div className="flex flex-grow w-full flex-col items-center justify-center">
                 <div className="flex flex-col items-center justify-center gap-4 p-8">
-                  <img src={VisualaiLogo} alt="Visual AI Logo" className="h-10 w-10 scale-[1.5]" />
+                  <LangflowLogo
+                    title="Langflow logo"
+                    className="h-10 w-10 scale-[1.5]"
+                  />
                   <div className="flex flex-col items-center justify-center">
                     <h3 className="mt-2 pb-2 text-2xl font-semibold text-primary">
                       New chat
@@ -226,6 +228,7 @@ export default function ChatView({
             flowRunningSkeletonMemo}
         </div>
       </StickToBottom.Content>
+      <SafariScrollFix />
 
       <div className="m-auto w-full max-w-[768px] md:w-5/6">
         <CustomChatInput

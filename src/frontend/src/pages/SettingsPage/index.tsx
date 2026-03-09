@@ -1,7 +1,5 @@
 import { Outlet, type To } from "react-router-dom";
-import { useContext } from "react";
-import type { ReactNode } from "react";
-import SideBarButtonsComponent, { type SidebarNavItem } from "@/components/core/sidebarComponent";
+import SideBarButtonsComponent from "@/components/core/sidebarComponent";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { CustomStoreSidebar } from "@/customization/components/custom-store-sidebar";
 import {
@@ -13,27 +11,31 @@ import useAuthStore from "@/stores/authStore";
 import { useStoreStore } from "@/stores/storeStore";
 import ForwardedIconComponent from "../../components/common/genericIconComponent";
 import PageLayout from "../../components/common/pageLayout";
-import { useClerk, useOrganization } from "@clerk/clerk-react";
-import { IS_CLERK_AUTH } from "@/clerk/auth";
-import { AuthContext } from "@/contexts/authContext";
-
-type SettingsPageBaseProps = {
-  headerActions?: ReactNode;
-  additionalNavItems?: SidebarNavItem[];
-};
-
-const SettingsPageBase = ({
-  headerActions,
-  additionalNavItems = [],
-}: SettingsPageBaseProps) => {
+export default function SettingsPage(): JSX.Element {
   const autoLogin = useAuthStore((state) => state.autoLogin);
   const hasStore = useStoreStore((state) => state.hasStore);
 
   // Hides the General settings if there is nothing to show
   const showGeneralSettings = ENABLE_PROFILE_ICONS || hasStore || !autoLogin;
 
-  // Build sidebar items in the intended order
-  const sidebarNavItems: SidebarNavItem[] = [];
+  const sidebarNavItems: {
+    href?: string;
+    title: string;
+    icon: React.ReactNode;
+  }[] = [];
+
+  if (showGeneralSettings) {
+    sidebarNavItems.push({
+      title: "General",
+      href: "/settings/general",
+      icon: (
+        <ForwardedIconComponent
+          name="SlidersHorizontal"
+          className="w-4 flex-shrink-0 justify-start stroke-[1.5]"
+        />
+      ),
+    });
+  }
 
   sidebarNavItems.push(
     {
@@ -52,6 +54,16 @@ const SettingsPageBase = ({
       icon: (
         <ForwardedIconComponent
           name="Globe"
+          className="w-4 flex-shrink-0 justify-start stroke-[1.5]"
+        />
+      ),
+    },
+    {
+      title: "Model Providers",
+      href: "/settings/model-providers",
+      icon: (
+        <ForwardedIconComponent
+          name="Brain"
           className="w-4 flex-shrink-0 justify-start stroke-[1.5]"
         />
       ),
@@ -85,14 +97,11 @@ const SettingsPageBase = ({
     sidebarNavItems.splice(2, 0, ...langflowItems);
   }
 
-  // Append Clerk-related items at the end
-  sidebarNavItems.push(...additionalNavItems);
-
   return (
     <PageLayout
       backTo={-1 as To}
       title="Settings"
-      description="Manage the general settings for Visual AI Agents Builder."
+      description="Manage the general settings for Langflow."
     >
       <SidebarProvider width="15rem" defaultOpen={false}>
         <SideBarButtonsComponent items={sidebarNavItems} />
@@ -104,88 +113,4 @@ const SettingsPageBase = ({
       </SidebarProvider>
     </PageLayout>
   );
-};
-
-const SettingsPageWithClerk = () => {
-  const { openUserProfile, openOrganizationProfile } = useClerk();
-  const { organization, isLoaded: isOrganizationLoaded } = useOrganization();
-
-  const canManageMembers = Boolean(
-    isOrganizationLoaded && organization?.id && openOrganizationProfile,
-  );
-
-  const { userData } = useContext(AuthContext);
-  const isSuperUser = Boolean(userData?.is_superuser);
-
-  const handleManageAccount = () => {
-    openUserProfile?.();
-  };
-
-  const handleManageMembers = () => {
-    if (canManageMembers) {
-      openOrganizationProfile?.();
-    }
-  };
-
-  const clerkNavItems: SidebarNavItem[] = [
-    {
-      title: "Manage Account",
-      icon: (
-        <ForwardedIconComponent
-          name="User"
-          className="w-4 flex-shrink-0 justify-start stroke-[1.5]"
-        />
-      ),
-      onClick: handleManageAccount,
-    },
-    {
-      title: "Members",
-      icon: (
-        <ForwardedIconComponent
-          name="Users"
-          className="w-4 flex-shrink-0 justify-start stroke-[1.5]"
-        />
-      ),
-      onClick: handleManageMembers,
-      disabled: !canManageMembers,
-    },
-  ];
-
-  if (isSuperUser) {
-    clerkNavItems.push({
-      title: "Admin Page",
-      href: "/admin",
-      icon: (
-        <ForwardedIconComponent
-          name="Shield"
-          className="w-4 flex-shrink-0 justify-start stroke-[1.5]"
-        />
-      ),
-    });
-  }
-
-  // Debugging goes after Members / Admin (if present)
-  clerkNavItems.push({
-    title: "Debugging",
-    href: "/settings/debugging",
-    icon: (
-      <ForwardedIconComponent
-        name="Bug"
-        className="w-4 flex-shrink-0 justify-start stroke-[1.5]"
-      />
-    ),
-  });
-
-  // Pass Clerk items so they show at the bottom
-  return <SettingsPageBase additionalNavItems={clerkNavItems} />;
-};
-
-const SettingsPageWithoutClerk = () => <SettingsPageBase />;
-
-export default function SettingsPage(): JSX.Element {
-  if (IS_CLERK_AUTH) {
-    return <SettingsPageWithClerk />;
-  }
-
-  return <SettingsPageWithoutClerk />;
 }

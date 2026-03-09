@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-import inspect
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from typing import TYPE_CHECKING
+
+from fastapi import HTTPException
+from sqlalchemy.exc import InvalidRequestError
 
 from lfx.log.logger import logger
 from lfx.services.schema import ServiceType
@@ -12,15 +14,17 @@ from lfx.services.schema import ServiceType
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
-    from sqlmodel.ext.asyncio.session import AsyncSession
+    from sqlalchemy.ext.asyncio import AsyncSession
 
     from lfx.services.interfaces import (
+        AuthServiceProtocol,
         CacheServiceProtocol,
         ChatServiceProtocol,
         DatabaseServiceProtocol,
         SettingsServiceProtocol,
         StorageServiceProtocol,
         TracingServiceProtocol,
+        TransactionServiceProtocol,
         VariableServiceProtocol,
     )
 
@@ -56,16 +60,32 @@ def get_service(service_type: ServiceType, default=None):
         return None
 
 
-def get_db_service(*, use_organisation: bool = True) -> DatabaseServiceProtocol | None:
-    """Retrieves the database service instance."""
-    from langflow.services.database.organisation import OrganizationService
+def get_db_service(*, use_organisation: bool = True) -> DatabaseServiceProtocol:
+    """Retrieve database service, optionally organisation scoped."""
 
+    from langflow.services.database.organisation import OrganizationService
+    from lfx.services.database.service import NoopDatabaseService
     from lfx.services.schema import ServiceType
 
-    if use_organisation and get_settings_service().auth_settings.CLERK_AUTH_ENABLED:
-        return OrganizationService.get_db_service_for_request()
+    settings_service = get_settings_service()
 
-    return get_service(ServiceType.DATABASE_SERVICE)
+    # Use organisation-specific DB when Clerk auth is enabled
+    if (
+        use_organisation
+        and settings_service
+        and settings_service.auth_settings.CLERK_AUTH_ENABLED
+    ):
+        try:
+            return OrganizationService.get_db_service_for_request()
+        except Exception as e:
+            logger.warning(f"Falling back to default DB service: {e}")
+
+    db_service = get_service(ServiceType.DATABASE_SERVICE)
+
+    if db_service is None:
+        return NoopDatabaseService()
+
+    return db_service
 
 
 def get_storage_service() -> StorageServiceProtocol | None:
@@ -110,29 +130,97 @@ def get_tracing_service() -> TracingServiceProtocol | None:
     return get_service(ServiceType.TRACING_SERVICE)
 
 
-@asynccontextmanager
-async def session_scope(*, use_organisation: bool = True) -> AsyncGenerator[AsyncSession, None]:
-    """Session scope context manager.
+def get_transaction_service() -> TransactionServiceProtocol | None:
+    """Retrieves the transaction service instance.
 
-    Returns a real session if database service is available, otherwise a NoopSession.
-    This ensures code can always call session methods without None checking.
+    Returns the transaction service for logging component executions.
+    Returns None if no transaction service is registered.
     """
-    db_service = get_db_service(use_organisation=use_organisation)
-    if db_service is None or inspect.isabstract(type(db_service)):
-        from lfx.services.session import NoopSession
+    from lfx.services.schema import ServiceType
 
-        yield NoopSession()
-        return
-
-    async with db_service.with_session() as session:
-        yield session
+    return get_service(ServiceType.TRANSACTION_SERVICE)
 
 
-def get_session():
-    """Get database session.
+def get_auth_service() -> AuthServiceProtocol | None:
+    """Retrieves the auth service instance.
 
-    Returns a session from the database service if available, otherwise NoopSession.
+    Returns the pluggable auth service (minimal LFX or full Langflow when configured).
     """
+    from lfx.services.schema import ServiceType
+
+    return get_service(ServiceType.AUTH_SERVICE)
+
+
+async def get_session():
     msg = "get_session is deprecated, use session_scope instead"
     logger.warning(msg)
     raise NotImplementedError(msg)
+
+
+async def injectable_session_scope():
+    async with session_scope() as session:
+        yield session
+
+
+@asynccontextmanager
+async def session_scope(*, use_organisation: bool = True) -> AsyncGenerator[AsyncSession, None]:
+    """Context manager for managing an async session scope with auto-commit for write operations.
+
+    This is used with `async with session_scope() as session:` for direct session management.
+    It ensures that the session is properly committed if no exceptions occur,
+    and rolled back if an exception is raised.
+    Use session_scope_readonly() for read-only operations to avoid unnecessary commits and locks.
+
+    Yields:
+        AsyncSession: The async session object.
+
+    Raises:
+        Exception: If an error occurs during the session scope.
+    """
+    db_service = get_db_service(use_organisation=use_organisation)
+    async with db_service._with_session() as session:  # noqa: SLF001
+        try:
+            yield session
+            await session.commit()
+        except HTTPException:
+            # HTTPExceptions are control flow in FastAPI (returning 4xx/5xx responses),
+            # not actual errors. Don't log them - FastAPI's exception handlers will
+            # take care of the HTTP response. Just rollback any uncommitted changes.
+            if session.is_active:
+                with suppress(InvalidRequestError):
+                    await session.rollback()
+            raise
+        except Exception as e:
+            # Actual application/database errors - log at error level
+            await logger.aexception("An error occurred during the session scope.", exception=e)
+
+            # Only rollback if session is still in a valid state
+            if session.is_active:
+                with suppress(InvalidRequestError):
+                    # Session was already rolled back by SQLAlchemy
+                    await session.rollback()
+            raise
+        # No explicit close needed - _with_session() handles it
+
+
+async def injectable_session_scope_readonly():
+    async with session_scope_readonly() as session:
+        yield session
+
+
+@asynccontextmanager
+async def session_scope_readonly() -> AsyncGenerator[AsyncSession, None]:
+    """Context manager for managing a read-only async session scope.
+
+    This is used with `async with session_scope_readonly() as session:` for direct session management
+    when only reading data. No auto-commit or rollback - the session is simply closed after use.
+
+    Yields:
+        AsyncSession: The async session object.
+    """
+    db_service = get_db_service()
+    async with db_service._with_session() as session:  # noqa: SLF001
+        yield session
+        # No commit - read-only
+        # No clean up - client is responsible (plus, read only sessions are not committed)
+        # No explicit close needed - _with_session() handles it

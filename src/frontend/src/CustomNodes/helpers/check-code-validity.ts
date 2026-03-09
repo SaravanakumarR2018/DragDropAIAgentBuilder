@@ -1,6 +1,5 @@
 import { componentsToIgnoreUpdate } from "@/constants/constants";
 import type { OutputFieldType } from "@/types/api";
-import { resolveTemplateEntry } from "@/utils/component-template-utils";
 import type { NodeDataType } from "../../types/flow";
 
 // Returns true if the code is outdated (code string changed and not ignored)
@@ -54,19 +53,12 @@ const codeHasBreakingChange = (
 export const checkCodeValidity = (
   data: NodeDataType,
   templates: { [key: string]: any },
-  templatesByModule?: { [key: string]: any },
 ) => {
   if (!data?.node || !templates) return;
-  const templateEntry = resolveTemplateEntry(
-    data.node,
-    templates,
-    templatesByModule,
-    data.type,
-  );
-  const template = templateEntry?.template;
+  const template = templates[data.type]?.template;
   const currentCode = template?.code?.value;
   const thisNodesCode = data.node!.template?.code?.value;
-  const originalOutputs = templateEntry?.outputs;
+  const originalOutputs = templates[data.type]?.outputs;
   const userOutputs = data.node?.outputs;
   const originalTemplate = template;
   const userTemplate = data.node?.template;

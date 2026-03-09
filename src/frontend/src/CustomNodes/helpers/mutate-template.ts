@@ -1,5 +1,5 @@
 import type { UseMutationResult } from "@tanstack/react-query";
-import { cloneDeep, type DebouncedFunc, debounce } from "lodash"
+import { cloneDeep, debounce } from "lodash";
 import {
   ERROR_UPDATING_COMPONENT,
   SAVE_DEBOUNCE_TIME,
@@ -8,32 +8,8 @@ import {
 import type { APIClassType, ResponseErrorDetailAPI } from "@/types/api";
 import { updateHiddenOutputs } from "./update-hidden-outputs";
 
-type MutateTemplateDebouncedFunc = DebouncedFunc<
-  (
-    newValue: any,
-    node: APIClassType,
-    setNodeClass: (node: APIClassType | undefined) => void,
-    postTemplateValue: UseMutationResult<
-      APIClassType | undefined,
-      ResponseErrorDetailAPI,
-      any
-    >,
-    setErrorData: (error: { title: string; list?: string[] }) => void,
-    parameterName?: string,
-    callback?: () => void,
-    toolMode?: boolean,
-  ) => Promise<void>
->;
-
 // Map to store debounced functions for each node ID
-const debouncedFunctions = new Map<string, MutateTemplateDebouncedFunc>();
-
-export const clearMutateTemplateDebounce = () => {
-  debouncedFunctions.forEach((fn) => {
-    fn.cancel();
-  });
-  debouncedFunctions.clear();
-};
+const debouncedFunctions = new Map<string, ReturnType<typeof debounce>>();
 
 export const mutateTemplate = async (
   newValue,
@@ -49,6 +25,7 @@ export const mutateTemplate = async (
   parameterName?: string,
   callback?: () => void,
   toolMode?: boolean,
+  isRefresh?: boolean,
 ) => {
   // Get or create a debounced function for this node ID
   if (!debouncedFunctions.has(nodeId)) {
@@ -68,6 +45,7 @@ export const mutateTemplate = async (
           parameterName?: string,
           callback?: () => void,
           toolMode?: boolean,
+          isRefresh?: boolean,
         ) => {
           try {
             const newNode = cloneDeep(node);
@@ -75,6 +53,7 @@ export const mutateTemplate = async (
               value: newValue,
               field_name: parameterName,
               tool_mode: toolMode ?? node.tool_mode,
+              is_refresh: isRefresh ?? false,
             });
             if (newTemplate) {
               newNode.template = newTemplate.template;
@@ -118,5 +97,6 @@ export const mutateTemplate = async (
     parameterName,
     callback,
     toolMode,
+    isRefresh,
   );
 };

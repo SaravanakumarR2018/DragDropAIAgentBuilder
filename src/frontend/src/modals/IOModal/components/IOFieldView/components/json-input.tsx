@@ -2,7 +2,6 @@ import { useEffect, useRef } from "react";
 import type { JsonEditor as VanillaJsonEditor } from "vanilla-jsoneditor";
 import JsonEditor from "@/components/core/jsonEditor";
 import type { IOJSONInputComponentType } from "@/types/components";
-
 export default function IoJsonInput({
   value = [],
   onChange,

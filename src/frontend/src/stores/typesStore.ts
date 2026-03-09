@@ -6,7 +6,6 @@ import {
   templatesGenerator,
   typesGenerator,
 } from "../utils/reactflowUtils";
-import { buildTemplatesByModule } from "../utils/component-template-utils";
 
 export const useTypesStore = create<TypesStoreType>((set, get) => ({
   ComponentFields: new Set(),
@@ -18,7 +17,6 @@ export const useTypesStore = create<TypesStoreType>((set, get) => ({
   },
   types: {},
   templates: {},
-  templatesByModule: {},
   data: {},
   setTypes: (data: APIDataType) => {
     set((old) => ({
@@ -29,7 +27,6 @@ export const useTypesStore = create<TypesStoreType>((set, get) => ({
         ...data,
       }),
       templates: templatesGenerator(data),
-      templatesByModule: buildTemplatesByModule(data),
     }));
   },
   setTemplates: (newState: {}) => {

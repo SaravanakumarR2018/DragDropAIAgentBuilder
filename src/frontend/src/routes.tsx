@@ -5,96 +5,123 @@ import {
   Outlet,
   Route,
 } from "react-router-dom";
+
 import { ProtectedAdminRoute } from "./components/authorization/authAdminGuard";
 import { ProtectedRoute } from "./components/authorization/authGuard";
 import { ProtectedLoginRoute } from "./components/authorization/authLoginGuard";
+import { AuthSettingsGuard } from "./components/authorization/authSettingsGuard";
+
 import ContextWrapper from "./contexts";
 import { CustomNavigate } from "./customization/components/custom-navigate";
 import { BASENAME } from "./customization/config-constants";
+
 import {
   ENABLE_CUSTOM_PARAM,
   ENABLE_FILE_MANAGEMENT,
   ENABLE_KNOWLEDGE_BASES,
 } from "./customization/feature-flags";
+
 import { CustomRoutesStore } from "./customization/utils/custom-routes-store";
 import { CustomRoutesStorePages } from "./customization/utils/custom-routes-store-pages";
+
 import { LoadingPage } from "./pages/LoadingPage";
-import { CollectionIndexRedirect } from "./routes/CollectionIndexRedirect";
-import { CatchAllRedirect } from "./routes/CatchAllRedirect";
 import { WorkspaceLoadingPage } from "./pages/WorkspaceLoadingPage";
 
-// ---- Lazy imports (your HEAD) ----
+import { CollectionIndexRedirect } from "./routes/CollectionIndexRedirect";
+import { CatchAllRedirect } from "./routes/CatchAllRedirect";
+
+/* Lazy pages */
+
 const AppWrapperPage = lazy(() =>
-  import("./pages/AppWrapperPage").then((module) => ({
-    default: module.AppWrapperPage,
-  })),
+  import("./pages/AppWrapperPage").then((m) => ({ default: m.AppWrapperPage }))
 );
+
 const AppInitPage = lazy(() =>
-  import("./pages/AppInitPage").then((module) => ({
-    default: module.AppInitPage,
-  })),
+  import("./pages/AppInitPage").then((m) => ({ default: m.AppInitPage }))
 );
+
 const AppAuthenticatedPage = lazy(() =>
-  import("./pages/AppAuthenticatedPage").then((module) => ({
-    default: module.AppAuthenticatedPage,
-  })),
+  import("./pages/AppAuthenticatedPage").then((m) => ({
+    default: m.AppAuthenticatedPage,
+  }))
 );
-const CustomDashboardWrapperPage = lazy(
-  () => import("./customization/components/custom-DashboardWrapperPage"),
+
+const CustomDashboardWrapperPage = lazy(() =>
+  import("./customization/components/custom-DashboardWrapperPage")
 );
+
 const CollectionPage = lazy(() => import("./pages/MainPage/pages/main-page"));
 const HomePage = lazy(() => import("./pages/MainPage/pages/homePage"));
 const FilesPage = lazy(() => import("./pages/MainPage/pages/filesPage"));
+
+const KnowledgePage = lazy(
+  () => import("./pages/MainPage/pages/knowledgePage")
+);
+
+const SourceChunksPage = lazy(
+  () =>
+    import(
+      "./pages/MainPage/pages/knowledgePage/sourceChunksPage/SourceChunksPage"
+    )
+);
+
 const FlowPage = lazy(() => import("./pages/FlowPage"));
+
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const GlobalVariablesPage = lazy(
-  () => import("./pages/SettingsPage/pages/GlobalVariablesPage"),
+  () => import("./pages/SettingsPage/pages/GlobalVariablesPage")
 );
-const ApiKeysPage = lazy(() => import("./pages/SettingsPage/pages/ApiKeysPage"));
 
-const ShortcutsPage = lazy(
-  () => import("./pages/SettingsPage/pages/ShortcutsPage"),
+const ApiKeysPage = lazy(() =>
+  import("./pages/SettingsPage/pages/ApiKeysPage")
 );
-const MessagesPage = lazy(
-  () => import("./pages/SettingsPage/pages/messagesPage"),
+
+const GeneralPage = lazy(() =>
+  import("./pages/SettingsPage/pages/GeneralPage")
 );
-const DebuggingPage = lazy(
-  () => import("./pages/SettingsPage/pages/DebuggingPage"),
+
+const ShortcutsPage = lazy(() =>
+  import("./pages/SettingsPage/pages/ShortcutsPage")
 );
+
+const MessagesPage = lazy(() =>
+  import("./pages/SettingsPage/pages/messagesPage")
+);
+
+const ModelProvidersPage = lazy(
+  () => import("./pages/SettingsPage/pages/ModelProvidersPage")
+);
+
 const MCPServersPage = lazy(
-  () => import("./pages/SettingsPage/pages/MCPServersPage"),
+  () => import("./pages/SettingsPage/pages/MCPServersPage")
 );
-const KnowledgePage = lazy(
-  () => import("./pages/MainPage/pages/knowledgePage"),
-);
+
 const ViewPage = lazy(() => import("./pages/ViewPage"));
+
 const OrganizationPage = lazy(() => import("./clerk/OrganizationPage"));
+
 const LoginPage = lazy(() =>
-  import("./clerk/login-pages").then((module) => ({
-    default: module.LoginPage,
-  })),
+  import("./clerk/login-pages").then((m) => ({ default: m.LoginPage }))
 );
+
 const SignUp = lazy(() =>
-  import("./clerk/login-pages").then((module) => ({
-    default: module.SignUp,
-  })),
+  import("./clerk/login-pages").then((m) => ({ default: m.SignUp }))
 );
+
 const LoginAdminPage = lazy(() =>
-  import("./clerk/login-pages").then((module) => ({
-    default: module.LoginAdminPage,
-  })),
+  import("./clerk/login-pages").then((m) => ({
+    default: m.LoginAdminPage,
+  }))
 );
 
 const AdminPage = lazy(() => import("./pages/AdminPage"));
 const DeleteAccountPage = lazy(() => import("./pages/DeleteAccountPage"));
 const PlaygroundPage = lazy(() => import("./pages/Playground"));
-const TermsOfServicePage = lazy(() => import("./pages/TermsOfServicePage"));
-const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage"));
-const RefundPolicyPage = lazy(() => import("./pages/RefundPolicyPage"));
 
-// ---- Router ----
 const router = createBrowserRouter(
   createRoutesFromElements([
+    /* Playground */
+
     <Route path="/playground/:id/">
       <Route
         path=""
@@ -107,6 +134,9 @@ const router = createBrowserRouter(
         }
       />
     </Route>,
+
+    /* Main App */
+
     <Route
       path={ENABLE_CUSTOM_PARAM ? "/:customParam?" : "/"}
       element={
@@ -158,16 +188,12 @@ const router = createBrowserRouter(
                 }
               >
                 <Route index element={<CollectionIndexRedirect />} />
-                <Route
-                  index
-                  element={<CustomNavigate replace to={"flows"} />}
-                />
+
+                {/* Assets */}
                 {ENABLE_FILE_MANAGEMENT && (
                   <Route path="assets">
-                    <Route
-                      index
-                      element={<CustomNavigate replace to="files" />}
-                    />
+                    <Route index element={<CustomNavigate replace to="files" />} />
+
                     <Route
                       path="files"
                       element={
@@ -176,18 +202,32 @@ const router = createBrowserRouter(
                         </Suspense>
                       }
                     />
+
                     {ENABLE_KNOWLEDGE_BASES && (
-                      <Route
-                        path="knowledge-bases"
-                        element={
-                          <Suspense fallback={<LoadingPage />}>
-                            <KnowledgePage />
-                          </Suspense>
-                        }
-                      />
+                      <>
+                        <Route
+                          path="knowledge-bases"
+                          element={
+                            <Suspense fallback={<LoadingPage />}>
+                              <KnowledgePage />
+                            </Suspense>
+                          }
+                        />
+
+                        <Route
+                          path="knowledge-bases/:sourceId/chunks"
+                          element={
+                            <Suspense fallback={<LoadingPage />}>
+                              <SourceChunksPage />
+                            </Suspense>
+                          }
+                        />
+                      </>
                     )}
                   </Route>
                 )}
+
+                {/* Flows */}
                 <Route
                   path="flows/"
                   element={
@@ -196,6 +236,7 @@ const router = createBrowserRouter(
                     </Suspense>
                   }
                 />
+
                 <Route
                   path="components/"
                   element={
@@ -213,6 +254,7 @@ const router = createBrowserRouter(
                     }
                   />
                 </Route>
+
                 <Route
                   path="all/"
                   element={
@@ -220,16 +262,8 @@ const router = createBrowserRouter(
                       <HomePage key="flows" type="flows" />
                     </Suspense>
                   }
-                >
-                  <Route
-                    path="folder/:folderId"
-                    element={
-                      <Suspense fallback={<LoadingPage />}>
-                        <HomePage key="flows" type="flows" />
-                      </Suspense>
-                    }
-                  />
-                </Route>
+                />
+
                 <Route
                   path="mcp/"
                   element={
@@ -237,19 +271,11 @@ const router = createBrowserRouter(
                       <HomePage key="mcp" type="mcp" />
                     </Suspense>
                   }
-                >
-                  <Route
-                    path="folder/:folderId"
-                    element={
-                      <Suspense fallback={<LoadingPage />}>
-                        <HomePage key="mcp" type="mcp" />
-                      </Suspense>
-                    }
-                  />
-                </Route>
+                />
               </Route>
 
-              {/* Settings Routes */}
+              {/* Settings */}
+
               <Route
                 path="settings"
                 element={
@@ -258,7 +284,8 @@ const router = createBrowserRouter(
                   </Suspense>
                 }
               >
-                <Route index element={<CustomNavigate replace to="mcp-servers" />} />
+                <Route index element={<CustomNavigate replace to="general" />} />
+
                 <Route
                   path="global-variables"
                   element={
@@ -267,6 +294,16 @@ const router = createBrowserRouter(
                     </Suspense>
                   }
                 />
+
+                <Route
+                  path="model-providers"
+                  element={
+                    <Suspense fallback={<LoadingPage />}>
+                      <ModelProvidersPage />
+                    </Suspense>
+                  }
+                />
+
                 <Route
                   path="mcp-servers"
                   element={
@@ -275,6 +312,7 @@ const router = createBrowserRouter(
                     </Suspense>
                   }
                 />
+
                 <Route
                   path="api-keys"
                   element={
@@ -283,7 +321,18 @@ const router = createBrowserRouter(
                     </Suspense>
                   }
                 />
-                
+
+                <Route
+                  path="general/:scrollId?"
+                  element={
+                    <Suspense fallback={<LoadingPage />}>
+                      <AuthSettingsGuard>
+                        <GeneralPage />
+                      </AuthSettingsGuard>
+                    </Suspense>
+                  }
+                />
+
                 <Route
                   path="shortcuts"
                   element={
@@ -292,6 +341,7 @@ const router = createBrowserRouter(
                     </Suspense>
                   }
                 />
+
                 <Route
                   path="messages"
                   element={
@@ -300,14 +350,7 @@ const router = createBrowserRouter(
                     </Suspense>
                   }
                 />
-                <Route
-                  path="debugging"
-                  element={
-                    <Suspense fallback={<LoadingPage />}>
-                      <DebuggingPage />
-                    </Suspense>
-                  }
-                />
+
                 {CustomRoutesStore()}
               </Route>
 
@@ -336,7 +379,8 @@ const router = createBrowserRouter(
               />
             </Route>
 
-            {/* Flow and View Routes */}
+            {/* Flow Editor */}
+
             <Route path="flow/:id/">
               <Route
                 path=""
@@ -347,14 +391,6 @@ const router = createBrowserRouter(
                 }
               >
                 <Route
-                  path="folder/:folderId/"
-                  element={
-                    <Suspense fallback={<WorkspaceLoadingPage />}>
-                      <FlowPage />
-                    </Suspense>
-                  }
-                />
-                <Route
                   path=""
                   element={
                     <Suspense fallback={<WorkspaceLoadingPage />}>
@@ -363,6 +399,7 @@ const router = createBrowserRouter(
                   }
                 />
               </Route>
+
               <Route
                 path="view"
                 element={
@@ -375,33 +412,8 @@ const router = createBrowserRouter(
           </Route>
         </Route>
 
-        {/* Public policy routes */}
-        <Route
-          path="terms-of-service"
-          element={
-            <Suspense fallback={<LoadingPage />}>
-              <TermsOfServicePage />
-            </Suspense>
-          }
-        />
-        <Route
-          path="privacy-policy"
-          element={
-            <Suspense fallback={<LoadingPage />}>
-              <PrivacyPolicyPage />
-            </Suspense>
-          }
-        />
-        <Route
-          path="refund-policy"
-          element={
-            <Suspense fallback={<LoadingPage />}>
-              <RefundPolicyPage />
-            </Suspense>
-          }
-        />
+        {/* Auth */}
 
-        {/* Auth routes */}
         <Route
           path="login"
           element={
@@ -412,6 +424,7 @@ const router = createBrowserRouter(
             </Suspense>
           }
         />
+
         <Route
           path="organization"
           element={
@@ -422,6 +435,7 @@ const router = createBrowserRouter(
             </Suspense>
           }
         />
+
         <Route
           path="signup"
           element={
@@ -432,6 +446,7 @@ const router = createBrowserRouter(
             </Suspense>
           }
         />
+
         <Route
           path="login/admin"
           element={
@@ -443,10 +458,11 @@ const router = createBrowserRouter(
           }
         />
       </Route>
+
       <Route path="*" element={<CatchAllRedirect />} />
     </Route>,
   ]),
-  { basename: BASENAME || undefined },
+  { basename: BASENAME || undefined }
 );
 
 export default router;

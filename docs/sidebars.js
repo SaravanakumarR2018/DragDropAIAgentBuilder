@@ -166,7 +166,6 @@ module.exports = {
       type: "category",
       label: "Deploy",
       items: [
-        "Components/concepts-components",
         {
           type:"doc",
           id: "Deployment/deployment-overview",
@@ -358,6 +357,7 @@ module.exports = {
           label: "Bundles",
           items: [
             "Components/components-bundles",
+            "Components/bundles-agentics",
             "Components/bundles-aiml",
             "Components/bundles-altk",
             "Components/bundles-amazon",

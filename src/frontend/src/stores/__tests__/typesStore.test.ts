@@ -23,17 +23,11 @@ jest.mock("../../utils/reactflowUtils", () => ({
   }),
 }));
 
-jest.mock("../../utils/component-template-utils", () => ({
-  buildTemplatesByModule: jest.fn(() => ({})),
-}));
-
 // Mock imports
 const mockExtractSecretFieldsFromComponents =
   require("../../utils/reactflowUtils").extractSecretFieldsFromComponents;
 const mockTemplatesGenerator =
   require("../../utils/reactflowUtils").templatesGenerator;
-const mockBuildTemplatesByModule =
-  require("../../utils/component-template-utils").buildTemplatesByModule;
 const mockTypesGenerator = require("../../utils/reactflowUtils").typesGenerator;
 
 const mockAPIData: APIDataType = {
@@ -91,7 +85,6 @@ describe("useTypesStore", () => {
       return new Set(Object.keys(data));
     });
     mockTemplatesGenerator.mockReturnValue({});
-    mockBuildTemplatesByModule.mockReturnValue({});
     mockTypesGenerator.mockReturnValue({});
 
     act(() => {
@@ -99,7 +92,6 @@ describe("useTypesStore", () => {
         ComponentFields: new Set(),
         types: {},
         templates: {},
-        templatesByModule: {},
         data: {},
       });
     });
@@ -112,7 +104,6 @@ describe("useTypesStore", () => {
       expect(result.current.ComponentFields).toEqual(new Set());
       expect(result.current.types).toEqual({});
       expect(result.current.templates).toEqual({});
-      expect(result.current.templatesByModule).toEqual({});
       expect(result.current.data).toEqual({});
     });
   });
@@ -218,9 +209,6 @@ describe("useTypesStore", () => {
     it("should set types, templates, data, and component fields", () => {
       mockTypesGenerator.mockReturnValue(mockTypes);
       mockTemplatesGenerator.mockReturnValue(mockTemplates);
-      mockBuildTemplatesByModule.mockReturnValue({
-        "module.text": mockTemplates.TextInput,
-      });
       mockExtractSecretFieldsFromComponents.mockReturnValue(
         new Set(["TextInput", "NumberInput"]),
       );
@@ -233,16 +221,12 @@ describe("useTypesStore", () => {
 
       expect(mockTypesGenerator).toHaveBeenCalledWith(mockAPIData);
       expect(mockTemplatesGenerator).toHaveBeenCalledWith(mockAPIData);
-      expect(mockBuildTemplatesByModule).toHaveBeenCalledWith(mockAPIData);
       expect(mockExtractSecretFieldsFromComponents).toHaveBeenCalledWith(
         mockAPIData,
       );
 
       expect(result.current.types).toEqual(mockTypes);
       expect(result.current.templates).toEqual(mockTemplates);
-      expect(result.current.templatesByModule).toEqual({
-        "module.text": mockTemplates.TextInput,
-      });
       expect(result.current.data).toEqual(mockAPIData);
       expect(result.current.ComponentFields).toEqual(
         new Set(["TextInput", "NumberInput"]),

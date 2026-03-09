@@ -1,5 +1,4 @@
 import json
-import math
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Annotated
 from uuid import UUID, uuid4
@@ -70,8 +69,12 @@ class MessageBase(SQLModel):
             for file in message.files:
                 if hasattr(file, "path") and hasattr(file, "url") and file.path:
                     session_id = message.session_id
-                    if session_id:
-                        image_paths.append(f"{session_id}{file.path.split(str(session_id))[1]}")
+                    if session_id and str(session_id) in file.path:
+                        parts = file.path.split(str(session_id))
+                        if len(parts) > 1:
+                            image_paths.append(f"{session_id}{parts[1]}")
+                        else:
+                            image_paths.append(file.path)
                     else:
                         image_paths.append(file.path)
             if image_paths:
@@ -155,10 +158,10 @@ class MessageTable(MessageBase, table=True):  # type: ignore[call-arg]
         if isinstance(value, list):
             return [cls.validate_properties_or_content_blocks(item) for item in value]
         if hasattr(value, "model_dump"):
-            value = value.model_dump()
+            return value.model_dump()
         if isinstance(value, str):
-            value = json.loads(value)
-        return cls._sanitize_json_value(value)
+            return json.loads(value)
+        return value
 
     @field_serializer("properties", "content_blocks")
     @classmethod
@@ -166,19 +169,9 @@ class MessageTable(MessageBase, table=True):  # type: ignore[call-arg]
         if isinstance(value, list):
             return [cls.serialize_properties_or_content_blocks(item) for item in value]
         if hasattr(value, "model_dump"):
-            value = value.model_dump()
+            return value.model_dump()
         if isinstance(value, str):
-            value = json.loads(value)
-        return cls._sanitize_json_value(value)
-
-    @staticmethod
-    def _sanitize_json_value(value):
-        if isinstance(value, dict):
-            return {key: MessageTable._sanitize_json_value(val) for key, val in value.items()}
-        if isinstance(value, list):
-            return [MessageTable._sanitize_json_value(item) for item in value]
-        if isinstance(value, float) and not math.isfinite(value):
-            return None
+            return json.loads(value)
         return value
 
 

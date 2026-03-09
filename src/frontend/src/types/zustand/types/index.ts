@@ -4,7 +4,6 @@ export type TypesStoreType = {
   types: { [char: string]: string };
   setTypes: (newState: {}) => void;
   templates: { [char: string]: APIClassType };
-  templatesByModule: { [module: string]: APIClassType };
   setTemplates: (newState: {}) => void;
   data: APIDataType;
   setData: (newState: {}) => void;
