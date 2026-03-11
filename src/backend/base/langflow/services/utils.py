@@ -129,7 +129,7 @@ async def teardown_superuser(settings_service, session: AsyncSession) -> None:
 
 async def teardown_services() -> None:
     """Teardown all the services."""
-    async with get_db_service(use_organisation=False)._with_session() as session:
+    async with get_db_service(use_organisation=False)._with_session() as session: # noqa: SLF001
         await teardown_superuser(get_settings_service(), session)
 
     from lfx.services.manager import get_service_manager

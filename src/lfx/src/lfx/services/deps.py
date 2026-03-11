@@ -62,8 +62,8 @@ def get_service(service_type: ServiceType, default=None):
 
 def get_db_service(*, use_organisation: bool = True) -> DatabaseServiceProtocol:
     """Retrieve database service, optionally organisation scoped."""
-
     from langflow.services.database.organisation import OrganizationService
+
     from lfx.services.database.service import NoopDatabaseService
     from lfx.services.schema import ServiceType
 
@@ -77,7 +77,7 @@ def get_db_service(*, use_organisation: bool = True) -> DatabaseServiceProtocol:
     ):
         try:
             return OrganizationService.get_db_service_for_request()
-        except Exception as e:
+        except Exception as e: # noqa: BLE001
             logger.warning(f"Falling back to default DB service: {e}")
 
     db_service = get_service(ServiceType.DATABASE_SERVICE)

@@ -1500,7 +1500,7 @@ async def init_mcp_servers():
         from langflow.services.mcp import init_mcp_servers_for_all_orgs
 
         await init_mcp_servers_for_all_orgs()
-    except Exception as e:
+    except Exception as e: # noqa: BLE001
         msg = f"Failed to initialize organisation MCP servers: {e}"
         logger.aexception(msg)
 

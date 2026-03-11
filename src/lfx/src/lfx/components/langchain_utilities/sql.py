@@ -85,18 +85,16 @@ class SQLAgentComponent(LCAgentComponent):
         )
 
     def _build_database_uri(self) -> str:
-        """
-        Credential precedence:
+        """Credential precedence:
         1. Explicit username/password inputs
         2. Credentials embedded in database_uri
         3. No credentials
 
-        NOTE:
+        Note:
         - IPv4 must NOT use square brackets
         - IPv6 MUST already be bracketed
         - Unbracketed IPv6 will FAIL (intentional)
         """
-
         parsed = urlparse(self.database_uri)
 
         # Non-host URIs (e.g., sqlite:///)
