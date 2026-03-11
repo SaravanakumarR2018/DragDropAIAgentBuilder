@@ -83,6 +83,7 @@ jest.mock("../typesStore", () => ({
   useTypesStore: {
     getState: () => ({
       templates: {},
+      templatesByModule: {},
       types: {},
     }),
   },

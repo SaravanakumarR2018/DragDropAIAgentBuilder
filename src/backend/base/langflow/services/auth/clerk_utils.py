@@ -1,7 +1,8 @@
 import uuid
+from datetime import datetime, timedelta, timezone
 from contextvars import ContextVar, Token
 from typing import Any
-from uuid import UUID
+from uuid import UUID, NAMESPACE_URL, uuid5
 
 import httpx
 from fastapi import HTTPException, Request, status
@@ -11,6 +12,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.status import HTTP_401_UNAUTHORIZED
 
 from langflow.logging.logger import logger
+from langflow.services.database.constants import DUMMY_USER_NAMESPACE_TEMPLATE
 from langflow.services.database.models.user import User
 from langflow.services.database.models.user.crud import get_user_by_id
 from langflow.services.deps import get_settings_service
@@ -103,13 +105,58 @@ def get_user_id_from_clerk_payload() -> UUID:
         ) from err
 
 
-async def process_new_user_with_clerk(new_user: User):
+def get_org_id_from_clerk_payload() -> str:
+    payload = auth_header_ctx.get()
+    if not payload:
+        raise HTTPException(status_code=401, detail="Missing Clerk payload")
+    org_id = payload.get("org_id") if isinstance(payload, dict) else None
+    if not org_id:
+        raise HTTPException(status_code=401, detail="Missing organization in Clerk payload")
+    if not isinstance(org_id, str):
+        raise HTTPException(status_code=401, detail="Invalid organization identifier")
+    return org_id
+
+
+async def _apply_dummy_user_optins(
+    new_user: User,
+    session: AsyncSession | None,
+) -> None:
+    if session is None:
+        logger.warning("[process_new_user_with_clerk] Session unavailable; skipping dummy optins lookup")
+        return
+
+    try:
+        org_id = get_org_id_from_clerk_payload()
+    except HTTPException:
+        logger.warning("[process_new_user_with_clerk] Missing org_id in Clerk payload; skipping dummy optins lookup")
+        return
+
+    dummy_seed = DUMMY_USER_NAMESPACE_TEMPLATE.format(org_id=org_id)
+    dummy_user_id = uuid5(NAMESPACE_URL, dummy_seed)
+    dummy_user = await session.get(User, str(dummy_user_id))
+
+    dummy_optins = dummy_user.optins if dummy_user and isinstance(dummy_user.optins, dict) else {}
+
+    skip_trial_access = dummy_optins.get("skip_trial_access", False)
+    trial_access_days = dummy_optins.get("trial_access_days", 7)
+    trial_access_until = (datetime.now(timezone.utc) + timedelta(days=trial_access_days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    new_user.optins = {
+        **(new_user.optins or {}),
+        "skip_trial_access": skip_trial_access,
+        "trial_access_until": trial_access_until,
+    }
+
+
+async def process_new_user_with_clerk(new_user: User, session: AsyncSession | None = None):
     settings = get_settings_service().auth_settings
     # ✅ If Clerk is enabled, pull UUID from enriched auth_header_ctx payload
     if settings.CLERK_AUTH_ENABLED:
         user_id = get_user_id_from_clerk_payload()
         new_user.id = user_id
         logger.info(f"[process_new_user_with_clerk] Assigned Clerk UUID {new_user.id} to new user object")
+        await _apply_dummy_user_optins(new_user, session)
+        await _ensure_admin_superuser(new_user)
 
 
 async def get_user_from_clerk_payload(db: AsyncSession) -> User:
@@ -136,6 +183,36 @@ async def get_user_from_clerk_payload(db: AsyncSession) -> User:
         )
 
     return user
+
+
+def _get_admin_email_from_env() -> str | None:
+    settings_service = get_settings_service()
+    website_domain = getattr(settings_service.settings, "website_domain", None)
+    if not website_domain:
+        return None
+    return f"admin@{website_domain}".lower()
+
+
+async def _ensure_admin_superuser(user: User) -> None:
+    admin_email = _get_admin_email_from_env()
+    if not admin_email:
+        logger.debug("[ClerkAdmin] LANGFLOW_WEBSITE_DOMAIN/WEBSITE_DOMAIN not set; skipping admin promotion")
+        return
+
+    optins = getattr(user, "optins", None)
+    if not isinstance(optins, dict):
+        return
+
+    optins_email = optins.get("email")
+    if not optins_email:
+        return
+
+    if optins_email.lower() != admin_email:
+        return
+
+    if not user.is_superuser:
+        user.is_superuser = True
+        logger.info("[ClerkAdmin] Promoted %s to superuser based on admin email", user.username)
 
 
 async def clerk_token_middleware(request: Request, call_next):

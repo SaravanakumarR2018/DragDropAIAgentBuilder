@@ -44,6 +44,7 @@ async def send_message_noop(
     id_: str | None = None,  # noqa: ARG001
     *,
     skip_db_update: bool = False,  # noqa: ARG001
+    **_: object,
 ) -> Message:
     """No-op implementation of send_message."""
     return message

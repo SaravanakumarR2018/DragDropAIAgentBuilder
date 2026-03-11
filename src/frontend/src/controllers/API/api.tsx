@@ -54,6 +54,7 @@ function ApiInterceptor() {
         const token = customGetAccessToken();
 
         if (!isExternalURL(url)) {
+          config.headers = config.headers || {};
           for (const [key, value] of Object.entries(customHeaders)) {
             config.headers[key] = value;
           }
@@ -164,6 +165,7 @@ function ApiInterceptor() {
 
         const urlIsFromCurrentOrigin = requestUrl.origin === currentOrigin;
         if (urlIsFromCurrentOrigin) {
+          config.headers = config.headers || {};
           for (const [key, value] of Object.entries(customHeaders)) {
             config.headers[key] = value;
           }
@@ -239,8 +241,16 @@ function ApiInterceptor() {
     const originalRequest = error.config as AxiosRequestConfig;
 
     try {
-      // Browser automatically sends cookies with the request
-      // No need to manually add Authorization header
+      const token = customGetAccessToken();
+
+      if (token) {
+        originalRequest.headers = originalRequest.headers || {};
+        originalRequest.headers = {
+          ...(originalRequest.headers as Record<string, string>),
+          Authorization: `Bearer ${token}`,
+        };
+      }
+
       const response = await axios.request(originalRequest);
       return response.data;
     } catch (err) {

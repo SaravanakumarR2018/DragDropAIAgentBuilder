@@ -28,6 +28,7 @@ import {
 } from "./components/flowSidebarComponent";
 import Page from "./components/PageComponent";
 import { FlowInsightsContent } from "./components/TraceComponent/FlowInsightsContent";
+import { clearMutateTemplateDebounce } from "@/CustomNodes/helpers/mutate-template";
 import { WorkspaceLoadingPage } from "../WorkspaceLoadingPage";
 
 function FlowPageMainContent({
@@ -169,6 +170,7 @@ export default function FlowPage({ view }: { view?: boolean }): JSX.Element {
     return () => {
       setOnFlowPage(false);
       setCurrentFlow(undefined);
+      clearMutateTemplateDebounce();
       // Reset playground state when leaving the flow
       setSlidingContainerOpen(false);
       setIsFullscreen(false);

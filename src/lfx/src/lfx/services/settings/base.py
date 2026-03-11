@@ -9,7 +9,7 @@ from typing import Any, Literal
 import orjson
 import yaml
 from aiofile import async_open
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic.fields import FieldInfo
 from pydantic_settings import BaseSettings, EnvSettingsSource, PydanticBaseSettingsSource, SettingsConfigDict
 from typing_extensions import override
@@ -71,6 +71,10 @@ class Settings(BaseSettings):
 
     dev: bool = False
     """If True, Langflow will run in development mode."""
+
+    website_domain: str | None = None
+    """Primary website domain used for admin detection and other host-bound logic."""
+
     database_url: str | None = None
     """Database URL for Langflow. If not provided, Langflow will use a SQLite database.
     The driver shall be an async one like `sqlite+aiosqlite` (`sqlite` and `postgresql`
@@ -217,6 +221,15 @@ class Settings(BaseSettings):
     """User agent for the API calls."""
     backend_only: bool = False
     """If set to True, Langflow will not serve the frontend."""
+    paddle_api_key: str | None = Field(default=None, repr=False)
+    """Paddle API key used for billing-related integrations.
+        Can be provided via LANGFLOW_PADDLE_API_KEY or PADDLE_API_KEY."""
+    paddle_client_key: str | None = Field(default=None, repr=False)
+    """Paddle client key used for billing-related integrations.
+        Can be provided via LANGFLOW_PADDLE_CLIENT_KEY or PADDLE_CLIENT_KEY."""
+    paddle_environment: str | None = None
+    """Paddle environment used for billing-related integrations.
+        Can be provided via LANGFLOW_PADDLE_ENVIRONMENT or PADDLE_ENVIRONMENT."""
 
     # CORS Settings
     cors_origins: list[str] | str = "*"
@@ -399,6 +412,25 @@ class Settings(BaseSettings):
             # Convert single origin to list for consistency
             return [value]
         return value
+
+    @model_validator(mode="after")
+    def validate_paddle_keys(self):
+        env_api_key = os.getenv("PADDLE_API_KEY")
+        env_client_key = os.getenv("PADDLE_CLIENT_KEY")
+        env_paddle_environment = os.getenv("PADDLE_ENVIRONMENT")
+
+        if not self.paddle_api_key and env_api_key:
+            self.paddle_api_key = env_api_key
+        if not self.paddle_client_key and env_client_key:
+            self.paddle_client_key = env_client_key
+        if not self.paddle_environment and env_paddle_environment:
+            self.paddle_environment = env_paddle_environment
+        if (self.paddle_api_key and not self.paddle_client_key) or (
+            self.paddle_client_key and not self.paddle_api_key
+        ):
+            msg = "PADDLE_API_KEY and PADDLE_CLIENT_KEY must both be set to enable Paddle integrations."
+            raise ValueError(msg)
+        return self   
 
     @field_validator("use_noop_database", mode="before")
     @classmethod

@@ -1,4 +1,4 @@
-import { lazy, ReactNode, useContext, useEffect, useRef } from "react";
+import { lazy, ReactNode, useContext, useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AuthContext } from "@/contexts/authContext";
 import { api } from "@/controllers/API/api";
@@ -10,6 +10,7 @@ import { LANGFLOW_ACCESS_TOKEN, LANGFLOW_REFRESH_TOKEN } from "@/constants/const
 import { Cookies } from "react-cookie";
 import OrganizationPage from "./OrganizationPage";
 import authStore from "@/stores/authStore";
+import { useDarkStore } from "@/stores/darkStore";
 import {
   getStoredActiveOrgId as readStoredActiveOrgId,
   setStoredActiveOrgId as persistActiveOrgId,
@@ -58,8 +59,9 @@ export async function createOrganisation(token: string) {
 
 // Backend synchronization helpers
 export async function ensureLangflowUser(
-  token: string, 
+  token: string,
   username: string,
+  email?: string,
   maxRetries: number = 2
 ): Promise<{
   justCreated: boolean;
@@ -83,9 +85,22 @@ export async function ensureLangflowUser(
         try {
           // User doesn't exist → create it
           console.debug("[ensureLangflowUser] trying to create user...");
+          const optins = IS_CLERK_AUTH
+            ? {
+                email: email ?? username,
+                github_starred: false,
+                dialog_dismissed: false,
+                discord_clicked: false,
+              }
+            : undefined;
+
           await api.post(
             `${getURL("USERS")}/`,
-            { username, password: CLERK_DUMMY_PASSWORD },
+            {
+              username,
+              password: CLERK_DUMMY_PASSWORD,
+              ...(optins ? { optins } : {}),
+            },
             { headers: { Authorization: `Bearer ${token}` } },
           );
           console.log(`✅ [ensureLangflowUser] User created successfully: ${username}`);
@@ -144,13 +159,14 @@ export function ClerkAuthAdapter() {
   const { getToken, isSignedIn } = useAuth();
   const { user } = useUser();
   const clerk = useClerk();
-  const { login } = useContext(AuthContext);
+  const { getUser, login, userData } = useContext(AuthContext);
   const cookie = new Cookies();
   const navigate = useNavigate();
   const location = useLocation();
   const { organization, isLoaded: isOrgLoaded } = useOrganization();
   const prevTokenRef = useRef<string | null>(null);
   const autoJoinAttemptedRef = useRef(false);
+  const hasRequestedUserRef = useRef(false);
 
   const isOrgSelected = useIsOrgSelected();
   const currentPath = location.pathname;
@@ -234,7 +250,12 @@ export function ClerkAuthAdapter() {
               const username = user?.primaryEmailAddress?.emailAddress || user?.id || "clerk_user";
               console.log(`[AutoRecovery] Step 1: Ensuring user exists - ${username}`);
               
-              const { justCreated: userCreated } = await ensureLangflowUser(token, username, 2);
+              const { justCreated: userCreated } = await ensureLangflowUser(
+                token,
+                username,
+                user?.primaryEmailAddress?.emailAddress,
+                2,
+              );
               
               if (userCreated) {
                 console.log("✅ [AutoRecovery] User created successfully");
@@ -327,6 +348,22 @@ export function ClerkAuthAdapter() {
     navigate,
   ]);
 
+  useEffect(() => {
+    if (!IS_CLERK_AUTH) {
+      return;
+    }
+
+    if (!isSignedIn || !isOrgSelected) {
+      return;
+    }
+
+    if (userData || hasRequestedUserRef.current) {
+      return;
+    }
+
+    hasRequestedUserRef.current = true;
+    getUser();
+  }, [getUser, isOrgSelected, isSignedIn, userData]);
 
   // ✅ Clerk token listener: backend sync ONLY after org is selected
   useEffect(() => {
@@ -407,8 +444,49 @@ export function useLogout(options?: Parameters<typeof useLogoutMutation>[0]) {
 //const LazyApp = lazy(() => import("../customization/custom-App"));
 
 export default function AppWithProvider({ children }: { children: ReactNode })  {
+  const dark = useDarkStore((state) => state.dark);
+
+  const clerkAppearance = useMemo(
+    () => ({
+      variables: {
+        colorPrimary: "hsl(var(--primary))",
+        colorText: "hsl(var(--foreground))",
+        colorTextSecondary: "hsl(var(--muted-foreground))",
+        colorInputText: "hsl(var(--foreground))",
+        colorBackground: "hsl(var(--card))",
+        colorInputBackground: "hsl(var(--input))",
+        colorDanger: "hsl(var(--destructive))",
+        fontFamily: "var(--font-sans)",
+        borderRadius: "12px",
+      },
+      elements: {
+        rootBox: "bg-transparent text-foreground",
+        card: "bg-card text-card-foreground border border-border shadow-xl",
+        modalContent:
+          "bg-background text-foreground border border-border shadow-xl backdrop-blur-sm",
+        headerTitle: "text-foreground",
+        headerSubtitle: "text-muted-foreground",
+        formButtonPrimary:
+          "bg-primary text-primary-foreground hover:bg-[hsl(var(--primary-hover))] border border-border shadow-sm",
+        formFieldInput:
+          "bg-input text-foreground border border-border focus:ring-2 focus:ring-primary/40 focus:border-primary/60 placeholder:text-muted-foreground",
+        formFieldLabel: "text-muted-foreground",
+        footerActionText: "text-muted-foreground",
+        footerActionLink: "text-primary hover:text-primary/80",
+        navbar: "bg-background text-foreground border-b border-border",
+        profileSectionPrimaryButton:
+          "bg-primary text-primary-foreground hover:bg-[hsl(var(--primary-hover))]",
+        profileSectionSecondaryButton:
+          "bg-secondary text-secondary-foreground hover:bg-[hsl(var(--secondary-hover))] border border-border",
+        socialButtonsBlockButton:
+          "border border-border bg-secondary text-secondary-foreground hover:bg-[hsl(var(--secondary-hover))]",
+      },
+    }),
+    [dark],
+  );
+
   return IS_CLERK_AUTH ? (
-    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
+    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} appearance={clerkAppearance}>
       {children}
     </ClerkProvider>
   ) : (

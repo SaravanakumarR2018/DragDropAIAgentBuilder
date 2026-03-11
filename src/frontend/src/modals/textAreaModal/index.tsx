@@ -20,6 +20,7 @@ export default function ComponentTextModal({
   password,
   changeVisibility,
   onCloseModal,
+  footerSlot,
 }: textModalPropsType): JSX.Element {
   const [modalOpen, setModalOpen] = useState(false);
   const [inputValue, setInputValue] = useState(value);
@@ -94,7 +95,8 @@ export default function ComponentTextModal({
         </div>
       </BaseModal.Content>
       <BaseModal.Footer>
-        <div className="flex w-full shrink-0 items-end justify-end">
+        <div className="flex w-full shrink-0 items-center justify-between gap-3">
+          <div>{footerSlot}</div>
           <Button
             data-testid="genericModalBtnSave"
             id="genericModalBtnSave"

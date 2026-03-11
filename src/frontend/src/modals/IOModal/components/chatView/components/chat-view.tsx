@@ -13,6 +13,7 @@ import { useMessagesStore } from "@/stores/messagesStore";
 import { useUtilityStore } from "@/stores/utilityStore";
 import { useVoiceStore } from "@/stores/voiceStore";
 import { cn } from "@/utils/utils";
+import VisualaiLogo from "@/assets/visualailogo.png"
 import useTabVisibility from "../../../../../shared/hooks/use-tab-visibility";
 import useFlowStore from "../../../../../stores/flowStore";
 import type { ChatMessageType } from "../../../../../types/chat";
@@ -194,10 +195,7 @@ export default function ChatView({
             ) : (
               <div className="flex flex-grow w-full flex-col items-center justify-center">
                 <div className="flex flex-col items-center justify-center gap-4 p-8">
-                  <LangflowLogo
-                    title="Langflow logo"
-                    className="h-10 w-10 scale-[1.5]"
-                  />
+                  <img src={VisualaiLogo} alt="Visual AI Logo" className="h-10 w-10 scale-[1.5]" />
                   <div className="flex flex-col items-center justify-center">
                     <h3 className="mt-2 pb-2 text-2xl font-semibold text-primary">
                       New chat

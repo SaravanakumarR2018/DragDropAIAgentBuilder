@@ -16,6 +16,7 @@ import { useCustomNavigate } from "@/customization/hooks/use-custom-navigate";
 import useTheme from "@/customization/hooks/use-custom-theme";
 import useAlertStore from "@/stores/alertStore";
 import FlowMenu from "./components/FlowMenu";
+import VisualaiLogo from "@/assets/visualailogo.png"
 
 export default function AppHeader(): JSX.Element {
   const notificationCenter = useAlertStore((state) => state.notificationCenter);
@@ -62,11 +63,11 @@ export default function AppHeader(): JSX.Element {
       >
         <Button
           unstyled
-          onClick={() => navigate("flows")}
+          onClick={() => navigate("/flows")}
           className="mr-1 flex h-8 w-8 items-center shrink-0"
           data-testid="icon-ChevronLeft"
         >
-          <LangflowLogo className="h-5 w-5" />
+          <img src={VisualaiLogo} alt="Visual AI Logo" className="h-5 w-5" />
         </Button>
         {/* Display organization name when Clerk auth is enabled */}
         <OrganizationDisplay />
@@ -85,9 +86,6 @@ export default function AppHeader(): JSX.Element {
       >
         {false && <ModelProviderCount />}
         {LANGFLOW_AGENTIC_EXPERIENCE && <AssistantButton type="header" />}
-        <div className="hidden pr-2 whitespace-nowrap lg:inline-flex lg:items-center">
-          <CustomLangflowCounts />
-        </div>
         <AlertDropdown
           notificationRef={notificationContentRef}
           onClose={() => setActiveState(null)}

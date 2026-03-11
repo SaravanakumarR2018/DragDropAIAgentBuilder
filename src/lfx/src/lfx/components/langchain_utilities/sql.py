@@ -1,3 +1,5 @@
+from urllib.parse import quote, urlparse, urlunparse
+
 from langchain.agents import AgentExecutor
 from langchain_community.agent_toolkits import SQLDatabaseToolkit
 from langchain_community.agent_toolkits.sql.base import create_sql_agent
@@ -48,6 +50,16 @@ class SQLAgentComponent(LCAgentComponent):
             required=False,
         ),
         MessageTextInput(name="database_uri", display_name="Database URI", required=True),
+        StrInput(
+            name="username",
+            display_name="Username",
+            required=False,
+        ),
+        SecretStrInput(
+            name="password",
+            display_name="Password",
+            required=False,
+        ),
         HandleInput(
             name="extra_tools",
             display_name="Extra Tools",
@@ -71,6 +83,55 @@ class SQLAgentComponent(LCAgentComponent):
             watsonx_url=getattr(self, "base_url_ibm_watsonx", None),
             watsonx_project_id=getattr(self, "project_id", None),
         )
+
+    def _build_database_uri(self) -> str:
+        """
+        Credential precedence:
+        1. Explicit username/password inputs
+        2. Credentials embedded in database_uri
+        3. No credentials
+
+        NOTE:
+        - IPv4 must NOT use square brackets
+        - IPv6 MUST already be bracketed
+        - Unbracketed IPv6 will FAIL (intentional)
+        """
+
+        parsed = urlparse(self.database_uri)
+
+        # Non-host URIs (e.g., sqlite:///)
+        if not parsed.hostname:
+            return self.database_uri
+
+        # Credentials from URI
+        uri_username = parsed.username
+        uri_password = parsed.password
+
+        # Decide final credentials
+        if self.username and self.password:
+            final_username = self.username
+            final_password = self.password
+        elif uri_username and uri_password:
+            final_username = uri_username
+            final_password = uri_password
+        else:
+            final_username = None
+            final_password = None
+
+        hostname = parsed.hostname  # brackets already stripped by urlparse
+
+        # Rebuild netloc
+        if final_username and final_password:
+            user = quote(final_username, safe="")
+            pwd = quote(final_password, safe="")
+            netloc = f"{user}:{pwd}@{hostname}"
+        else:
+            netloc = hostname
+
+        if parsed.port:
+            netloc += f":{parsed.port}"
+
+        return urlunparse(parsed._replace(netloc=netloc))
 
     def update_build_config(self, build_config: dict, field_value: str, field_name: str | None = None) -> dict:
         """Dynamically update build config with user-filtered model options (tool-calling capable models)."""
@@ -104,7 +165,8 @@ class SQLAgentComponent(LCAgentComponent):
 
     def build_agent(self) -> AgentExecutor:
         llm = self._get_llm()
-        db = SQLDatabase.from_uri(self.database_uri)
+        database_uri = self._build_database_uri()
+        db = SQLDatabase.from_uri(database_uri)
         toolkit = SQLDatabaseToolkit(db=db, llm=llm)
         agent_args = self.get_agent_kwargs()
         agent_args["max_iterations"] = agent_args["agent_executor_kwargs"]["max_iterations"]

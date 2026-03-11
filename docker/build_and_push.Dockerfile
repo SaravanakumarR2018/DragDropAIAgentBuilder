@@ -68,6 +68,17 @@ RUN --mount=type=cache,target=/root/.npm \
     && cp -r build /app/src/backend/langflow/frontend \
     && rm -rf /tmp/src/frontend
 
+# Build the marketing landing page served from nginx
+COPY src/new-landingpage /tmp/src/new-landingpage
+WORKDIR /tmp/src/new-landingpage
+
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci \
+    && npm run build \
+    && mkdir -p /app/new-landingpage \
+    && cp -r dist /app/new-landingpage/dist \
+    && rm -rf /tmp/src/new-landingpage
+
 WORKDIR /app
 
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -83,7 +94,7 @@ FROM python:3.12.12-slim-trixie AS runtime
 
 RUN apt-get update \
     && apt-get upgrade -y \
-    && apt-get install --no-install-recommends -y curl git libpq5 gnupg xz-utils \
+    && apt-get install --no-install-recommends -y curl git libpq5 gnupg xz-utils nginx gettext-base supervisor \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 RUN ARCH=$(dpkg --print-architecture) \
@@ -100,6 +111,11 @@ RUN ARCH=$(dpkg --print-architecture) \
 RUN useradd user -u 1000 -g 0 --no-create-home --home-dir /app/data
 
 COPY --from=builder --chown=1000 /app/.venv /app/.venv
+COPY --from=builder --chown=1000 /app/new-landingpage /app/new-landingpage
+COPY docker/nginx/nginx.conf /etc/nginx/nginx.conf.template
+COPY docker/supervisord.conf /etc/supervisor/supervisord.conf
+COPY docker/entrypoint.sh /usr/local/bin/langflow-entrypoint.sh
+RUN chmod +x /usr/local/bin/langflow-entrypoint.sh
 ENV PATH="/app/.venv/bin:$PATH"
 RUN /app/.venv/bin/pip install --upgrade playwright \
     && /app/.venv/bin/playwright install
@@ -110,11 +126,12 @@ LABEL org.opencontainers.image.licenses=MIT
 LABEL org.opencontainers.image.url=https://github.com/langflow-ai/langflow
 LABEL org.opencontainers.image.source=https://github.com/langflow-ai/langflow
 
-USER user
 WORKDIR /app
 
 ENV LANGFLOW_HOST=0.0.0.0
-ENV LANGFLOW_PORT=7860
+ENV LANGFLOW_PORT=7861
+ENV LANGFLOW_BACKEND_PORT=7861
+ENV NGINX_PORT=7860
 
-CMD ["langflow", "run"]
+CMD ["/usr/local/bin/langflow-entrypoint.sh"]
 
