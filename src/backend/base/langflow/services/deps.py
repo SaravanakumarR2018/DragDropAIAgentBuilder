@@ -178,7 +178,7 @@ async def session_scope(*, use_organisation: bool = True) -> AsyncGenerator[Asyn
     """
     db_service = get_db_service(use_organisation=use_organisation)
 
-    async with db_service._with_session() as session:
+    async with db_service._with_session() as session: # noqa: SLF001
         try:
             yield session
         except Exception:

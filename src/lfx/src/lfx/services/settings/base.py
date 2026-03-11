@@ -430,7 +430,7 @@ class Settings(BaseSettings):
         ):
             msg = "PADDLE_API_KEY and PADDLE_CLIENT_KEY must both be set to enable Paddle integrations."
             raise ValueError(msg)
-        return self   
+        return self
 
     @field_validator("use_noop_database", mode="before")
     @classmethod

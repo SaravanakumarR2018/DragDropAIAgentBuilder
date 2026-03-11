@@ -681,9 +681,6 @@ def superuser(
     """
     configure(log_level=log_level)
 
-    # Ensure CLI uses global DB instead of organization DB
-    db_service = get_db_service(use_organisation=False)
-
     asyncio.run(_create_superuser(username, password, auth_token))
 
 

@@ -1502,7 +1502,7 @@ async def init_mcp_servers():
         await init_mcp_servers_for_all_orgs()
     except Exception as e:
         msg = f"Failed to initialize organisation MCP servers: {e}"
-        logger.aexception(msg)    
+        logger.aexception(msg)
 
 
 async def verify_project_access(project_id: UUID, current_user: CurrentActiveMCPUser) -> Folder:
