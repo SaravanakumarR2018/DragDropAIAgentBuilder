@@ -8,8 +8,8 @@ from cryptography.fernet import InvalidToken
 from sqlmodel import select, update
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from langflow.services.auth.api_key_codec import apply_api_key_context, generate_api_key_for_user
 from langflow.services.auth import utils as auth_utils
+from langflow.services.auth.api_key_codec import apply_api_key_context, generate_api_key_for_user
 from langflow.services.database.models.api_key.model import ApiKey, ApiKeyCreate, ApiKeyRead, UnmaskedApiKeyRead
 from langflow.services.database.models.user.model import User
 from langflow.services.deps import get_settings_service

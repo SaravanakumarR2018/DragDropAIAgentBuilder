@@ -26,7 +26,6 @@ from pydantic import PydanticDeprecatedSince20
 from pydantic_core import PydanticSerializationError
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
-from langflow.services.auth.clerk_utils import clerk_token_middleware
 from langflow.api import health_check_router, log_router
 from langflow.api.router import router
 from langflow.api.v1.mcp_projects import init_mcp_servers
@@ -40,6 +39,7 @@ from langflow.initial_setup.setup import (
 )
 from langflow.middleware import ContentSizeLimitMiddleware
 from langflow.plugin_routes import load_plugin_routes
+from langflow.services.auth.clerk_utils import clerk_token_middleware
 from langflow.services.deps import (
     get_queue_service,
     get_service,
@@ -495,7 +495,7 @@ def create_app():
 
         return await call_next(request)
 
-    app.middleware("http")(clerk_token_middleware)    
+    app.middleware("http")(clerk_token_middleware)
 
     if prome_port_str := os.environ.get("LANGFLOW_PROMETHEUS_PORT"):
         # set here for create_app() entry point

@@ -15,8 +15,9 @@ from jwt import InvalidTokenError
 from lfx.log.logger import logger
 from lfx.services.auth.base import BaseAuthService
 from sqlalchemy.exc import IntegrityError
-from langflow.services.auth.clerk_utils import get_user_from_clerk_payload
+
 from langflow.helpers.user import get_user_by_flow_id_or_endpoint_name
+from langflow.services.auth.clerk_utils import get_user_from_clerk_payload
 from langflow.services.auth.constants import AUTO_LOGIN_ERROR, AUTO_LOGIN_WARNING
 from langflow.services.auth.exceptions import (
     InactiveUserError,

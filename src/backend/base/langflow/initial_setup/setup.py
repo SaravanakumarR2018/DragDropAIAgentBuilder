@@ -1206,7 +1206,7 @@ async def initialize_auto_login_default_superuser() -> None:
         msg = "SUPERUSER and SUPERUSER_PASSWORD must be set in the settings if AUTO_LOGIN is true."
         raise ValueError(msg)
 
-    async with session_scope(use_organisation=false) as async_session:
+    async with session_scope(use_organisation=False) as async_session:
         super_user = await get_auth_service().create_super_user(username, password, db=async_session)
         await get_variable_service().initialize_user_variables(super_user.id, async_session)
         # Initialize agentic variables if agentic experience is enabled

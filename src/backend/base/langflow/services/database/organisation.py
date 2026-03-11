@@ -17,8 +17,8 @@ from langflow.logging.logger import logger
 from langflow.services.auth.clerk_utils import auth_header_ctx
 from langflow.services.auth.utils import get_password_hash
 from langflow.services.database.constants import DUMMY_USER_NAMESPACE_TEMPLATE
-from langflow.services.database.service import DatabaseService
 from langflow.services.database.models.user.model import User, UserOptin
+from langflow.services.database.service import DatabaseService
 from langflow.services.deps import get_settings_service
 from langflow.services.settings.service import SettingsService
 from langflow.services.utils import setup_superuser
@@ -203,7 +203,7 @@ class OrganizationService:
             db_path = Path(new_url.split("///", 1)[1])
             db_path.parent.mkdir(parents=True, exist_ok=True)
 
-            if not db_path.exists():
+            if not await anyio.Path(db_path).exists():
                 logger.info(f"[OrgInit] Creating database for org_id={org_id}")
                 async_engine = create_async_engine(new_url, connect_args={"check_same_thread": False})
                 async with async_engine.begin() as conn:
@@ -230,7 +230,7 @@ class OrganizationService:
 
             # Setup superuser
             logger.info(f"[OrgInit] Setting up superuser for org_id={org_id}")
-            async with new_db_service._with_session() as session:
+            async with new_db_service._with_session() as session: # noqa: SLF001
                 await setup_superuser(new_settings_service, session)
                 await self._ensure_dummy_user(session, org_id)
 
@@ -252,7 +252,7 @@ class OrganizationService:
         """Attempt to clean up any artefacts from a failed organisation setup."""
         cls._db_service_cache.pop(org_id, None)
         try:
-            async with db_service._with_session() as session, session.bind.connect() as conn:
+            async with db_service._with_session() as session, session.bind.connect() as conn: # noqa: SLF001
                 await conn.run_sync(SQLModel.metadata.drop_all)
         except Exception:  # noqa: BLE001
             logger.exception("Error dropping organisation tables during cleanup")
@@ -281,7 +281,6 @@ class OrganizationService:
 
     async def _ensure_dummy_user(self, session, org_id: str) -> None:
         """Create a deterministic dummy user row for the organisation if missing."""
-
         dummy_user_id = self._build_dummy_user_id(org_id)
         existing_user = await session.get(User, dummy_user_id)
         if existing_user:
@@ -311,7 +310,7 @@ class OrganizationService:
     async def _organisation_db_exists(db_service: DatabaseService) -> bool:
         """Return True if the organisation database already has required tables."""
         try:
-            async with db_service._with_session() as session, session.bind.connect() as conn:
+            async with db_service._with_session() as session, session.bind.connect() as conn: # noqa: SLF001
 
                 def check_tables(sync_conn):
                     inspector = sa.inspect(sync_conn)
@@ -342,7 +341,7 @@ class OrganizationService:
             db_path = base_url.split("///", 1)[1]
             base_dir = Path(db_path).parent
             base_name = Path(db_path).stem
-            return [p.stem for p in base_dir.glob("*.db") if p.stem not in {base_name}]
+            return [p.stem for p in base_dir.glob("*.db") if p.stem != base_name]
 
         url_obj = sa.engine.make_url(base_url)
         driver = "postgresql+psycopg" if url_obj.drivername.startswith("postgres") else url_obj.drivername

@@ -101,7 +101,7 @@ async def patch_user(
         sensitive_updates = set(user_update.optins.keys()) & SENSITIVE_OPTIN_KEYS
         if sensitive_updates:
             raise HTTPException(status_code=403, detail="Permission denied")
-                
+
     if update_password:
         if not user.is_superuser:
             raise HTTPException(status_code=400, detail="You can't change your password here")
