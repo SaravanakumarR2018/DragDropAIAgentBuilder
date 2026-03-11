@@ -85,7 +85,8 @@ class SQLAgentComponent(LCAgentComponent):
         )
 
     def _build_database_uri(self) -> str:
-        """Credential precedence:
+        """Credential precedence.
+
         1. Explicit username/password inputs
         2. Credentials embedded in database_uri
         3. No credentials
