@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import json
-import time
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
+import importlib.resources
 
 from lfx.log.logger import logger
 from paddle_billing import Client  #noqa: TCH002
@@ -35,11 +35,13 @@ class PlanDefinition:
 
 
 @lru_cache(maxsize=1)
-def _load_plan_config() -> dict[str, Any]:
-    config_path = Path(__file__).resolve().parents[5] / "frontend" / "src" / "common" / "plan_config.json"
-    with config_path.open(encoding="utf-8") as config_file:
-        return json.load(config_file)
+def _load_plan_config() -> dict:
+    config_path = Path(__file__).parents[2] / "frontend" / "plan_config.json"
 
+    logger.info(f"Loading Paddle plan config from: {config_path}")
+
+    with config_path.open("r", encoding="utf-8") as f:
+        return json.load(f)
 
 def _get_paddle_plans() -> tuple[PlanDefinition, ...]:
     plans = []

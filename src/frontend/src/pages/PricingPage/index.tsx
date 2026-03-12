@@ -4,7 +4,7 @@ import type { SVGProps } from "react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getURL } from "../../controllers/API/helpers/constants";
-import planConfigData from "../../common/plan_config.json";
+import planConfigData from "../../../public/plan_config.json";
 
 const MIN_SEATS = 1;
 const PADDLE_PRICE_CACHE_KEY = "pricing_page_paddle_prices";
