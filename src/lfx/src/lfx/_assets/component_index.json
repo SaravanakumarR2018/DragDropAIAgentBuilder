@@ -83047,6 +83047,8 @@
             "base_url_ibm_watsonx",
             "project_id",
             "database_uri",
+            "username",
+            "password",
             "extra_tools"
           ],
           "frozen": false,
@@ -83205,7 +83207,7 @@
               "show": true,
               "title_case": false,
               "type": "code",
-              "value": "from langchain.agents import AgentExecutor\nfrom langchain_community.agent_toolkits import SQLDatabaseToolkit\nfrom langchain_community.agent_toolkits.sql.base import create_sql_agent\nfrom langchain_community.utilities import SQLDatabase\n\nfrom lfx.base.agents.agent import LCAgentComponent\nfrom lfx.base.models.unified_models import get_language_model_options, get_llm, update_model_options_in_build_config\nfrom lfx.base.models.watsonx_constants import IBM_WATSONX_URLS\nfrom lfx.inputs.inputs import DropdownInput, HandleInput, MessageTextInput, ModelInput\nfrom lfx.io import Output, SecretStrInput, StrInput\n\n\nclass SQLAgentComponent(LCAgentComponent):\n    display_name = \"SQLAgent\"\n    description = \"Construct an SQL agent from an LLM and tools.\"\n    name = \"SQLAgent\"\n    icon = \"LangChain\"\n    inputs = [\n        *LCAgentComponent.get_base_inputs(),\n        ModelInput(\n            name=\"model\",\n            display_name=\"Language Model\",\n            info=\"Select your model provider or connect a Language Model component.\",\n            real_time_refresh=True,\n            required=True,\n        ),\n        SecretStrInput(\n            name=\"api_key\",\n            display_name=\"API Key\",\n            info=\"Model Provider API key\",\n            real_time_refresh=True,\n            advanced=True,\n        ),\n        DropdownInput(\n            name=\"base_url_ibm_watsonx\",\n            display_name=\"watsonx API Endpoint\",\n            info=\"The base URL of the API (IBM watsonx.ai only)\",\n            options=IBM_WATSONX_URLS,\n            value=IBM_WATSONX_URLS[0],\n            show=False,\n            real_time_refresh=True,\n        ),\n        StrInput(\n            name=\"project_id\",\n            display_name=\"watsonx Project ID\",\n            info=\"The project ID associated with the foundation model (IBM watsonx.ai only)\",\n            show=False,\n            required=False,\n        ),\n        MessageTextInput(name=\"database_uri\", display_name=\"Database URI\", required=True),\n        HandleInput(\n            name=\"extra_tools\",\n            display_name=\"Extra Tools\",\n            input_types=[\"Tool\"],\n            is_list=True,\n            advanced=True,\n        ),\n    ]\n\n    outputs = [\n        Output(display_name=\"Response\", name=\"response\", method=\"message_response\"),\n        Output(display_name=\"Agent\", name=\"agent\", method=\"build_agent\", tool_mode=False),\n    ]\n\n    def _get_llm(self):\n        \"\"\"Resolve the language model from dropdown selection or connected component.\"\"\"\n        return get_llm(\n            model=self.model,\n            user_id=self.user_id,\n            api_key=getattr(self, \"api_key\", None),\n            watsonx_url=getattr(self, \"base_url_ibm_watsonx\", None),\n            watsonx_project_id=getattr(self, \"project_id\", None),\n        )\n\n    def update_build_config(self, build_config: dict, field_value: str, field_name: str | None = None) -> dict:\n        \"\"\"Dynamically update build config with user-filtered model options (tool-calling capable models).\"\"\"\n\n        def get_tool_calling_model_options(user_id=None):\n            return get_language_model_options(user_id=user_id, tool_calling=True)\n\n        build_config = update_model_options_in_build_config(\n            component=self,\n            build_config=dict(build_config),\n            cache_key_prefix=\"language_model_options_tool_calling\",\n            get_options_func=get_tool_calling_model_options,\n            field_name=field_name,\n            field_value=field_value,\n        )\n\n        # Show/hide watsonx fields based on selected model\n        current_model_value = field_value if field_name == \"model\" else build_config.get(\"model\", {}).get(\"value\")\n        if isinstance(current_model_value, list) and len(current_model_value) > 0:\n            selected_model = current_model_value[0]\n            provider = selected_model.get(\"provider\", \"\")\n            is_watsonx = provider == \"IBM WatsonX\"\n            if \"base_url_ibm_watsonx\" in build_config:\n                build_config[\"base_url_ibm_watsonx\"][\"show\"] = is_watsonx\n                build_config[\"base_url_ibm_watsonx\"][\"required\"] = is_watsonx\n            if \"project_id\" in build_config:\n                build_config[\"project_id\"][\"show\"] = is_watsonx\n                build_config[\"project_id\"][\"required\"] = is_watsonx\n\n        return build_config\n\n    def build_agent(self) -> AgentExecutor:\n        llm = self._get_llm()\n        db = SQLDatabase.from_uri(self.database_uri)\n        toolkit = SQLDatabaseToolkit(db=db, llm=llm)\n        agent_args = self.get_agent_kwargs()\n        agent_args[\"max_iterations\"] = agent_args[\"agent_executor_kwargs\"][\"max_iterations\"]\n        del agent_args[\"agent_executor_kwargs\"][\"max_iterations\"]\n        return create_sql_agent(llm=llm, toolkit=toolkit, extra_tools=self.extra_tools or [], **agent_args)\n"
+              "value": "from urllib.parse import quote, urlparse, urlunparse\n\nfrom langchain.agents import AgentExecutor\nfrom langchain_community.agent_toolkits import SQLDatabaseToolkit\nfrom langchain_community.agent_toolkits.sql.base import create_sql_agent\nfrom langchain_community.utilities import SQLDatabase\n\nfrom lfx.base.agents.agent import LCAgentComponent\nfrom lfx.base.models.unified_models import get_language_model_options, get_llm, update_model_options_in_build_config\nfrom lfx.base.models.watsonx_constants import IBM_WATSONX_URLS\nfrom lfx.inputs.inputs import DropdownInput, HandleInput, MessageTextInput, ModelInput\nfrom lfx.io import Output, SecretStrInput, StrInput\n\n\nclass SQLAgentComponent(LCAgentComponent):\n    display_name = \"SQLAgent\"\n    description = \"Construct an SQL agent from an LLM and tools.\"\n    name = \"SQLAgent\"\n    icon = \"LangChain\"\n    inputs = [\n        *LCAgentComponent.get_base_inputs(),\n        ModelInput(\n            name=\"model\",\n            display_name=\"Language Model\",\n            info=\"Select your model provider or connect a Language Model component.\",\n            real_time_refresh=True,\n            required=True,\n        ),\n        SecretStrInput(\n            name=\"api_key\",\n            display_name=\"API Key\",\n            info=\"Model Provider API key\",\n            real_time_refresh=True,\n            advanced=True,\n        ),\n        DropdownInput(\n            name=\"base_url_ibm_watsonx\",\n            display_name=\"watsonx API Endpoint\",\n            info=\"The base URL of the API (IBM watsonx.ai only)\",\n            options=IBM_WATSONX_URLS,\n            value=IBM_WATSONX_URLS[0],\n            show=False,\n            real_time_refresh=True,\n        ),\n        StrInput(\n            name=\"project_id\",\n            display_name=\"watsonx Project ID\",\n            info=\"The project ID associated with the foundation model (IBM watsonx.ai only)\",\n            show=False,\n            required=False,\n        ),\n        MessageTextInput(name=\"database_uri\", display_name=\"Database URI\", required=True),\n        StrInput(\n            name=\"username\",\n            display_name=\"Username\",\n            required=False,\n        ),\n        SecretStrInput(\n            name=\"password\",\n            display_name=\"Password\",\n            required=False,\n        ),\n        HandleInput(\n            name=\"extra_tools\",\n            display_name=\"Extra Tools\",\n            input_types=[\"Tool\"],\n            is_list=True,\n            advanced=True,\n        ),\n    ]\n\n    outputs = [\n        Output(display_name=\"Response\", name=\"response\", method=\"message_response\"),\n        Output(display_name=\"Agent\", name=\"agent\", method=\"build_agent\", tool_mode=False),\n    ]\n\n    def _get_llm(self):\n        \"\"\"Resolve the language model from dropdown selection or connected component.\"\"\"\n        return get_llm(\n            model=self.model,\n            user_id=self.user_id,\n            api_key=getattr(self, \"api_key\", None),\n            watsonx_url=getattr(self, \"base_url_ibm_watsonx\", None),\n            watsonx_project_id=getattr(self, \"project_id\", None),\n        )\n\n    def _build_database_uri(self) -> str:\n        \"\"\"Credential precedence.\n\n        1. Explicit username/password inputs\n        2. Credentials embedded in database_uri\n        3. No credentials\n\n        Note:\n        - IPv4 must NOT use square brackets\n        - IPv6 MUST already be bracketed\n        - Unbracketed IPv6 will FAIL (intentional)\n        \"\"\"\n        parsed = urlparse(self.database_uri)\n\n        # Non-host URIs (e.g., sqlite:///)\n        if not parsed.hostname:\n            return self.database_uri\n\n        # Credentials from URI\n        uri_username = parsed.username\n        uri_password = parsed.password\n\n        # Decide final credentials\n        if self.username and self.password:\n            final_username = self.username\n            final_password = self.password\n        elif uri_username and uri_password:\n            final_username = uri_username\n            final_password = uri_password\n        else:\n            final_username = None\n            final_password = None\n\n        hostname = parsed.hostname  # brackets already stripped by urlparse\n\n        # Rebuild netloc\n        if final_username and final_password:\n            user = quote(final_username, safe=\"\")\n            pwd = quote(final_password, safe=\"\")\n            netloc = f\"{user}:{pwd}@{hostname}\"\n        else:\n            netloc = hostname\n\n        if parsed.port:\n            netloc += f\":{parsed.port}\"\n\n        return urlunparse(parsed._replace(netloc=netloc))\n\n    def update_build_config(self, build_config: dict, field_value: str, field_name: str | None = None) -> dict:\n        \"\"\"Dynamically update build config with user-filtered model options (tool-calling capable models).\"\"\"\n\n        def get_tool_calling_model_options(user_id=None):\n            return get_language_model_options(user_id=user_id, tool_calling=True)\n\n        build_config = update_model_options_in_build_config(\n            component=self,\n            build_config=dict(build_config),\n            cache_key_prefix=\"language_model_options_tool_calling\",\n            get_options_func=get_tool_calling_model_options,\n            field_name=field_name,\n            field_value=field_value,\n        )\n\n        # Show/hide watsonx fields based on selected model\n        current_model_value = field_value if field_name == \"model\" else build_config.get(\"model\", {}).get(\"value\")\n        if isinstance(current_model_value, list) and len(current_model_value) > 0:\n            selected_model = current_model_value[0]\n            provider = selected_model.get(\"provider\", \"\")\n            is_watsonx = provider == \"IBM WatsonX\"\n            if \"base_url_ibm_watsonx\" in build_config:\n                build_config[\"base_url_ibm_watsonx\"][\"show\"] = is_watsonx\n                build_config[\"base_url_ibm_watsonx\"][\"required\"] = is_watsonx\n            if \"project_id\" in build_config:\n                build_config[\"project_id\"][\"show\"] = is_watsonx\n                build_config[\"project_id\"][\"required\"] = is_watsonx\n\n        return build_config\n\n    def build_agent(self) -> AgentExecutor:\n        llm = self._get_llm()\n        database_uri = self._build_database_uri()\n        db = SQLDatabase.from_uri(database_uri)\n        toolkit = SQLDatabaseToolkit(db=db, llm=llm)\n        agent_args = self.get_agent_kwargs()\n        agent_args[\"max_iterations\"] = agent_args[\"agent_executor_kwargs\"][\"max_iterations\"]\n        del agent_args[\"agent_executor_kwargs\"][\"max_iterations\"]\n        return create_sql_agent(llm=llm, toolkit=toolkit, extra_tools=self.extra_tools or [], **agent_args)\n"
             },
             "database_uri": {
               "_input_type": "MessageTextInput",
@@ -83356,6 +83358,25 @@
               "type": "model",
               "value": ""
             },
+            "password": {
+              "_input_type": "SecretStrInput",
+              "advanced": false,
+              "display_name": "Password",
+              "dynamic": false,
+              "info": "",
+              "input_types": [],
+              "load_from_db": true,
+              "name": "password",
+              "override_skip": false,
+              "password": true,
+              "placeholder": "",
+              "required": false,
+              "show": true,
+              "title_case": false,
+              "track_in_telemetry": false,
+              "type": "str",
+              "value": ""
+            },
             "project_id": {
               "_input_type": "StrInput",
               "advanced": false,
@@ -83370,6 +83391,27 @@
               "placeholder": "",
               "required": false,
               "show": false,
+              "title_case": false,
+              "tool_mode": false,
+              "trace_as_metadata": true,
+              "track_in_telemetry": false,
+              "type": "str",
+              "value": ""
+            },
+            "username": {
+              "_input_type": "StrInput",
+              "advanced": false,
+              "display_name": "Username",
+              "dynamic": false,
+              "info": "",
+              "list": false,
+              "list_add_label": "Add More",
+              "load_from_db": false,
+              "name": "username",
+              "override_skip": false,
+              "placeholder": "",
+              "required": false,
+              "show": true,
               "title_case": false,
               "tool_mode": false,
               "trace_as_metadata": true,
