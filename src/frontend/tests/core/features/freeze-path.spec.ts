@@ -37,6 +37,9 @@ test(
 
     // Use unique prompts to avoid OpenAI caching returning identical responses
     const timestamp = Date.now();
+
+    await page.getByText("Chat Input", { exact: true }).click();
+
     await page
       .getByTestId("textarea_str_input_value")
       .first()
@@ -66,6 +69,8 @@ test(
 
     await page.getByText("Close").last().click();
 
+    await page.getByText("Chat Input", { exact: true }).click();
+
     // Change the prompt to ensure different output (avoid OpenAI caching)
     await page
       .getByTestId("textarea_str_input_value")
@@ -93,11 +98,14 @@ test(
 
     await page.getByText("Close").last().click();
 
-    await page.waitForSelector("text=OpenAI", {
-      timeout: 3000,
-    });
+    const languageModelNode = page
+      .locator(".react-flow__node", {
+        has: page.getByText("Language Model", { exact: true }),
+      })
+      .last();
 
-    await page.getByText("Language Model", { exact: true }).last().click();
+    await languageModelNode.waitFor({ timeout: 3000 });
+    await languageModelNode.click();
 
     await page.waitForSelector('[data-testid="more-options-modal"]', {
       timeout: 3000,

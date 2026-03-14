@@ -6,9 +6,9 @@ import ComponentTextModal from "@/modals/textAreaModal";
 import { useUtilityStore } from "@/stores/utilityStore";
 import { cn } from "../../../../../utils/utils";
 import IconComponent from "../../../../common/genericIconComponent";
+import WebhookCurlApiKeyButton from "../customewebhookFieldComponent/components/webhook-curl-api-key-button";
+import {ensureCurlHasApiKeyHeader,getApiKeyFromCurl,WEBHOOK_API_KEY_PLACEHOLDER,} from "../customewebhookFieldComponent/utils/webhook-curl-utils‎";
 import { Input } from "../../../../ui/input";
-import WebhookCurlApiKeyButton from "../webhookFieldComponent/components/webhook-curl-api-key-button";
-import {ensureCurlHasApiKeyHeader,getApiKeyFromCurl,WEBHOOK_API_KEY_PLACEHOLDER,} from "../webhookFieldComponent/utils/webhook-curl-utils";
 import { getPlaceholder } from "../../helpers/get-placeholder-disabled";
 import type { InputProps, TextAreaComponentType } from "../../types";
 import { getIconName } from "../inputComponent/components/helpers/get-icon-name";
@@ -73,7 +73,8 @@ export default function TextAreaComponent({
   placeholder,
   isToolMode = false,
   nodeInformationMetadata,
-}: InputProps<string, TextAreaComponentType>): JSX.Element {
+  showParameter = true,
+}: InputProps<string, TextAreaComponentType>): JSX.Element | null {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isFocused, setIsFocused] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -193,6 +194,10 @@ export default function TextAreaComponent({
       />
     </div>
   );
+
+  if (!showParameter) {
+    return null;
+  }
 
   return (
     <div className={cn("w-full", disabled && "pointer-events-none")}>

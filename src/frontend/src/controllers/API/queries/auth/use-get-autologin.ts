@@ -53,8 +53,8 @@ export const useGetAutoLogin: useQueryFunctionType<undefined, undefined> = (
       if (error.name !== "CanceledError") {
         setAutoLogin(false);
         const status = error.response?.status;
-         if (status === 400 && IS_CLERK_AUTH) {
-          console.debug("[AutoLogin] Clerk login - skipping logout on 400");
+         if (status === 403 && IS_CLERK_AUTH) {
+          console.debug("[AutoLogin] Clerk login - skipping logout on 403");
         } else if (!isLoginPage) {
           await handleAutoLoginError();
         }

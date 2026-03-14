@@ -240,7 +240,7 @@ describe("useTypesStore", () => {
 
       expect(result.current.types).toEqual(mockTypes);
       expect(result.current.templates).toEqual(mockTemplates);
-      expect(result.current.templatesByModule).toEqual({
+       expect(result.current.templatesByModule).toEqual({
         "module.text": mockTemplates.TextInput,
       });
       expect(result.current.data).toEqual(mockAPIData);

@@ -33,6 +33,9 @@ RUN apt-get update \
     npm \
     # gcc
     gcc \
+    curl \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -48,24 +51,20 @@ COPY ./src/lfx/pyproject.toml /app/src/lfx/pyproject.toml
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     RUSTFLAGS='--cfg reqwest_unstable' \
-    uv sync --frozen --no-install-project --no-editable --extra postgresql
+    uv sync --frozen --no-install-project --no-editable --extra postgresql --no-group dev
 
 COPY ./src /app/src
-
 ARG VITE_AUTO_LOGIN=true
 ENV VITE_AUTO_LOGIN=$VITE_AUTO_LOGIN
-    
 COPY src/frontend /tmp/src/frontend
 WORKDIR /tmp/src/frontend
-
 ARG VITE_CLERK_AUTH_ENABLED=false
 ARG VITE_CLERK_PUBLISHABLE_KEY=""
 ENV VITE_CLERK_AUTH_ENABLED=$VITE_CLERK_AUTH_ENABLED
 ENV VITE_CLERK_PUBLISHABLE_KEY=$VITE_CLERK_PUBLISHABLE_KEY
-
 RUN --mount=type=cache,target=/root/.npm \
     npm ci \
-    && ESBUILD_BINARY_PATH="" NODE_OPTIONS="--max-old-space-size=12288" JOBS=1 npm run build \
+    && ESBUILD_BINARY_PATH="" NODE_OPTIONS="--max-old-space-size=4096" JOBS=1 npm run build \
     && cp -r build /app/src/backend/langflow/frontend \
     && rm -rf /tmp/src/frontend
 
@@ -84,22 +83,32 @@ WORKDIR /app
 
 RUN --mount=type=cache,target=/root/.cache/uv \
     RUSTFLAGS='--cfg reqwest_unstable' \
-    uv sync --frozen --no-editable --extra postgresql
+    uv sync --frozen --no-editable --extra postgresql --no-group dev
 
 ################################
 # RUNTIME
 # Setup user, utilities and copy the virtual environment only
 ################################
-FROM python:3.12.3-slim AS runtime
+FROM python:3.12.12-slim-trixie AS runtime
+
 
 RUN apt-get update \
     && apt-get upgrade -y \
-    && apt-get install -y curl git libpq5 gnupg nginx gettext-base supervisor \
-    && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
-    && apt-get install -y nodejs \
+    && apt-get install --no-install-recommends -y curl git libpq5 gnupg xz-utils nginx gettext-base supervisor \
     && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* \
-    && useradd user -u 1000 -g 0 --no-create-home --home-dir /app/data
+    && rm -rf /var/lib/apt/lists/*
+RUN ARCH=$(dpkg --print-architecture) \
+    && if [ "$ARCH" = "amd64" ]; then NODE_ARCH="x64"; \
+       elif [ "$ARCH" = "arm64" ]; then NODE_ARCH="arm64"; \
+       else NODE_ARCH="$ARCH"; fi \
+    && NODE_VERSION=$(curl -fsSL https://nodejs.org/dist/latest-v22.x/ \
+                    | grep -oP "node-v\K[0-9]+\.[0-9]+\.[0-9]+(?=-linux-${NODE_ARCH}\.tar\.xz)" \
+                    | head -1) \
+    && curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${NODE_ARCH}.tar.xz" \
+    | tar -xJ -C /usr/local --strip-components=1 \
+    && npm install -g npm@latest \
+    && npm cache clean --force
+RUN useradd user -u 1000 -g 0 --no-create-home --home-dir /app/data
 
 COPY --from=builder --chown=1000 /app/.venv /app/.venv
 COPY --from=builder --chown=1000 /app/new-landingpage /app/new-landingpage
@@ -107,9 +116,9 @@ COPY docker/nginx/nginx.conf /etc/nginx/nginx.conf.template
 COPY docker/supervisord.conf /etc/supervisor/supervisord.conf
 COPY docker/entrypoint.sh /usr/local/bin/langflow-entrypoint.sh
 RUN chmod +x /usr/local/bin/langflow-entrypoint.sh
-
-# Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"
+RUN /app/.venv/bin/pip install --upgrade playwright \
+    && /app/.venv/bin/playwright install
 
 LABEL org.opencontainers.image.title=langflow
 LABEL org.opencontainers.image.authors=['Langflow']
@@ -125,3 +134,4 @@ ENV LANGFLOW_BACKEND_PORT=7861
 ENV NGINX_PORT=7860
 
 CMD ["/usr/local/bin/langflow-entrypoint.sh"]
+

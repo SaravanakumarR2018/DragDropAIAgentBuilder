@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 async def init_mcp_servers_for_org(org_id: str) -> None:
     """Initialise MCP servers for every project stored in the given organisation."""
     db_service = OrganizationService.get_db_service_for_org(org_id)
-    async with db_service.with_session() as session:
+    async with db_service._with_session() as session: # noqa: SLF001
         projects = (await session.exec(select(Folder))).all()
 
         for project in projects:

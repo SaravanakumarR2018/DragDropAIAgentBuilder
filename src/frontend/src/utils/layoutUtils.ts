@@ -15,14 +15,13 @@ const layoutOptions = {
   "elk.spacing.componentComponent": `${NODE_WIDTH}`,
   "elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
 };
+const elk = new ELK();
 
 // uses elkjs to give each node a layouted position
 export const getLayoutedNodes = async (
   nodes: AllNodeType[],
   edges: EdgeType[],
 ): Promise<AllNodeType[]> => {
-  const { default: ELK } = await import("elkjs/lib/elk.bundled.js");
-  const elk = new ELK();
   const graph = {
     id: "root",
     layoutOptions,
@@ -32,7 +31,7 @@ export const getLayoutedNodes = async (
         .map((e) => ({
           id: e.sourceHandle,
           properties: {
-            side: "EAST"
+            side: "EAST",
           },
         }));
 
@@ -41,10 +40,9 @@ export const getLayoutedNodes = async (
         .map((e) => ({
           id: e.targetHandle,
           properties: {
-            side: "WEST"
+            side: "WEST",
           },
         }));
-
       return {
         id: n.id,
         width: NODE_WIDTH,
@@ -53,6 +51,7 @@ export const getLayoutedNodes = async (
         properties: {
           "org.eclipse.elk.portConstraints": "FIXED_ORDER",
         },
+        // we are also passing the id, so we can also handle edges without a sourceHandle or targetHandle option
         ports: [{ id: n.id }, ...targetPorts, ...sourcePorts],
       };
     }) as ElkNode[],

@@ -1,6 +1,7 @@
 // @ts-check
 // Note: type annotations allow type checking and IDEs autocompletion
 
+const path = require("path");
 const lightCodeTheme = require("prism-react-renderer/themes/github");
 const darkCodeTheme = require("prism-react-renderer/themes/dracula");
 const { remarkCodeHike } = require("@code-hike/mdx");
@@ -153,6 +154,11 @@ const config = {
             spec: "openapi/openapi.json",
             route: "/api",
           },
+          {
+            id: "workflow",
+            spec: "openapi/langflow-workflows-openapi.json",
+            route: "/api/workflow",
+          },
         ],
         theme: {
           primaryColor: "#7528FC",
@@ -161,6 +167,21 @@ const config = {
     ],
   ],
   plugins: [
+    // Alias so MDX can import code from the Langflow repo with !!raw-loader!@langflow/src/...
+    function langflowCodeImportPlugin(context) {
+      return {
+        name: "langflow-code-import",
+        configureWebpack() {
+          return {
+            resolve: {
+              alias: {
+                "@langflow": path.resolve(context.siteDir, ".."),
+              },
+            },
+          };
+        },
+      };
+    },
     ["docusaurus-node-polyfills", { excludeAliases: ["console"] }],
     "docusaurus-plugin-image-zoom",
     ["./src/plugins/segment", { segmentPublicWriteKey: process.env.SEGMENT_PUBLIC_WRITE_KEY, allowedInDev: true }],

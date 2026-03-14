@@ -18,6 +18,9 @@ It supports multiple file types, provides parameters for parallel processing and
 You can add files to the **Read File** component in the visual editor or at runtime, and you can upload multiple files at once.
 For more information about uploading files and working with files in flows, see [File management](/concepts-file-management) and [Create a chatbot that can ingest files](/chat-with-files).
 
+The **Read File** component can read files from the local Langflow database, **AWS S3**, or **Google Drive**.
+For more information, see [Configure file storage](/concepts-file-management#configure-file-storage).
+
 ## File type and size limits
 
 By default, the maximum file size is 1024 MB.
@@ -111,7 +114,7 @@ To use advanced parsing, do the following:
 
 3. Enable **Advanced Parsing**.
 
-4. Click <Icon name="SlidersHorizontal" aria-hidden="true"/> **Controls** in the [component's header menu](/concepts-components#component-menus) to configure advanced parsing parameters, which are hidden by default:
+4. To configure advanced parsing parameters, click the component to open the [component inspection panel](/concepts-components#component-menus).
 
     | Name | Display Name | Info |
     |------|--------------|------|

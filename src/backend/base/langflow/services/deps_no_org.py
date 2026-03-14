@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 async def get_no_org_session() -> AsyncGenerator[AsyncSession, None]:
     """Retrieve a database session without organisation scoping."""
-    async with get_db_service(use_organisation=False).with_session() as session:
+    async with get_db_service(use_organisation=False)._with_session() as session: # noqa: SLF001
         yield session
 
 

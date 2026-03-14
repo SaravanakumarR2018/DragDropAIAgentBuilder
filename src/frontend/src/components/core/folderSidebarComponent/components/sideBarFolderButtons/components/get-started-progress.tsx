@@ -117,7 +117,6 @@ export const GetStartedProgress: FC<{
       </div>
 
       <div className="mt-2 space-y-1">
-        
 
         <Button
           unstyled

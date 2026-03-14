@@ -73,7 +73,7 @@ export function AuthBroadcastListener() {
 
       // 5. Always redirect tabs to the public landing page (/) for a consistent post-logout state
       console.debug("[AuthBroadcast] Redirecting to / (public landing)...");
-      navigate("/", { replace: true });
+      navigate("/", { replace: true })
 
       // Sign out from Clerk in background (best effort, don't block)
       // If this fails, the landing page will detect and clean up stale session
@@ -88,7 +88,8 @@ export function AuthBroadcastListener() {
       return;
     } catch (error) {
       console.error("[AuthBroadcast] Error during cross-tab logout:", error);
-      // Force redirect even if cleanup fails
+      // Force redirect even if cleanup fails (but not for root path)
+       // Force redirect even if cleanup fails
       navigate("/", { replace: true });
     }
   }, [location.pathname, queryClient, logout, navigate, signOut]);

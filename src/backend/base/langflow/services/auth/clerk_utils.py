@@ -1,8 +1,8 @@
 import uuid
-from datetime import datetime, timedelta, timezone
 from contextvars import ContextVar, Token
+from datetime import datetime, timedelta, timezone
 from typing import Any
-from uuid import UUID, NAMESPACE_URL, uuid5
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 import httpx
 from fastapi import HTTPException, Request, status
@@ -262,6 +262,13 @@ async def clerk_token_middleware(request: Request, call_next):
                 response = await call_next(request)
 
         # 3️⃣ No auth header → pass through
+        elif (cookie_token := request.cookies.get("access_token_lf")):
+            try:
+                payload = await verify_clerk_token(cookie_token)
+                ctx_token = auth_header_ctx.set(payload)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"[ClerkMiddleware] Failed to verify Clerk cookie token: {exc}")
+            response = await call_next(request)
         else:
             response = await call_next(request)
 

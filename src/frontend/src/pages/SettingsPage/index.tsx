@@ -56,6 +56,16 @@ const SettingsPageBase = ({
         />
       ),
     },
+    {
+      title: "Model Providers",
+      href: "/settings/model-providers",
+      icon: (
+        <ForwardedIconComponent
+          name="Brain"
+          className="w-4 flex-shrink-0 justify-start stroke-[1.5]"
+        />
+      ),
+    },
 
     {
       title: "Shortcuts",
