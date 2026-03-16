@@ -1,4 +1,4 @@
-import { useUser } from "@clerk/clerk-react";
+import { useAuth, useUser } from "@clerk/clerk-react";
 import axios from "axios";
 import type { SVGProps } from "react";
 import { useEffect, useState } from "react";
@@ -9,6 +9,7 @@ import planConfigData from "../../../public/plan_config.json";
 const MIN_SEATS = 1;
 const PADDLE_PRICE_CACHE_KEY = "pricing_page_paddle_prices";
 const PADDLE_PRICE_CACHE_TTL_MS = 60 * 60 * 1000;
+const BILLING_SUBSCRIPTION_STORAGE_KEY = "paddle_subscription_id";
 
 type PlanKey = "starter" | "pro" | "enterprise";
 
@@ -94,9 +95,15 @@ function CheckIcon(props: SVGProps<SVGSVGElement>) {
 export default function PricingPage() {
   const navigate = useNavigate();
   const { user } = useUser();
+  const { getToken } = useAuth();
   const email = user?.primaryEmailAddress?.emailAddress;
   const [showEnterpriseContactMessage, setShowEnterpriseContactMessage] =
     useState(false);
+  const [showStarterTrialModal, setShowStarterTrialModal] = useState(false);
+  const [trialSeats, setTrialSeats] = useState(MIN_SEATS);
+  const [trialPostalCode, setTrialPostalCode] = useState("");
+  const [trialCountry, setTrialCountry] = useState("");
+  const [manualCountry, setManualCountry] = useState("");
 
   const [selectedPlan, setSelectedPlan] = useState<PlanKey>("starter");
   const [seatsByPlan, setSeatsByPlan] = useState<Record<PlanKey, number>>({
@@ -108,6 +115,11 @@ export default function PricingPage() {
 
   const [priceMap, setPriceMap] = useState<Record<string, string>>({});
   const [loadingPrices, setLoadingPrices] = useState(true);
+
+  const existingSubscriptionId =
+    (user?.publicMetadata?.paddle_subscription_id as string | undefined)?.trim() ||
+    window.localStorage.getItem(BILLING_SUBSCRIPTION_STORAGE_KEY) ||
+    null;
 
   useEffect(() => {
     const fetchPrices = async () => {
@@ -133,6 +145,23 @@ export default function PricingPage() {
     fetchPrices();
   }, []);
 
+  useEffect(() => {
+    const detectCountry = async () => {
+      try {
+        const res = await axios.get("https://ipapi.co/json/");
+        const detectedCountry = res.data?.country_name;
+
+        if (detectedCountry) {
+          setTrialCountry(detectedCountry);
+        }
+      } catch (err) {
+        console.warn("Unable to detect country via ipapi", err);
+      }
+    };
+
+    detectCountry();
+  }, []);
+
   const handleDecrement = (planKey: PlanKey) => {
     setSeatsByPlan((prev) => ({
       ...prev,
@@ -154,6 +183,15 @@ export default function PricingPage() {
 
     if (plan.key === "enterprise") {
       setShowEnterpriseContactMessage(true);
+      return;
+    }
+
+    if (
+      plan.paddlePlanKey === "starter_pack_monthly" &&
+      !existingSubscriptionId
+    ) {
+      setTrialSeats(seats);
+      setShowStarterTrialModal(true);
       return;
     }
 
@@ -197,6 +235,51 @@ export default function PricingPage() {
         seats,
       },
     });
+  };
+
+  const handleConfirmStarterTrial = async () => {
+    const starterPlanKey = "starter_pack_monthly";
+    const finalCountry =
+      manualCountry.trim().length > 0
+        ? manualCountry.trim()
+            .toLowerCase()
+            .replace(/\b\w/g, (c) => c.toUpperCase())
+        : trialCountry;
+
+    try {
+      const token = await getToken();
+      if (!token) {
+        console.error("Unable to start trial: missing auth token");
+        return;
+      }
+
+      const { data } = await axios.post(
+        getURL("START_TRIAL"),
+        {
+          plan_key: starterPlanKey,
+          seats: trialSeats,
+          country: finalCountry,
+          postal_code: trialPostalCode,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      if (data?.subscription_id) {
+        window.localStorage.setItem(
+          BILLING_SUBSCRIPTION_STORAGE_KEY,
+          data.subscription_id,
+        );
+      }
+
+      setShowStarterTrialModal(false);
+      navigate("/flows");
+    } catch (error) {
+      console.error("Failed to start Starter Pack trial", error);
+    }
   };
 
   return (
@@ -311,6 +394,66 @@ export default function PricingPage() {
             <p className="mt-4 text-center text-sm text-cyan-300">
               For Enterprise plans, please contact us.
             </p>
+          )}
+          {showStarterTrialModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+              <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#0f1217] p-6">
+                <h2 className="text-lg font-semibold">Start Starter Trial</h2>
+                <p className="mt-1 mb-4 text-sm text-white/70">
+                  Confirm your details to start your free trial.
+                </p>
+
+                <label className="text-sm text-white/70">Country</label>
+                <select
+                  value={trialCountry}
+                  onChange={(e) => setTrialCountry(e.target.value)}
+                  className="w-full mt-1 mb-4 bg-black border border-white/10 rounded p-2"
+                >
+                  <option value="United States">United States</option>
+                  <option value="India">India</option>
+                  <option value="United Kingdom">United Kingdom</option>
+                  <option value="Canada">Canada</option>
+                  <option value="Germany">Germany</option>
+                  <option value="France">France</option>
+                  <option value="Australia">Australia</option>
+                </select>
+
+                <label className="text-sm text-white/70">Country (type if not listed)</label>
+                <input
+                  type="text"
+                  value={manualCountry}
+                  onChange={(e) => setManualCountry(e.target.value)}
+                  placeholder="Type your country"
+                  className="w-full mt-1 mb-4 bg-black border border-white/10 rounded p-2"
+                />
+
+                <label className="text-sm text-white/70">Postal code</label>
+                <input
+                  type="text"
+                  value={trialPostalCode}
+                  onChange={(e) => setTrialPostalCode(e.target.value)}
+                  placeholder="Enter postal code"
+                  className="w-full mt-1 mb-4 bg-black border border-white/10 rounded p-2"
+                />
+
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowStarterTrialModal(false)}
+                    className="rounded-lg border border-white/20 px-4 py-2 text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConfirmStarterTrial}
+                    className="rounded-lg border border-cyan-300/40 px-4 py-2 text-sm"
+                  >
+                    Start trial
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>

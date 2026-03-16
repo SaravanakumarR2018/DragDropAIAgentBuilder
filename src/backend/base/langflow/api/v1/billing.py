@@ -14,10 +14,16 @@ from langflow.services.paddle.provisioning import get_paddle_prices
 from langflow.services.paddle.subscriptions import (
     ensure_paddle_customer_for_user,
     has_active_subscription,
+    start_trial_subscription,
 )
 
 router = APIRouter(tags=["Billing"], prefix="/billing")
 
+class StartTrialRequest(BaseModel):
+    plan_key: str
+    seats: int = 1
+    country: str
+    postal_code: str
 
 class EnsurePaddleCustomerRequest(BaseModel):
     email: str | None = None
@@ -114,3 +120,25 @@ async def list_paddle_prices():
     except Exception as exc: #noqa: BLE001
         logger.exception(f"Error fetching Paddle prices {exc}")
         raise HTTPException(status_code=500, detail="Internal server error") #noqa: B904
+
+@router.post("/start-trial")
+async def start_trial(
+    payload: StartTrialRequest,
+    current_user: CurrentActiveUser,
+) -> dict:
+    """Start a cardless trial subscription for first-time users."""
+    if not get_settings_service().auth_settings.CLERK_AUTH_ENABLED:
+        raise HTTPException(status_code=400, detail="Clerk auth not enabled")
+
+    try:
+        return await start_trial_subscription(
+            plan_key=payload.plan_key,
+            seats=payload.seats,
+            country=payload.country,
+            postal_code=payload.postal_code,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:  #noqa: BLE001
+        logger.exception(f"Error starting trial subscription {exc}")
+        raise HTTPException(status_code=500, detail="Internal server error") from exc

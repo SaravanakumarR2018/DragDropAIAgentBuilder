@@ -33,6 +33,7 @@ export const URLs = {
   KNOWLEDGE_BASES: `knowledge_bases`,
   BILLING_ACCESS: `billing/org-access`,
   GET_PADDLE_PRICES: `billing/paddle-prices`,
+  START_TRIAL: `billing/start-trial`,
 } as const;
 
 // IMPORTANT: FOLDERS endpoint now points to 'projects' for backward compatibility

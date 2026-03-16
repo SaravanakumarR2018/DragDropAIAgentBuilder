@@ -25,6 +25,7 @@ dependencies = [
     "networkx==3.4.2",
     "fake-useragent==1.5.1",
     "pyarrow==19.0.0",
+    "pycountry>=24.6.1,<25.0.0",
     "wikipedia==1.4.0",
     "qdrant-client==1.9.2",
     "weaviate-client==4.10.2",

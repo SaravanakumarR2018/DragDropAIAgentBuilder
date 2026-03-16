@@ -23,6 +23,10 @@ CLERK_JWT_UUID_KEY = "uuid"  # Deterministic UUID derived from Clerk ID
 PADDLE_CUSTOMER_ID_KEY = "paddle_customer_id"  # Paddle customer ID
 PADDLE_SUBSCRIPTION_ID_KEY = "paddle_subscription_id"  # Paddle subscription ID
 ORGANISATION_CREATED_BY_KEY = "organisation_created_by"  # Clerk user id of org creator/admin
+PADDLE_PLAN_KEY = "paddle_plan_key"  # Active plan key
+PADDLE_SUBSCRIPTION_STATUS_KEY = "paddle_subscription_status"  # Active subscription status
+PADDLE_TRIAL_END_KEY = "paddle_trial_end"  # Trial end timestamp
+PADDLE_SEATS_KEY = "paddle_seats"  # Active seat count
 
 # ============================================================================
 # Custom Data Keys (stored in Paddle customer custom_data)
