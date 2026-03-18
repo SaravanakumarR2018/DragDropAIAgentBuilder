@@ -98,17 +98,26 @@ show_verbose_help() {
 ⚙️  Prerequisites:
     1. Docker must be installed and running
     2. .env-file must exist in the project root
-    3. VITE_CLERK_PUBLISHABLE_KEY environment variable must be set
+    3. Clerk and Paddle frontend environment variables must be set
 
 🔑 Required Environment Variable:
     VITE_CLERK_PUBLISHABLE_KEY - Clerk publishable key (required for build)
+    VITE_CLERK_FRONTEND_API - Clerk frontend API host (required for build)
+    VITE_PADDLE_CLIENT_KEY - Paddle client-side token (required for build)
+    VITE_PADDLE_ENVIRONMENT - Paddle environment: staging or production (required for build)
     
     To set it, run:
     export VITE_CLERK_PUBLISHABLE_KEY="pk_test_your_key_here"
+    export VITE_CLERK_FRONTEND_API="clerk.yourapp.dev"
+    export VITE_PADDLE_CLIENT_KEY="test_XXXXXXXXXXXXXXXX"
+    export VITE_PADDLE_ENVIRONMENT="staging"
 
 💡 Examples:
     # Set the required environment variable
     export VITE_CLERK_PUBLISHABLE_KEY="pk_test_xxxxxxxxxxxx"
+    export VITE_CLERK_FRONTEND_API="clerk.localhost.dev"
+    export VITE_PADDLE_CLIENT_KEY="test_XXXXXXXXXXXXXXXX"
+    export VITE_PADDLE_ENVIRONMENT="staging"
     
     # Build the Docker image with default timestamp tag
     ./local-docker-test.sh build
@@ -199,8 +208,8 @@ display_multiline_command() {
     echo ""
 }
 
-# Check if VITE_CLERK_PUBLISHABLE_KEY is set
-check_clerk_envs() {
+# Check required frontend environment variables for Docker build
+check_required_frontend_envs() {
     local missing=false
 
     echo ""
@@ -254,11 +263,67 @@ check_clerk_envs() {
     fi
 }
 
+# Check Paddle variables together
+check_paddle_envs() {
+    local missing=false
+
+    echo ""
+    echo "🔍 Checking Paddle environment variables..."
+
+    if [ -z "${VITE_PADDLE_CLIENT_KEY:-}" ] && [ -z "${VITE_PADDLE_ENVIRONMENT:-}" ]; then
+        echo "❌ Both Paddle environment variables are missing!"
+        echo ""
+        echo "You must set both before continuing:"
+        echo "    export VITE_PADDLE_CLIENT_KEY=\"test_your_client_key_here\""
+        echo "    export VITE_PADDLE_ENVIRONMENT=\"staging\""
+        echo ""
+        echo "💡 Example:"
+        echo "    export VITE_PADDLE_CLIENT_KEY=\"test_12345ABCDE\""
+        echo "    export VITE_PADDLE_ENVIRONMENT=\"production\""
+        echo ""
+        missing=true
+
+    elif [ -z "${VITE_PADDLE_CLIENT_KEY:-}" ]; then
+        echo "❌ VITE_PADDLE_CLIENT_KEY is missing!"
+        echo "✅ VITE_PADDLE_ENVIRONMENT is set to: ${VITE_PADDLE_ENVIRONMENT}"
+        echo ""
+        echo "Set it using:"
+        echo "    export VITE_PADDLE_CLIENT_KEY=\"test_your_client_key_here\""
+        echo ""
+        missing=true
+
+    elif [ -z "${VITE_PADDLE_ENVIRONMENT:-}" ]; then
+        echo "❌ VITE_PADDLE_ENVIRONMENT is missing!"
+        echo "✅ VITE_PADDLE_CLIENT_KEY is set"
+        echo ""
+        echo "Set it using:"
+        echo "    export VITE_PADDLE_ENVIRONMENT=\"staging\""
+        echo ""
+        echo "💡 Valid values: staging, production"
+        echo ""
+        missing=true
+
+    else
+        echo "✅ Both Paddle environment variables are set"
+        echo "   - VITE_PADDLE_CLIENT_KEY: ${VITE_PADDLE_CLIENT_KEY}"
+        echo "   - VITE_PADDLE_ENVIRONMENT: ${VITE_PADDLE_ENVIRONMENT}"
+    fi
+
+    if [ "$missing" = true ]; then
+        echo ""
+        echo "❌ Please fix the missing Paddle variables above before continuing."
+        echo ""
+        exit 1
+    fi
+}
+
 # Configuration from GitHub workflow (staging environment)
 VITE_AUTO_LOGIN=false
 VITE_CLERK_AUTH_ENABLED=true
 VITE_CLERK_PUBLISHABLE_KEY="${VITE_CLERK_PUBLISHABLE_KEY:-}"
 VITE_CLERK_FRONTEND_API="${VITE_CLERK_FRONTEND_API:-}"
+VITE_PADDLE_CLIENT_KEY="${VITE_PADDLE_CLIENT_KEY:-}"
+VITE_PADDLE_ENVIRONMENT="${VITE_PADDLE_ENVIRONMENT:-}"
 
 # Docker image details
 IMAGE_NAME="langflow"
@@ -275,8 +340,9 @@ POSTGRES_PORT="5432"
 
 # Function to build Docker image
 build_docker() {
-    # Check Clerk environment variables together
-    check_clerk_envs
+    # Check required frontend environment variables
+    check_required_frontend_envs
+    check_paddle_envs
 
     # Ask for custom tag
     echo ""
@@ -314,6 +380,8 @@ build_docker() {
     VITE_CLERK_AUTH_ENABLED=${VITE_CLERK_AUTH_ENABLED} \
     VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY} \
     VITE_CLERK_FRONTEND_API=${VITE_CLERK_FRONTEND_API} \
+    VITE_PADDLE_CLIENT_KEY=${VITE_PADDLE_CLIENT_KEY} \
+    VITE_PADDLE_ENVIRONMENT=${VITE_PADDLE_ENVIRONMENT} \
     make docker_build"
     display_command "$BUILD_CMD" "Building Docker image"
 
@@ -323,6 +391,8 @@ build_docker() {
     VITE_CLERK_AUTH_ENABLED=${VITE_CLERK_AUTH_ENABLED} \
     VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY} \
     VITE_CLERK_FRONTEND_API=${VITE_CLERK_FRONTEND_API} \
+    VITE_PADDLE_CLIENT_KEY=${VITE_PADDLE_CLIENT_KEY} \
+    VITE_PADDLE_ENVIRONMENT=${VITE_PADDLE_ENVIRONMENT} \
     make docker_build
     
     echo ""

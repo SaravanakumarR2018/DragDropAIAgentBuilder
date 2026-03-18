@@ -3,34 +3,28 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
-from datetime import datetime
-from http import HTTPStatus
 import re
-from typing import Any, Literal
+from typing import Any
 
 from lfx.log.logger import logger
-from paddle_billing import Client
+from paddle_billing import Client  #noqa: TCH002
 from paddle_billing.Entities.Shared import CustomData
 from paddle_billing.Resources.Customers.Operations import CreateCustomer, UpdateCustomer
-from paddle_billing.Resources.Subscriptions.Operations import ListSubscriptions
 
+from langflow.services.auth.clerk_metadata_constants import (
+    ORGANISATION_CREATED_BY_KEY,
+    PADDLE_CUSTOM_DATA_USER_ID_KEY,
+    PADDLE_CUSTOMER_ID_KEY,
+    PADDLE_SUBSCRIPTION_ID_KEY,
+)
 from langflow.services.auth.clerk_utils import (
-    get_org_id_from_clerk_payload,
-    get_email_from_clerk_payload,
     get_clerk_user_id_from_payload,
+    get_email_from_clerk_payload,
+    get_organisation_created_by_from_clerk_payload,
     get_paddle_customer_id_from_clerk_payload,
     get_paddle_subscription_id_from_clerk_payload,
-    get_organisation_created_by_from_clerk_payload,
-    update_clerk_user_metadata,
     update_clerk_organization,
-)
-from langflow.services.auth.clerk_metadata_constants import (
-    PADDLE_SUBSCRIPTION_ID_KEY,
-    ORGANISATION_CREATED_BY_KEY,
-    PADDLE_CUSTOMER_ID_KEY,
-    PADDLE_CUSTOM_DATA_USER_ID_KEY,
-    ORG_ID_KEY,
+    update_clerk_user_metadata,
 )
 from langflow.services.paddle.client import get_paddle_client
 
@@ -53,7 +47,7 @@ async def get_subscription_status(
         )
         status = getattr(subscription, "status", None)
         logger.info(f"Subscription {subscription_id} status: {status}")
-        return status
+        return status #noqa: TRY300
 
     except Exception as e:
         logger.info(f"Error retrieving subscription {subscription_id}: {e}")
@@ -162,7 +156,7 @@ async def _create_paddle_customer_and_update_clerk_metadata(
             ),
         )
         logger.info(f"Paddle customer creation response: {customer}")
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         customer_id = None
         customer_id = _extract_customer_id_from_error(exc)
 
@@ -190,7 +184,7 @@ async def _create_paddle_customer_and_update_clerk_metadata(
             )
             try:
                 customer = await asyncio.to_thread(client.customers.get, customer_id)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.exception(
                     "Failed to retrieve existing Paddle customer with ID %s for clerk user %s.",
                     customer_id,

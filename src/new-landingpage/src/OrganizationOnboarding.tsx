@@ -427,6 +427,10 @@ export default function OrganizationOnboarding() {
       const shouldGoToPricing = (access as any)?.has_access === false;
 
       if (shouldGoToPricing) {
+        // Persist organization context so the main app can correctly hydrate
+        // selected-org state while the user is on the pricing route.
+        localStorage.setItem(ORG_SELECTED_KEY, "true");
+        setStoredActiveOrgId(activeOrgId);
         setStatus("Redirecting to billing...");
         goToPricing();
         return;

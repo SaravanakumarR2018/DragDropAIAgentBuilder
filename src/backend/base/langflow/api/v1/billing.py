@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
+from lfx.log.logger import logger
 from pydantic import BaseModel
 
-from lfx.log.logger import logger
 from langflow.api.utils import CurrentActiveUser
 from langflow.services.auth.clerk_utils import (
     get_clerk_user_id_from_payload,
@@ -10,6 +10,7 @@ from langflow.services.auth.clerk_utils import (
     get_paddle_subscription_id_from_clerk_payload,
 )
 from langflow.services.deps import get_settings_service
+from langflow.services.paddle.provisioning import get_paddle_prices
 from langflow.services.paddle.subscriptions import (
     ensure_paddle_customer_for_user,
     has_active_subscription,
@@ -20,7 +21,6 @@ router = APIRouter(tags=["Billing"], prefix="/billing")
 
 class EnsurePaddleCustomerRequest(BaseModel):
     email: str | None = None
-
 
 @router.post("/ensure-paddle-customer")
 async def ensure_paddle_customer(
@@ -103,3 +103,14 @@ async def get_org_access(
         "is_admin": is_admin,
         "reason": "subscription_inactive",
     }
+
+@router.get("/paddle-prices")
+async def list_paddle_prices():
+    """Return a mapping of plan_key -> Paddle price_id."""
+    try:
+        return await get_paddle_prices()
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) # noqa: B904
+    except Exception as exc: #noqa: BLE001
+        logger.exception(f"Error fetching Paddle prices {exc}")
+        raise HTTPException(status_code=500, detail="Internal server error") #noqa: B904

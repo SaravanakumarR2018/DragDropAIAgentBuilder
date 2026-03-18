@@ -122,7 +122,10 @@ jobs:
             PADDLE_ENVIRONMENT="prod"
           fi
 
-          if [ -z "$PADDLE_API_KEY" ] || [ -z "$PADDLE_CLIENT_KEY" ]; then
+          VITE_PADDLE_CLIENT_KEY="$PADDLE_CLIENT_KEY"
+          VITE_PADDLE_ENVIRONMENT="$PADDLE_ENVIRONMENT"
+
+          if [ -z "$PADDLE_API_KEY" ] || [ -z "$PADDLE_CLIENT_KEY" ] || [ -z "$PADDLE_ENVIRONMENT" ]; then
             echo "❌ Missing Paddle secrets for ${ENVIRONMENT} environment"
             exit 1
           fi
@@ -145,6 +148,18 @@ jobs:
             sed -i "s|^PADDLE_ENVIRONMENT=.*|PADDLE_ENVIRONMENT=${PADDLE_ENVIRONMENT}|" "$ENV_FILE"
           else
             echo "PADDLE_ENVIRONMENT=${PADDLE_ENVIRONMENT}" >> "$ENV_FILE"
+          fi
+
+          if grep -q '^VITE_PADDLE_CLIENT_KEY=' "$ENV_FILE"; then
+            sed -i "s|^VITE_PADDLE_CLIENT_KEY=.*|VITE_PADDLE_CLIENT_KEY=${VITE_PADDLE_CLIENT_KEY}|" "$ENV_FILE"
+          else
+            echo "VITE_PADDLE_CLIENT_KEY=${VITE_PADDLE_CLIENT_KEY}" >> "$ENV_FILE"
+          fi
+
+          if grep -q '^VITE_PADDLE_ENVIRONMENT=' "$ENV_FILE"; then
+            sed -i "s|^VITE_PADDLE_ENVIRONMENT=.*|VITE_PADDLE_ENVIRONMENT=${PADDLE_ENVIRONMENT}|" "$ENV_FILE"
+          else
+            echo "VITE_PADDLE_ENVIRONMENT=${PADDLE_ENVIRONMENT}" >> "$ENV_FILE"
           fi
 
       - name: Prepare Clerk API key
@@ -332,6 +347,8 @@ jobs:
           VITE_CLERK_AUTH_ENABLED=true \
           VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.CLERK_PUBLISHABLE_KEY }} \
           VITE_CLERK_FRONTEND_API=${{ vars.STAGING_CLERK_FRONTEND_API }} \
+          VITE_PADDLE_CLIENT_KEY=${{ secrets.STAGING_PADDLE_CLIENT_KEY }} \
+          VITE_PADDLE_ENVIRONMENT=${{ github.event.inputs.environment }} \
           make docker_build TAG=langflow:staging-$BRANCH_NAME-$COMMIT_ID DOCKER=docker
 
           docker tag langflow:staging-$BRANCH_NAME-$COMMIT_ID forwardemailforaifirstdesk/langflow:staging-$BRANCH_NAME-$COMMIT_ID
@@ -350,6 +367,8 @@ jobs:
           VITE_CLERK_AUTH_ENABLED=true \
           VITE_CLERK_PUBLISHABLE_KEY=${{ secrets.PROD_CLERK_PUBLISHABLE_KEY }} \
           VITE_CLERK_FRONTEND_API=${{ vars.PROD_CLERK_FRONTEND_API }} \
+          VITE_PADDLE_CLIENT_KEY=${{ secrets.PROD_PADDLE_CLIENT_KEY }} \
+          VITE_PADDLE_ENVIRONMENT=${{ github.event.inputs.environment }} \
           make docker_build TAG=langflow:prod-$BRANCH_NAME-$COMMIT_ID DOCKER=docker
 
           docker tag langflow:prod-$BRANCH_NAME-$COMMIT_ID forwardemailforaifirstdesk/langflow:prod-$BRANCH_NAME-$COMMIT_ID

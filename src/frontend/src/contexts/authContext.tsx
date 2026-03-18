@@ -46,6 +46,11 @@ export function AuthProvider({ children }): React.ReactElement {
   const { mutate: mutateLoggedUser } = useGetUserData();
   const { mutate: mutateGetGlobalVariables } = useGetGlobalVariablesMutation();
 
+  const shouldBootstrapAppDataForPath = () => {
+    const path = window.location.pathname;
+    return !path.startsWith("/pricing");
+  };
+
   useEffect(() => {
     const storedAccessToken = getAuthCookie(cookies, LANGFLOW_ACCESS_TOKEN);
     if (storedAccessToken) {
@@ -92,6 +97,11 @@ export function AuthProvider({ children }): React.ReactElement {
     }
     setAccessToken(newAccessToken);
     setIsAuthenticated(true);
+
+    if (!shouldBootstrapAppDataForPath()) {
+      return;
+    }
+
     getUser();
     getGlobalVariables();
   }
