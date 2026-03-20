@@ -23,7 +23,7 @@ from paddle_billing.Resources.Products.Operations import CreateProduct
 
 from langflow.services.paddle.client import get_paddle_client
 from langflow.services.paddle.subscriptions import _normalize_custom_data
-
+from langflow.services.auth.clerk_metadata_constants import PADDLE_LOCK_KEY
 
 
 @dataclass(frozen=True)
@@ -62,20 +62,28 @@ def _get_paddle_plans() -> tuple[PlanDefinition, ...]:
 
 def provision_paddle_plans() -> None:
     """Idempotently provision Paddle products (plans) and monthly subscription prices."""
-    from langflow.services.paddle.client import get_paddle_client
 
     client = get_paddle_client()
 
-    if not _acquire_provisioning_lock(client):
-        logger.info("Paddle provisioning already in progress or completed; skipping.")
-        return
-
+    # Fetch ALL products & prices once
     products = list(client.products.list())
     prices = list(client.prices.list())
 
+    # Check provisioning lock (do NOT early return)
+    has_lock = any(
+        _custom_data_value(product.custom_data, "lock") == PADDLE_LOCK_KEY
+        for product in products
+    )
+
+    if has_lock:
+        logger.info("Provisioning lock found — continuing idempotent checks.")
+
+    # Provision plans (idempotent)
     for plan in _get_paddle_plans():
         product = _find_existing_product(plan, products)
-        if _find_existing_price(plan, prices, product):
+        existing_price = _find_existing_price(plan, prices, product)
+
+        if existing_price:
             logger.info("Paddle plan %s already provisioned; skipping.", plan.key)
             continue
 
@@ -83,6 +91,9 @@ def provision_paddle_plans() -> None:
 
         _create_monthly_price(plan, product_id, client)
         logger.info("Paddle plan %s provisioned.", plan.key)
+
+    # Create provisioning lock (safe, idempotent)
+    _create_provisioning_lock(client)
 
 
 def _find_existing_product(plan: PlanDefinition, products: list[Any]) -> Any | None:
@@ -141,24 +152,25 @@ def _custom_data_value(custom_data: Any, key: str) -> Any | None:
         return None
 
 
-def _acquire_provisioning_lock(client: Any) -> bool:
-    LOCK_KEY = "paddle_provisioning_lock" #noqa:N806
+def _has_provisioning_lock(client: Any) -> bool:
+    return any(
+        _custom_data_value(product.custom_data, "lock") == PADDLE_LOCK_KEY
+        for product in client.products.list()
+    )
 
-    for product in client.products.list():
-        if _custom_data_value(product.custom_data, "lock") == LOCK_KEY:
-            return False
 
-    try:
-        client.products.create(
-            CreateProduct(
-                name="Paddle Provisioning Lock",
-                tax_category=TaxCategory.Standard,
-                custom_data={"lock": LOCK_KEY},
-            )
+def _create_provisioning_lock(client: Any) -> None:
+    if _has_provisioning_lock(client):
+        logger.info("Paddle provisioning lock already exists; skipping lock creation.")
+        return
+
+    client.products.create(
+        CreateProduct(
+            name="Paddle Provisioning Lock",
+            tax_category=TaxCategory.Standard,
+            custom_data={"lock": PADDLE_LOCK_KEY},
         )
-        return True #noqa:TRY300
-    except Exception: #noqa: BLE001
-        return False
+    )
 
 
 def _create_product(plan: PlanDefinition, client: Any) -> str:

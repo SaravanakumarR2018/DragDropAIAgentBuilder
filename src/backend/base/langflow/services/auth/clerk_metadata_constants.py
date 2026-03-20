@@ -22,6 +22,7 @@ CLERK_JWT_UUID_KEY = "uuid"  # Deterministic UUID derived from Clerk ID
 
 PADDLE_CUSTOMER_ID_KEY = "paddle_customer_id"  # Paddle customer ID
 PADDLE_SUBSCRIPTION_ID_KEY = "paddle_subscription_id"  # Paddle subscription ID
+PADDLE_LOCK_KEY = "paddle_provisioning_lock"  # Key to indicate a lock for provisioning
 ORGANISATION_CREATED_BY_KEY = "organisation_created_by"  # Clerk user id of org creator/admin
 
 # ============================================================================
