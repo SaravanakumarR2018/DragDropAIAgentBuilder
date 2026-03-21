@@ -16,6 +16,22 @@ export const useMessagesStore = create<MessagesStoreType>((set, get) => ({
     set(() => ({ messages: messages }));
   },
   addMessage: (message) => {
+    if (!message.properties?.optimistic && message.sender === "User") {
+      const optimisticIndex = get().messages.findIndex(
+        (msg) =>
+          msg.properties?.optimistic &&
+          msg.sender === "User" &&
+          msg.session_id === message.session_id &&
+          msg.flow_id === message.flow_id &&
+          msg.text === message.text,
+      );
+      if (optimisticIndex !== -1) {
+        const updatedMessages = [...get().messages];
+        updatedMessages[optimisticIndex] = message;
+        set(() => ({ messages: updatedMessages }));
+        return;
+      }
+    }
     const existingMessage = get().messages.find((msg) => msg.id === message.id);
     if (existingMessage) {
       // Check if this is a streaming partial message (state: "partial")
