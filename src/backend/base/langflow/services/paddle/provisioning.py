@@ -144,12 +144,10 @@ def _duration_matches(duration: Any, interval: Interval, frequency: int) -> bool
 
 
 def _custom_data_value(custom_data: Any, key: str) -> Any | None:
-    if not custom_data:
+    normalized_custom_data = _normalize_custom_data(custom_data)
+    if not normalized_custom_data:
         return None
-    try:
-        return custom_data[key]
-    except Exception:  # noqa: BLE001
-        return None
+    return normalized_custom_data.get(key)
 
 
 def _has_provisioning_lock(client: Any) -> bool:
