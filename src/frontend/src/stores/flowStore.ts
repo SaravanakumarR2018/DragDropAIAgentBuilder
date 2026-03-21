@@ -119,13 +119,14 @@ const useFlowStore = create<FlowStoreType>((set, get) => ({
   nodes: [],
   edges: [],
   isBuilding: false,
+  buildingSessionId: null,
   stopBuilding: () => {
     get().buildController.abort();
     get().updateEdgesRunningByNodes(
       get().nodes.map((n) => n.id),
       false,
     );
-    set({ isBuilding: false });
+    set({ isBuilding: false, buildingSessionId: null });
     get().revertBuiltStatusFromBuilding();
     useAlertStore.getState().setErrorData({
       title: "Build stopped",
@@ -253,7 +254,10 @@ const useFlowStore = create<FlowStoreType>((set, get) => ({
     });
   },
   setIsBuilding: (isBuilding) => {
-    set({ isBuilding });
+    set({
+      isBuilding,
+      buildingSessionId: isBuilding ? get().buildingSessionId : null,
+    });
   },
   setFlowState: (flowState) => {
     const newFlowState =
@@ -669,6 +673,7 @@ const useFlowStore = create<FlowStoreType>((set, get) => ({
         eventDelivery,
       },
       buildInfo: null,
+      buildingSessionId: session ?? null,
     });
     const playgroundPage = get().playgroundPage;
     get().setIsBuilding(true);

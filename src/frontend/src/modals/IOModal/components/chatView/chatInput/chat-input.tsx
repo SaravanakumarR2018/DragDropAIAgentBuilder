@@ -40,6 +40,8 @@ export default function ChatInput({
   const { validateFileSize } = useFileSizeValidator();
   const stopBuilding = useFlowStore((state) => state.stopBuilding);
   const isBuilding = useFlowStore((state) => state.isBuilding);
+  const buildingSessionId = useFlowStore((state) => state.buildingSessionId);
+  const currentSessionId = useUtilityStore((state) => state.currentSessionId);
   const chatValue = useUtilityStore((state) => state.chatValueStore);
 
   const { scrollToBottom } = useStickToBottomContext();
@@ -60,7 +62,10 @@ export default function ChatInput({
     }
   }, [showAudioInput]);
 
-  useFocusOnUnlock(isBuilding, inputRef);
+  const isBuildingForSession =
+    isBuilding && buildingSessionId === currentSessionId;
+
+  useFocusOnUnlock(isBuildingForSession, inputRef);
   useAutoResizeTextArea(chatValue, inputRef);
 
   const { mutate } = usePostUploadFile();
@@ -192,7 +197,7 @@ export default function ChatInput({
   const checkSendingOk = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     return (
       event.key === "Enter" &&
-      !isBuilding &&
+      !isBuildingForSession &&
       !event.shiftKey &&
       !event.nativeEvent.isComposing
     );
@@ -210,7 +215,7 @@ export default function ChatInput({
   if (noInput) {
     return (
       <NoInputView
-        isBuilding={isBuilding}
+        isBuilding={isBuildingForSession}
         sendMessage={sendMessage}
         stopBuilding={stopBuilding}
       />

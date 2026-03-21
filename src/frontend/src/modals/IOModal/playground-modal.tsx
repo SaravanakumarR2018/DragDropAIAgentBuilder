@@ -1,6 +1,7 @@
 //import LangflowLogoColor from "@/assets/LangflowLogocolor.svg?react";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import ShortUniqueId from "short-unique-id";
 import { useShallow } from "zustand/react/shallow";
 import ThemeButtons from "@/components/core/appHeaderComponent/components/ThemeButtons";
 import { useGetMessagesQuery } from "@/controllers/API/queries/messages";
@@ -43,8 +44,8 @@ export default function IOModal({
   const outputs = useFlowStore((state) => state.outputs);
   const nodes = useFlowStore((state) => state.nodes);
   const buildFlow = useFlowStore((state) => state.buildFlow);
-  const setIsBuilding = useFlowStore((state) => state.setIsBuilding);
   const isBuilding = useFlowStore((state) => state.isBuilding);
+  const buildingSessionId = useFlowStore((state) => state.buildingSessionId);
   const newChatOnPlayground = useFlowStore(
     (state) => state.newChatOnPlayground,
   );
@@ -75,6 +76,7 @@ export default function IOModal({
   const setErrorData = useAlertStore((state) => state.setErrorData);
   const setSuccessData = useAlertStore((state) => state.setSuccessData);
   const deleteSession = useMessagesStore((state) => state.deleteSession);
+  const addMessage = useMessagesStore((state) => state.addMessage);
   const currentFlowId = useGetFlowId();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -88,7 +90,6 @@ export default function IOModal({
   const {
     data: sessionsFromDb,
     isLoading: sessionsLoading,
-    refetch: refetchSessions,
   } = useGetSessionsFromFlowQuery(
     {
       id: currentFlowId,
@@ -208,7 +209,45 @@ export default function IOModal({
       repeat: number;
       files?: string[];
     }): Promise<void> => {
-      if (isBuilding) return;
+      const activeSessionId = visibleSession ?? sessionId;
+      if (isBuilding && buildingSessionId === activeSessionId) return;
+      const shouldAddOptimisticMessage =
+        chatValue !== "" || (files && files.length > 0);
+      if (shouldAddOptimisticMessage) {
+        const uid = new ShortUniqueId();
+        addMessage({
+          id: `optimistic-${uid.randomUUID(10)}`,
+          flow_id: currentFlowId,
+          text: chatValue,
+          sender: "User",
+          sender_name: "User",
+          session_id: activeSessionId,
+          timestamp: new Date().toISOString(),
+          files: files ?? [],
+          edit: false,
+          background_color: "",
+          text_color: "",
+          properties: {
+            optimistic: true,
+          },
+        });
+        addMessage({
+          id: `optimistic-${uid.randomUUID(10)}`,
+          flow_id: currentFlowId,
+          text: "Thinking...",
+          sender: "Machine",
+          sender_name: "AI",
+          session_id: activeSessionId,
+          timestamp: new Date().toISOString(),
+          files: [],
+          edit: false,
+          background_color: "",
+          text_color: "",
+          properties: {
+            optimistic: true,
+          },
+        });
+      }
       setChatValue("");
       for (let i = 0; i < repeat; i++) {
         await buildFlow({
@@ -216,7 +255,7 @@ export default function IOModal({
           startNodeId: chatInput?.id,
           files: files,
           silent: true,
-          session: sessionId,
+          session: activeSessionId,
           eventDelivery: eventDeliveryConfig,
         }).catch((err) => {
           console.error(err);
@@ -224,7 +263,19 @@ export default function IOModal({
         });
       }
     },
-    [isBuilding, setIsBuilding, chatValue, chatInput?.id, sessionId, buildFlow],
+    [
+      addMessage,
+      buildFlow,
+      chatInput?.id,
+      chatValue,
+      currentFlowId,
+      eventDeliveryConfig,
+      buildingSessionId,
+      isBuilding,
+      sessionId,
+      setChatValue,
+      visibleSession,
+    ],
   );
 
   useEffect(() => {
@@ -232,39 +283,45 @@ export default function IOModal({
       window.sessionStorage.setItem(currentFlowId, JSON.stringify(messages));
     }
     if (newChatOnPlayground && !sessionsLoading) {
-      const handleRefetchAndSetSession = async () => {
-        try {
-          const result = await refetchSessions();
-          if (result.data?.sessions && result.data.sessions.length > 0) {
-            setvisibleSession(
-              result.data.sessions[result.data.sessions.length - 1],
-            );
-          }
-        } catch (error) {
-          console.error("Error refetching sessions:", error);
+      const newSessionId = createNewSessionName();
+      setSessions((prevSessions) => {
+        if (prevSessions.includes(newSessionId)) {
+          return prevSessions;
         }
-      };
-
-      handleRefetchAndSetSession();
+        return [newSessionId, ...prevSessions];
+      });
+      setvisibleSession(newSessionId);
       setNewChatOnPlayground(false);
     }
-  }, [messages, playgroundPage]);
+  }, [
+    currentFlowId,
+    messages,
+    newChatOnPlayground,
+    playgroundPage,
+    sessionsLoading,
+    setNewChatOnPlayground,
+  ]);
 
   useEffect(() => {
     if (!visibleSession) {
-      setSessionId(createNewSessionName());
-      setCurrentSessionId(currentFlowId);
-    } else if (visibleSession) {
-      setSessionId(visibleSession);
-      setCurrentSessionId(visibleSession);
-      if (selectedViewField?.type === "Session") {
-        setSelectedViewField({
-          id: visibleSession,
-          type: "Session",
-        });
+      if (newChatOnPlayground) {
+        return;
       }
+      const newSessionId = createNewSessionName();
+      setSessionId(newSessionId);
+      setCurrentSessionId(newSessionId);
+      setvisibleSession(newSessionId);
+      return;
     }
-  }, [visibleSession]);
+    setSessionId(visibleSession);
+    setCurrentSessionId(visibleSession);
+    if (selectedViewField?.type === "Session") {
+      setSelectedViewField({
+        id: visibleSession,
+        type: "Session",
+      });
+    }
+  }, [newChatOnPlayground, visibleSession]);
 
   const setPlaygroundScrollBehaves = useUtilityStore(
     (state) => state.setPlaygroundScrollBehaves,
