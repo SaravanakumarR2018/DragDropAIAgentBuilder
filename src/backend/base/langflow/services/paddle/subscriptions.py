@@ -10,6 +10,7 @@ from lfx.log.logger import logger
 from paddle_billing import Client  #noqa: TCH002
 from paddle_billing.Entities.Shared import CustomData
 from paddle_billing.Resources.Customers.Operations import CreateCustomer, UpdateCustomer
+from paddle_billing.Resources.Subscriptions.Operations import ListSubscriptions
 
 from langflow.services.auth.clerk_metadata_constants import (
     ORGANISATION_CREATED_BY_KEY,
@@ -321,3 +322,46 @@ async def _sync_paddle_customer_metadata(
         )
         raise
 
+async def get_subscriptions_by_customer_id(
+    *,
+    customer_id: str,
+    client: Client | None = None,
+) -> list[dict]:
+
+    paddle_client = client or get_paddle_client()
+
+    def _fetch():
+        return paddle_client.subscriptions.list(
+            ListSubscriptions(customer_id=[customer_id])
+        )
+
+    collection = await asyncio.to_thread(_fetch)
+
+    subscriptions = []
+
+    while collection:
+        for sub in collection:
+            subscriptions.append({
+                "id": sub.id,
+                "status": getattr(sub, "status", None),
+                "customer_id": getattr(sub, "customer_id", None),
+            })
+
+        paginator = getattr(collection, "paginator", None)
+        next_page = getattr(paginator, "next", None) if paginator else None
+
+        if not callable(next_page):
+            break
+
+        try:
+            collection = next_page()
+        except Exception:
+            break
+
+    return subscriptions
+
+def pick_active_subscription(subscriptions: list[dict]) -> str | None:
+    for sub in subscriptions:
+        if sub["status"] in ACTIVE_SUBSCRIPTION_STATUSES:
+            return sub["id"]
+    return None
