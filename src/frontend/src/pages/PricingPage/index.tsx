@@ -200,118 +200,148 @@ export default function PricingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f1217] px-4 py-14 text-white">
-      <div className="mx-auto max-w-7xl">
-        <div className="rounded-2xl border border-white/10 bg-[#0f1217] p-8">
-          <div className="text-center">
-            <h1 className="text-2xl font-semibold">Simple, Scalable Pricing</h1>
-            <p className="mt-3 text-white/70">
-              Choose the plan that matches your team size and scale with
-              confidence.
-            </p>
-          </div>
-
-          <div className="mt-10 grid gap-6 md:grid-cols-3">
-            {STATIC_PLANS.map((plan) => {
-              const seats = seatsByPlan[plan.key];
-              const total = seats * plan.pricePerSeat;
-
-              return (
-                <div
-                  key={plan.key}
-                  className={`flex flex-col rounded-xl border p-6 ${
-                    selectedPlan === plan.key
-                      ? "border-cyan-400/50 bg-[#11161d]"
-                      : "border-white/10 bg-[#0f1217]"
-                  }`}
-                >
-                  <div className="text-sm text-white/60">{plan.name}</div>
-                  <div className="mt-2 text-3xl font-semibold">
-                    ${plan.pricePerSeat}/seat/month
+    <div className="w-full overflow-hidden">
+      <div style={{
+        transform: "scale(0.67)",
+        transformOrigin: "top center",
+        width: "100%",
+        display: "flex",
+        justifyContent: "center",
+      }}
+      > 
+        <div style={{ width: "149.25%" }}>
+          <div>
+            <div className="min-h-screen px-4 py-12 text-slate-900 overflow-hidden">
+              <div className="mx-auto max-w-6xl">
+                <div className="rounded-[28px] border border-slate-200 bg-white p-8 shadow-[0_24px_80px_rgba(15,23,42,0.08)] sm:p-10">
+                  <div className="text-center">
+                    <span className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-sky-700">
+                      Pricing
+                    </span>
+                    <h1 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
+                      Simple, scalable pricing
+                    </h1>
+                    <p className="mt-3 text-base text-slate-600 sm:text-lg">
+                      Choose the plan that matches your team size and move from
+                      onboarding to workspace with a consistent experience.
+                    </p>
                   </div>
 
-                  {plan.hasTrial && (
-                    <div className="mt-1 text-sm text-cyan-300">
-                      {plan.trialDays}-day free trial
-                    </div>
+                  <div className="mt-10 grid gap-6 md:grid-cols-3">
+                    {STATIC_PLANS.map((plan) => {
+                      const seats = seatsByPlan[plan.key];
+                      const total = seats * plan.pricePerSeat;
+
+                      return (
+                        <div
+                          key={plan.key}
+                          className={`flex flex-col rounded-2xl border p-6 transition-all ${
+                            selectedPlan === plan.key
+                              ? "border-sky-400 bg-sky-50/80 shadow-[0_18px_45px_rgba(14,165,233,0.12)]"
+                              : "border-slate-200 bg-white shadow-sm"
+                          }`}
+                        >
+                          <div className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500">
+                            {plan.name}
+                          </div>
+                          <div className="mt-2 text-3xl font-semibold text-slate-900">
+                            ${plan.pricePerSeat}/seat/month
+                          </div>
+
+                          {plan.hasTrial && (
+                            <div className="mt-1 text-sm font-medium text-sky-700">
+                              {plan.trialDays}-day free trial
+                            </div>
+                          )}
+
+                          <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <div className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                              Seats
+                            </div>
+
+                            <div className="mt-2 flex items-center gap-3">
+                              <button
+                                type="button"
+                                onClick={() => handleDecrement(plan.key)}
+                                className="h-9 w-9 rounded-xl border border-slate-200 bg-white text-lg text-slate-700 transition hover:border-sky-300 hover:text-sky-700"
+                              >
+                                -
+                              </button>
+
+                              <span className="min-w-8 text-center text-xl font-semibold text-slate-900">
+                                {seats}
+                              </span>
+
+                              <button
+                                type="button"
+                                onClick={() => handleIncrement(plan.key)}
+                                className="h-9 w-9 rounded-xl border border-slate-200 bg-white text-lg text-slate-700 transition hover:border-sky-300 hover:text-sky-700"
+                              >
+                                +
+                              </button>
+                            </div>
+
+                            <div className="mt-3 text-sm text-slate-500">
+                              Estimated monthly total
+                            </div>
+                            <div className="text-2xl font-semibold text-slate-900">
+                              ${total} USD
+                            </div>
+                          </div>
+
+                          <ul className="mt-5 space-y-3 text-sm text-slate-600">
+                            {plan.features.map((feature) => (
+                              <li key={feature} className="flex items-center gap-2">
+                                <CheckIcon className="h-4 w-4 text-sky-600" />
+                                {feature}
+                              </li>
+                            ))}
+                          </ul>
+
+                          <button
+                            type="button"
+                            onClick={() => handleSelectPlan(plan)}
+                            className={`mt-6 rounded-xl px-4 py-3 text-sm font-semibold transition ${
+                              plan.key === "enterprise"
+                                ? "border border-slate-200 bg-white text-slate-700 hover:border-sky-300 hover:text-sky-700"
+                                : "bg-slate-900 text-white hover:bg-slate-800"
+                            }`}
+                          >
+                            Select {plan.name}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-10 flex flex-wrap justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigate("/flows?pricing_bypass=1");
+                      }}
+                      className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
+                    >
+                    Go to flows
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigate("/organization")}
+                      className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-sky-300 hover:text-sky-700"
+                    >
+                      Back to organization
+                    </button>
+                  </div>
+
+                  {showEnterpriseContactMessage && (
+                    <p className="mt-5 text-center text-sm font-medium text-sky-700">
+                      For Enterprise plans, please contact us.
+                    </p>
                   )}
-
-                  <div className="mt-5 rounded-lg border border-white/10 bg-black/20 p-4">
-                    <div className="text-xs uppercase text-white/60">Seats</div>
-
-                    <div className="mt-2 flex items-center gap-3">
-                      <button
-                        type="button"
-                        onClick={() => handleDecrement(plan.key)}
-                        className="h-8 w-8 rounded-md border border-white/20"
-                      >
-                        -
-                      </button>
-
-                      <span className="text-xl font-semibold">{seats}</span>
-
-                      <button
-                        type="button"
-                        onClick={() => handleIncrement(plan.key)}
-                        className="h-8 w-8 rounded-md border border-white/20"
-                      >
-                        +
-                      </button>
-                    </div>
-
-                    <div className="mt-3 text-sm text-white/70">
-                      Estimated monthly total
-                    </div>
-                    <div className="text-2xl font-semibold text-cyan-200">
-                      ${total} USD
-                    </div>
-                  </div>
-
-                  <ul className="mt-4 space-y-2 text-sm text-white/80">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-center gap-2">
-                        <CheckIcon className="h-4 w-4" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-
-                  <button
-                    type="button"
-                    onClick={() => handleSelectPlan(plan)}
-                    className="mt-6 rounded-lg border border-cyan-300/40 px-4 py-2 text-sm"
-                  >
-                    Select {plan.name}
-                  </button>
                 </div>
-              );
-            })}
+              </div>
+            </div>
           </div>
-
-          <div className="mt-8 flex justify-center">
-           <button
-              type="button"
-              onClick={() => {
-                navigate("/flows?pricing_bypass=1");
-              }}
-              className="mr-3 rounded-lg border border-cyan-300/40 px-4 py-2 text-sm"
-            >
-             Go to flows
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/organization")}
-              className="rounded-lg border border-white/15 px-4 py-2 text-sm"
-            >
-              Back to organization
-            </button>
-          </div>
-
-          {showEnterpriseContactMessage && (
-            <p className="mt-4 text-center text-sm text-cyan-300">
-              For Enterprise plans, please contact us.
-            </p>
-          )}
         </div>
       </div>
     </div>
