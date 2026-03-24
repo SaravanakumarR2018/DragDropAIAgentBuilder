@@ -47,6 +47,8 @@ async def get_subscription_status(
             subscription_id,
         )
         status = getattr(subscription, "status", None)
+        if status:
+            status = str(status).lower()
         logger.info(f"Subscription {subscription_id} status: {status}")
         return status #noqa: TRY300
 

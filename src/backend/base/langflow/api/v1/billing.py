@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from backend.base.langflow.services.auth.clerk_metadata_constants import PADDLE_SUBSCRIPTION_ID_KEY
+from langflow.services.auth.clerk_metadata_constants import PADDLE_SUBSCRIPTION_ID_KEY
 from lfx.log.logger import logger
 from pydantic import BaseModel
 
@@ -148,6 +148,7 @@ async def get_subscriptions_by_customer(
 
     # 2️⃣ Pick active subscription
     active_sub_id = pick_active_subscription(subscriptions)
+    logger.info(f"Active subscription id: {active_sub_id}")
 
     if not active_sub_id:
         return {

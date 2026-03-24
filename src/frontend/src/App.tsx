@@ -1,17 +1,51 @@
-import { Suspense, useEffect } from "react";
+import { useAuth } from "@clerk/clerk-react";
 import { initializePaddle } from "@paddle/paddle-js";
-import { api } from "./controllers/API/api";
-import { getURL } from "./controllers/API/helpers/constants";
+import { Suspense, useCallback, useEffect } from "react";
 import { RouterProvider } from "react-router-dom";
+import { IS_CLERK_AUTH } from "@/clerk/auth";
+import {api} from "@/controllers/API/api";
+import { getURL } from "@/controllers/API/helpers/constants";
 import { LoadingPage } from "./pages/LoadingPage";
 import router from "./routes";
 import { useDarkStore } from "./stores/darkStore";
 
-
-const PADDLE_ENVIRONMENT = (import.meta.env.VITE_PADDLE_ENVIRONMENT)=="staging" ? "sandbox" : "production";
+const PADDLE_ENVIRONMENT =
+  import.meta.env.VITE_PADDLE_ENVIRONMENT === "staging"
+    ? "sandbox"
+    : "production";
 const PADDLE_TOKEN = import.meta.env.VITE_PADDLE_CLIENT_KEY;
+
 export default function App() {
   const dark = useDarkStore((state) => state.dark);
+  const { getToken } = IS_CLERK_AUTH
+    ? useAuth()
+    : { getToken: async () => null };
+
+  const fetchPaddleSubscription = useCallback(async () => {
+    if (!IS_CLERK_AUTH) {
+      console.warn("Skipping Paddle subscription lookup because Clerk auth is disabled");
+      return;
+    }
+
+    try {
+      const clerkToken = await getToken();
+
+      if (!clerkToken) {
+        console.warn("Unable to resolve Clerk token for Paddle subscription lookup");
+        return;
+      }
+
+      const { data } = await api.get(getURL("GET_PADDLE_SUBSCRIPTION"), {
+        headers: {
+          Authorization: `Bearer ${clerkToken}`,
+        },
+      });
+
+      console.log("Resolved Paddle subscription from backend:", data);
+    } catch (error) {
+      console.error("Failed to fetch Paddle subscription from backend", error);
+    }
+  }, [getToken]);
 
   // Dark mode + dynamic css import
   useEffect(() => {
@@ -24,7 +58,7 @@ export default function App() {
   }, [dark]);
 
   useEffect(() => {
-  initializePaddle({
+    initializePaddle({
       environment: PADDLE_ENVIRONMENT,
       token: PADDLE_TOKEN,
       eventCallback: (event) => {
@@ -35,22 +69,7 @@ export default function App() {
           const subscriptionId = (event.data as any)?.subscription?.id;
 
           console.log("Paddle checkout completed", { customerId, subscriptionId });
-
-          if (customerId) {
-            api
-              .get(getURL("GET_PADDLE_SUBSCRIPTION"),)
-              .then(({ data }) => {
-                console.log("Resolved Paddle subscription from backend:", data);
-              })
-              .catch((error) => {
-                console.error(
-                  "Failed to fetch Paddle subscription by customer ID",
-                  error,
-                );
-              });
-          } else {
-            console.warn("Checkout completed without a Paddle customer id");
-          }
+          void fetchPaddleSubscription();
         }
 
         if (event.name === "checkout.closed") {
@@ -61,9 +80,9 @@ export default function App() {
         settings: {
           allowLogout: false,
         },
-    },
-  });
-}, []);
+      },
+    });
+  }, [fetchPaddleSubscription]);
 
   return (
     <Suspense fallback={<LoadingPage />}>
