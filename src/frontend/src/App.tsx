@@ -1,9 +1,9 @@
-import { useAuth } from "@clerk/clerk-react";
+import { useAuth, useOrganization } from "@clerk/clerk-react";
 import { initializePaddle } from "@paddle/paddle-js";
 import { Suspense, useCallback, useEffect } from "react";
 import { RouterProvider } from "react-router-dom";
 import { IS_CLERK_AUTH } from "@/clerk/auth";
-import {api} from "@/controllers/API/api";
+import { api } from "@/controllers/API/api";
 import { getURL } from "@/controllers/API/helpers/constants";
 import { LoadingPage } from "./pages/LoadingPage";
 import router from "./routes";
@@ -17,13 +17,18 @@ const PADDLE_TOKEN = import.meta.env.VITE_PADDLE_CLIENT_KEY;
 
 export default function App() {
   const dark = useDarkStore((state) => state.dark);
+  const { organization } = IS_CLERK_AUTH
+    ? useOrganization()
+    : { organization: undefined };
   const { getToken } = IS_CLERK_AUTH
     ? useAuth()
     : { getToken: async () => null };
 
   const fetchPaddleSubscription = useCallback(async () => {
     if (!IS_CLERK_AUTH) {
-      console.warn("Skipping Paddle subscription lookup because Clerk auth is disabled");
+      console.warn(
+        "Skipping Paddle subscription lookup because Clerk auth is disabled",
+      );
       return;
     }
 
@@ -31,21 +36,60 @@ export default function App() {
       const clerkToken = await getToken();
 
       if (!clerkToken) {
-        console.warn("Unable to resolve Clerk token for Paddle subscription lookup");
+        console.warn(
+          "Unable to resolve Clerk token for Paddle subscription lookup",
+        );
         return;
       }
 
-      const { data } = await api.post(getURL("GET_PADDLE_SUBSCRIPTION"), {
-        headers: {
-          Authorization: `Bearer ${clerkToken}`,
+      const { data } = await api.post(
+        getURL("GET_PADDLE_SUBSCRIPTION"),
+        undefined,
+        {
+          headers: {
+            Authorization: `Bearer ${clerkToken}`,
+          },
         },
-      });
+      );
 
       console.log("Resolved Paddle subscription from backend:", data);
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const refreshedToken = await getToken({
+          skipCache: true,
+          organizationId: organization?.id,
+        });
+
+        if (!refreshedToken) {
+          console.warn(
+            "Unable to resolve refreshed Clerk token for org access check",
+          );
+          break;
+        }
+
+        const accessResponse = await api.get(getURL("BILLING_ACCESS"), {
+          headers: {
+            Authorization: `Bearer ${refreshedToken}`,
+          },
+        });
+
+        const hasAccess = accessResponse.data?.has_access === true;
+        console.log("Resolved org access from backend:", accessResponse.data);
+
+        if (hasAccess) {
+          window.location.href = "/flows";
+          return;
+        }
+
+        // Give backend webhooks/claims propagation a moment before retrying.
+        await new Promise((resolve) => {
+          setTimeout(resolve, 1200);
+        });
+      }
     } catch (error) {
       console.error("Failed to fetch Paddle subscription from backend", error);
     }
-  }, [getToken]);
+  }, [getToken, organization?.id]);
 
   // Dark mode + dynamic css import
   useEffect(() => {
@@ -68,7 +112,10 @@ export default function App() {
           const customerId = (event.data as any)?.customer?.id;
           const subscriptionId = (event.data as any)?.subscription?.id;
 
-          console.log("Paddle checkout completed", { customerId, subscriptionId });
+          console.log("Paddle checkout completed", {
+            customerId,
+            subscriptionId,
+          });
           void fetchPaddleSubscription();
         }
 
