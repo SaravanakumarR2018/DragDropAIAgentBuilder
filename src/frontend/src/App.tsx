@@ -35,7 +35,7 @@ export default function App() {
         return;
       }
 
-      const { data } = await api.get(getURL("GET_PADDLE_SUBSCRIPTION"), {
+      const { data } = await api.post(getURL("GET_PADDLE_SUBSCRIPTION"), {
         headers: {
           Authorization: `Bearer ${clerkToken}`,
         },
