@@ -334,7 +334,7 @@ async def get_subscriptions_by_customer_id(
 
     def _fetch():
         return paddle_client.subscriptions.list(
-            ListSubscriptions(customer_id=[customer_id])
+            ListSubscriptions(customer_ids=[customer_id])
         )
 
     collection = await asyncio.to_thread(_fetch)
@@ -345,7 +345,7 @@ async def get_subscriptions_by_customer_id(
         for sub in collection:
             subscriptions.append({
                 "id": sub.id,
-                "status": getattr(sub, "status", None),
+                "status": str(getattr(sub, "status", "")).lower(),
                 "customer_id": getattr(sub, "customer_id", None),
             })
 
@@ -364,6 +364,12 @@ async def get_subscriptions_by_customer_id(
 
 def pick_active_subscription(subscriptions: list[dict]) -> str | None:
     for sub in subscriptions:
-        if sub["status"] in ACTIVE_SUBSCRIPTION_STATUSES:
+        status = sub["status"]
+
+        if status:
+            status = str(status).lower()
+
+        if status in ACTIVE_SUBSCRIPTION_STATUSES:
             return sub["id"]
+
     return None
