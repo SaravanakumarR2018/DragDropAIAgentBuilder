@@ -1,4 +1,4 @@
-import { useUser } from "@clerk/clerk-react";
+import {useOrganization, useUser } from "@clerk/clerk-react";
 import axios from "axios";
 import type { SVGProps } from "react";
 import { useEffect, useState } from "react";
@@ -94,6 +94,7 @@ function CheckIcon(props: SVGProps<SVGSVGElement>) {
 export default function PricingPage() {
   const navigate = useNavigate();
   const { user } = useUser();
+  const { organization } = useOrganization();
   const email = user?.primaryEmailAddress?.emailAddress;
   const [showEnterpriseContactMessage, setShowEnterpriseContactMessage] =
     useState(false);
@@ -195,6 +196,7 @@ export default function PricingPage() {
       customData: {
         plan_key: planKey,
         seats,
+        org_id: organization?.id,
       },
     });
   };
