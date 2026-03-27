@@ -147,7 +147,7 @@ async def get_subscriptions_by_customer(
         }
 
     # 2️⃣ Pick active subscription
-    active_sub_id = pick_active_subscription(subscriptions)
+    active_sub_id = pick_active_subscription(subscriptions, org_id=org_id)
     logger.info(f"Active subscription id: {active_sub_id}")
 
     if not active_sub_id:

@@ -14,6 +14,7 @@ from paddle_billing.Resources.Subscriptions.Operations import ListSubscriptions
 
 from langflow.services.auth.clerk_metadata_constants import (
     ORGANISATION_CREATED_BY_KEY,
+    PADDLE_CUSTOM_DATA_ORG_ID_KEY,
     PADDLE_CUSTOM_DATA_USER_ID_KEY,
     PADDLE_CUSTOMER_ID_KEY,
     PADDLE_SUBSCRIPTION_ID_KEY,
@@ -343,10 +344,12 @@ async def get_subscriptions_by_customer_id(
 
     while collection:
         for sub in collection:
+            custom_data = _normalize_custom_data(getattr(sub, "custom_data", None))
             subscriptions.append({
                 "id": sub.id,
                 "status": str(getattr(sub, "status", "")).lower(),
                 "customer_id": getattr(sub, "customer_id", None),
+                 "org_id": custom_data.get(PADDLE_CUSTOM_DATA_ORG_ID_KEY),
             })
 
         paginator = getattr(collection, "paginator", None)
@@ -362,14 +365,14 @@ async def get_subscriptions_by_customer_id(
 
     return subscriptions
 
-def pick_active_subscription(subscriptions: list[dict]) -> str | None:
-    for sub in subscriptions:
-        status = sub["status"]
-
-        if status:
-            status = str(status).lower()
-
-        if status in ACTIVE_SUBSCRIPTION_STATUSES:
-            return sub["id"]
-
+def pick_active_subscription(
+    subscriptions: list[dict],
+    *,
+    org_id: str | None = None,
+) -> str | None:
+    if org_id:
+        for sub in subscriptions:
+            status = str(sub.get("status", "")).lower()
+            if status in ACTIVE_SUBSCRIPTION_STATUSES and str(sub.get("org_id", "")).strip() == org_id:
+                return sub["id"]
     return None
