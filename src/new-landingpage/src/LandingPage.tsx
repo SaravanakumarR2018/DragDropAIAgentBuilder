@@ -1,4 +1,4 @@
-import { AnimatePresence, motion, SVGMotionProps } from "framer-motion";
+import { AnimatePresence, motion, type SVGMotionProps } from "framer-motion";
 import { useState, type SVGProps } from "react";
 import { useCookies } from "react-cookie";
 import { useAuth } from "@clerk/clerk-react";
