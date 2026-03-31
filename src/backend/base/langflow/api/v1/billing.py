@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, HTTPException
 from langflow.services.auth.clerk_metadata_constants import PADDLE_SUBSCRIPTION_ID_KEY
 from lfx.log.logger import logger
@@ -148,6 +150,23 @@ async def get_subscriptions_by_customer(
 
     # 2️⃣ Pick active subscription
     active_sub_id = pick_active_subscription(subscriptions, org_id=org_id)
+    retry_attempts = 3
+    retry_delay_seconds = 3
+
+    if not active_sub_id:
+        for attempt in range(retry_attempts):
+            logger.info(
+                "No active subscription found on initial lookup, retrying %s/%s after %ss",
+                attempt + 1,
+                retry_attempts,
+                retry_delay_seconds,
+            )
+            await asyncio.sleep(retry_delay_seconds)
+            subscriptions = await get_subscriptions_by_customer_id(customer_id=customer_id)
+            active_sub_id = pick_active_subscription(subscriptions, org_id=org_id)
+            if active_sub_id:
+                break
+
     logger.info(f"Active subscription id: {active_sub_id}")
 
     if not active_sub_id:
