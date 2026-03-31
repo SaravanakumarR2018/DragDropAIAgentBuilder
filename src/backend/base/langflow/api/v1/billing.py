@@ -1,5 +1,3 @@
-import asyncio
-
 from fastapi import APIRouter, HTTPException
 from langflow.services.auth.clerk_metadata_constants import PADDLE_SUBSCRIPTION_ID_KEY
 from lfx.log.logger import logger
@@ -18,9 +16,11 @@ from langflow.services.deps import get_settings_service
 from langflow.services.paddle.provisioning import get_paddle_prices
 from langflow.services.paddle.subscriptions import (
     ensure_paddle_customer_for_user,
+    fetch_active_subscription,
     get_subscriptions_by_customer_id,
     has_active_subscription,
     pick_active_subscription,
+    retry_with_backoff,
 )
 
 router = APIRouter(tags=["Billing"], prefix="/billing")
@@ -127,54 +127,34 @@ async def list_paddle_prices():
 async def get_subscriptions_by_customer(
     current_user: CurrentActiveUser,
 ) -> dict:
+
     if not get_settings_service().auth_settings.CLERK_AUTH_ENABLED:
         raise HTTPException(status_code=400, detail="Clerk auth not enabled")
 
     customer_id = await get_paddle_customer_id_from_clerk_payload()
     org_id = get_org_id_from_clerk_payload()
-    organisation_created_by = await get_organisation_created_by_from_clerk_payload()
 
     if not customer_id:
         raise HTTPException(status_code=400, detail="Missing paddle_customer_id")
-
-    # 1️⃣ Fetch subscriptions
-    subscriptions = await get_subscriptions_by_customer_id(
-        customer_id=customer_id
-    )
-
-    if not subscriptions:
-        return {
-            "updated": False,
-            "reason": "no_subscriptions_found",
-        }
-
-    # 2️⃣ Pick active subscription
+    
+    subscriptions = await get_subscriptions_by_customer_id(customer_id)
     active_sub_id = pick_active_subscription(subscriptions, org_id=org_id)
-    retry_attempts = 3
-    retry_delay_seconds = 3
-
     if not active_sub_id:
-        for attempt in range(retry_attempts):
-            logger.info(
-                "No active subscription found on initial lookup, retrying %s/%s after %ss",
-                attempt + 1,
-                retry_attempts,
-                retry_delay_seconds,
+        try:
+            active_sub_id, subscriptions = await retry_with_backoff(
+                lambda: fetch_active_subscription(customer_id, org_id),
+                retries=3,
+                base_delay=2,
+                max_delay=5,
+                retry_exceptions=(ValueError,),  # retry only for this
             )
-            await asyncio.sleep(retry_delay_seconds)
-            subscriptions = await get_subscriptions_by_customer_id(customer_id=customer_id)
-            active_sub_id = pick_active_subscription(subscriptions, org_id=org_id)
-            if active_sub_id:
-                break
 
-    logger.info(f"Active subscription id: {active_sub_id}")
-
-    if not active_sub_id:
-        return {
-            "updated": False,
-            "reason": "no_active_subscription",
-            "subscriptions": subscriptions,
-        }
+        except ValueError:
+            return {
+                "updated": False,
+                "reason": "no_active_subscription",
+                "subscriptions": subscriptions,
+            }
 
     # 3️⃣ Update Clerk org metadata
     await update_clerk_organization(

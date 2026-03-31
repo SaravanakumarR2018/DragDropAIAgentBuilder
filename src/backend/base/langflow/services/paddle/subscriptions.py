@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import re
-from typing import Any
+from typing import Callable, Any, Awaitable
+import random
 
 from lfx.log.logger import logger
 from paddle_billing import Client  #noqa: TCH002
@@ -376,3 +377,44 @@ def pick_active_subscription(
             if status in ACTIVE_SUBSCRIPTION_STATUSES and str(sub.get("org_id", "")).strip() == org_id:
                 return sub["id"]
     return None
+
+async def fetch_active_subscription(customer_id, org_id):
+    subs = await get_subscriptions_by_customer_id(customer_id=customer_id)
+    active_id = pick_active_subscription(subs, org_id=org_id)
+
+    if not active_id:
+        raise ValueError("No active subscription yet")
+
+    return active_id, subs
+
+async def retry_with_backoff(
+    func: Callable[[], Awaitable[Any]],
+    retries: int = 3,
+    base_delay: float = 2,
+    max_delay: float = 10,
+    jitter: bool = True,
+    retry_exceptions: tuple = (Exception,),
+) -> Any:
+    last_exception = None
+
+    for attempt in range(retries):
+        try:
+            return await func()
+
+        except retry_exceptions as e:
+            last_exception = e
+
+            delay = min(base_delay * (2 ** attempt), max_delay)
+
+            if jitter:
+                delay += random.uniform(0, 0.5)
+
+            logger.info(
+                "Retry %s/%s failed. Retrying in %.2fs",
+                attempt + 1,
+                retries,
+                delay
+            )
+            await asyncio.sleep(delay)
+
+    raise last_exception
