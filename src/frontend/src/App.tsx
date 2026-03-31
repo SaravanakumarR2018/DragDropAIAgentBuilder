@@ -42,6 +42,10 @@ export default function App() {
         return;
       }
 
+      await new Promise((resolve) => {
+        setTimeout(resolve, 3000);
+      });
+
       const { data } = await api.post(
         getURL("GET_PADDLE_SUBSCRIPTION"),
         undefined,
