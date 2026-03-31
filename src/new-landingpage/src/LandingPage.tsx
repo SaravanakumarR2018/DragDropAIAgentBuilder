@@ -470,13 +470,37 @@ export default function LandingPage(): JSX.Element {
             </div>
           </div>
 
-          <div className="aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-[#0f1217]">
-            <img
-              src={demoWalkthrough}
-              alt="Demo video walkthrough"
-              className="h-full w-full object-cover"
-            />
-          </div>
+          <div className="relative group aspect-video w-full overflow-hidden rounded-2xl border border-white/10 bg-[#0f1217] shadow-xl">
+		  	<img
+				src="https://img.youtube.com/vi/NCBnmrc0feg/maxresdefault.jpg"
+				alt="Demo video walkthrough"
+				className="h-full w-full object-cover object-center scale-110 transition duration-500 group-hover:scale-125"
+			/>
+
+			<div className="absolute inset-0 bg-black/40 group-hover:bg-black/30 transition"/>
+
+			<div className="absolute inset-0 bg-gradient-to-tr from-cyan-500/10 via-transparent to-blue-500/10 opacity-0 group-hover:opacity-100 transition duration-500" />
+
+			<a
+				href="https://www.youtube.com/watch?v=NCBnmrc0feg"
+				target="_blank"
+				rel="noopener noreferrer"
+				className="absolute inset-0 flex items-center justify-center"
+			>
+			<div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/90 backdrop-blur-md shadow-lg transition group-hover:scale-110 group-hover:bg-cyan-400">
+		  		<svg 
+					xmlns="http://www.w3.org/2000/svg"
+					className="h-8 w-8 text-black ml-1"
+					fill="currentColor"
+					viewBox="0 0 24 24"
+				>
+				<path d="M8 5v14l11-7z" />
+		  		</svg>
+			</div>
+			</a>
+
+			<div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-white/10 group-hover:ring-cyan-400/40 transition" />
+		  </div>
         </div>
       </section>
 
