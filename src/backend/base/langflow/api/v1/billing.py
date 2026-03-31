@@ -137,7 +137,7 @@ async def get_subscriptions_by_customer(
     if not customer_id:
         raise HTTPException(status_code=400, detail="Missing paddle_customer_id")
     
-    subscriptions = await get_subscriptions_by_customer_id(customer_id)
+    subscriptions = await get_subscriptions_by_customer_id(customer_id=customer_id)
     active_sub_id = pick_active_subscription(subscriptions, org_id=org_id)
     if not active_sub_id:
         try:
