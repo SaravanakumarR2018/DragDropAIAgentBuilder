@@ -1,6 +1,6 @@
 import { useAuth, useOrganization } from "@clerk/clerk-react";
 import { initializePaddle } from "@paddle/paddle-js";
-import { Suspense, useCallback, useEffect } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { RouterProvider } from "react-router-dom";
 import { IS_CLERK_AUTH } from "@/clerk/auth";
 import { api } from "@/controllers/API/api";
@@ -24,6 +24,8 @@ export default function App() {
     ? useAuth()
     : { getToken: async () => null };
 
+  const [isCheckingSubscription, setIsCheckingSubscription] = useState(false);
+
   const fetchPaddleSubscription = useCallback(async () => {
     if (!IS_CLERK_AUTH) {
       console.warn(
@@ -31,6 +33,8 @@ export default function App() {
       );
       return;
     }
+
+    setIsCheckingSubscription(true);
 
     try {
       const clerkToken = await getToken();
@@ -92,6 +96,8 @@ export default function App() {
       }
     } catch (error) {
       console.error("Failed to fetch Paddle subscription from backend", error);
+    }finally {
+      setIsCheckingSubscription(false);
     }
   }, [getToken, organization?.id]);
 
@@ -136,8 +142,11 @@ export default function App() {
   }, [fetchPaddleSubscription]);
 
   return (
-    <Suspense fallback={<LoadingPage />}>
-      <RouterProvider router={router} />
-    </Suspense>
+    <>
+      <Suspense fallback={<LoadingPage />}>
+        <RouterProvider router={router} />
+      </Suspense>
+      {isCheckingSubscription && <LoadingPage overlay />}
+    </>
   );
 }
