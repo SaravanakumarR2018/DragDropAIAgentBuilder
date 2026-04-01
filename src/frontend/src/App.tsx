@@ -15,6 +15,18 @@ const PADDLE_ENVIRONMENT =
     : "production";
 const PADDLE_TOKEN = import.meta.env.VITE_PADDLE_CLIENT_KEY;
 
+function closePaddleCheckoutModal() {
+  try {
+    const paddle = (window as any)?.Paddle;
+    if (paddle?.Checkout?.close) {
+      paddle.Checkout.close();
+      console.log("Closed Paddle checkout modal before subscription sync");
+    }
+  } catch (error) {
+    console.warn("Unable to close Paddle checkout modal", error);
+  }
+}
+
 export default function App() {
   const dark = useDarkStore((state) => state.dark);
   const { organization } = IS_CLERK_AUTH
@@ -126,6 +138,7 @@ export default function App() {
             customerId,
             subscriptionId,
           });
+          closePaddleCheckoutModal();
           void fetchPaddleSubscription();
         }
 
