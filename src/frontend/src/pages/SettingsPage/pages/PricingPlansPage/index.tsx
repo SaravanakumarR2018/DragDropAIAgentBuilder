@@ -5,21 +5,41 @@ import ForwardedIconComponent from "@/components/common/genericIconComponent";
 import Loading from "@/components/ui/loading";
 import { api } from "@/controllers/API/api";
 import { getURL } from "@/controllers/API/helpers/constants";
+import planConfigData from "../../../../../public/plan_config.json";
 
 type BillingAccessResponse = {
   has_access?: boolean;
   subscription_status?: string | null;
+  subscription_plan_key?: string | null;
   paddle_subscription_id?: string | null;
 };
+
+const PLAN_NAME_BY_KEY = Object.fromEntries(
+  (planConfigData.plans ?? []).map((plan) => [
+    String(plan?.paddle?.plan_key ?? "").toLowerCase(),
+    String(plan?.name ?? "").trim(),
+  ]),
+) as Record<string, string>;
+
+function formatPlanKey(planKey: string): string {
+  return planKey
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
 
 function SelectedPlan({ billing }: { billing: BillingAccessResponse | null }) {
   const selectedPlan = useMemo(() => {
     if (!billing?.has_access) return "Free";
 
-    const status = (billing.subscription_status ?? "").toLowerCase();
-    if (status === "trialing") return "Paid (Trialing)";
+    const planKey = (billing.subscription_plan_key ?? "").toLowerCase();
+    const planName = PLAN_NAME_BY_KEY[planKey];
+    if (planName) return planName;
+    if (planKey) return formatPlanKey(planKey);
 
-    return "Paid";
+    const status = (billing.subscription_status ?? "").toLowerCase();
+    return status === "trialing" ? "Paid (Trialing)" : "Paid";
   }, [billing]);
 
   return (
