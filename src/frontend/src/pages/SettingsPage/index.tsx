@@ -77,6 +77,16 @@ const SettingsPageBase = ({
         />
       ),
     },
+    {
+      title: "Pricing Plans",
+      href: "/settings/pricing-plans",
+      icon: (
+        <ForwardedIconComponent
+          name="BadgeDollarSign"
+          className="w-4 flex-shrink-0 justify-start stroke-[1.5]"
+        />
+      ),
+    },
   );
 
   // TODO: Remove this on cleanup
