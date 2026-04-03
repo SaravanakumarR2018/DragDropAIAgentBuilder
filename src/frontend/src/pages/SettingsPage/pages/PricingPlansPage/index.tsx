@@ -280,16 +280,21 @@ export default function PricingPlansPage() {
                   You have access {accessEndsMessage}
                 </DialogDescription>
               </DialogHeader>
-
-              <Checkbox
-                checked={cancelImmediately}
-                onCheckedChange={(checked) =>
-                  setCancelImmediately(Boolean(checked))
-                }
-              >
-                Cancel now (no refund)
-              </Checkbox>
-
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="cancel-now"
+                  checked={cancelImmediately}
+                  onCheckedChange={(checked) =>
+                    setCancelImmediately(Boolean(checked))
+                  }
+                />
+                <label
+                  htmlFor="cancel-now"
+                  className="text-sm text-muted-foreground cursor-pointer"
+                >
+                  Cancel now (no refund)
+                </label>
+              </div>
               <DialogFooter>
                 <Button onClick={() => setCancelModalOpen(false)}>
                   Keep subscription
