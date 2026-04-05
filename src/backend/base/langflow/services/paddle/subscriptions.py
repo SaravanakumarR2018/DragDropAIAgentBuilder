@@ -72,16 +72,31 @@ async def has_active_subscription(
         return {
             "has_access": False,
             "subscription_status": None,
+            "subscription_plan_key": None,
             "paddle_subscription_id": None,
             "organisation_created_by": created_by,
         }
 
-    status = await get_subscription_status(subscription_id=sub_id, client=client)
+    paddle_client = client or get_paddle_client()
+    subscription = await asyncio.to_thread(
+        paddle_client.subscriptions.get,
+        sub_id,
+    )
+    status = getattr(subscription, "status", None)
+    if status:
+        status = str(status).lower()
     has_access = status in ACTIVE_SUBSCRIPTION_STATUSES if status else False
+    subscription_custom_data = _normalize_custom_data(
+        getattr(subscription, "custom_data", None)
+    )
+    plan_key = subscription_custom_data.get("plan_key")
+    if plan_key is not None:
+        plan_key = str(plan_key)
     logger.info(f"Subscription {sub_id} - status: {status}, has_access: {has_access}, active_statuses: {ACTIVE_SUBSCRIPTION_STATUSES}")
     return {
         "has_access": has_access,
         "subscription_status": status,
+        "subscription_plan_key": plan_key,
         "paddle_subscription_id": sub_id,
         "organisation_created_by": created_by,
     }

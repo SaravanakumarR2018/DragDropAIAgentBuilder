@@ -64,6 +64,9 @@ const DebuggingPage = lazy(
 const MCPServersPage = lazy(
   () => import("./pages/SettingsPage/pages/MCPServersPage"),
 );
+const PricingPlansPage = lazy(
+  () => import("./pages/SettingsPage/pages/PricingPlansPage"),
+);
 const KnowledgePage = lazy(
   () => import("./pages/MainPage/pages/knowledgePage"),
 );
@@ -298,6 +301,14 @@ const router = createBrowserRouter(
                   element={
                     <Suspense fallback={<LoadingPage />}>
                       <MessagesPage />
+                    </Suspense>
+                  }
+                />
+                <Route
+                  path="pricing-plans"
+                  element={
+                    <Suspense fallback={<LoadingPage />}>
+                      <PricingPlansPage />
                     </Suspense>
                   }
                 />
