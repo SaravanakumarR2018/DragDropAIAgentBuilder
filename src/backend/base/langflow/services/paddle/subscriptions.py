@@ -4,15 +4,18 @@ from __future__ import annotations
 
 import asyncio
 import re
-from typing import Any
+from typing import Callable, Any, Awaitable
+import random
 
 from lfx.log.logger import logger
 from paddle_billing import Client  #noqa: TCH002
 from paddle_billing.Entities.Shared import CustomData
 from paddle_billing.Resources.Customers.Operations import CreateCustomer, UpdateCustomer
+from paddle_billing.Resources.Subscriptions.Operations import ListSubscriptions
 
 from langflow.services.auth.clerk_metadata_constants import (
     ORGANISATION_CREATED_BY_KEY,
+    PADDLE_CUSTOM_DATA_ORG_ID_KEY,
     PADDLE_CUSTOM_DATA_USER_ID_KEY,
     PADDLE_CUSTOMER_ID_KEY,
     PADDLE_SUBSCRIPTION_ID_KEY,
@@ -323,3 +326,95 @@ async def _sync_paddle_customer_metadata(
         )
         raise
 
+async def get_subscriptions_by_customer_id(
+    *,
+    customer_id: str,
+    client: Client | None = None,
+) -> list[dict]:
+
+    paddle_client = client or get_paddle_client()
+
+    def _fetch():
+        return paddle_client.subscriptions.list(
+            ListSubscriptions(customer_ids=[customer_id])
+        )
+
+    collection = await asyncio.to_thread(_fetch)
+
+    subscriptions = []
+
+    while collection:
+        for sub in collection:
+            custom_data = _normalize_custom_data(getattr(sub, "custom_data", None))
+            subscriptions.append({
+                "id": sub.id,
+                "status": str(getattr(sub, "status", "")).lower(),
+                "customer_id": getattr(sub, "customer_id", None),
+                 "org_id": custom_data.get(PADDLE_CUSTOM_DATA_ORG_ID_KEY),
+            })
+
+        paginator = getattr(collection, "paginator", None)
+        next_page = getattr(paginator, "next", None) if paginator else None
+
+        if not callable(next_page):
+            break
+
+        try:
+            collection = next_page()
+        except Exception:
+            break
+
+    return subscriptions
+
+def pick_active_subscription(
+    subscriptions: list[dict],
+    *,
+    org_id: str | None = None,
+) -> str | None:
+    if org_id:
+        for sub in subscriptions:
+            status = str(sub.get("status", "")).lower()
+            if status in ACTIVE_SUBSCRIPTION_STATUSES and str(sub.get("org_id", "")).strip() == org_id:
+                return sub["id"]
+    return None
+
+async def fetch_active_subscription(customer_id, org_id):
+    subs = await get_subscriptions_by_customer_id(customer_id=customer_id)
+    active_id = pick_active_subscription(subs, org_id=org_id)
+
+    if not active_id:
+        raise ValueError("No active subscription yet")
+
+    return active_id, subs
+
+async def retry_with_backoff(
+    func: Callable[[], Awaitable[Any]],
+    retries: int = 3,
+    base_delay: float = 2,
+    max_delay: float = 10,
+    jitter: bool = True,
+    retry_exceptions: tuple = (Exception,),
+) -> Any:
+    last_exception = None
+
+    for attempt in range(retries):
+        try:
+            return await func()
+
+        except retry_exceptions as e:
+            last_exception = e
+
+            delay = min(base_delay * (2 ** attempt), max_delay)
+
+            if jitter:
+                delay += random.uniform(0, 0.5)
+
+            logger.info(
+                "Retry %s/%s failed. Retrying in %.2fs",
+                attempt + 1,
+                retries,
+                delay
+            )
+            await asyncio.sleep(delay)
+
+    raise last_exception

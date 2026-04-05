@@ -1,5 +1,11 @@
 from fastapi import APIRouter, HTTPException
-
+from lfx.log.logger import logger
+from langflow.services.auth.clerk_metadata_constants import ORGANISATION_CREATED_BY_KEY
+from langflow.services.auth.clerk_utils import (
+    get_clerk_user_id_from_payload,
+    get_org_id_from_clerk_payload,
+    update_clerk_organization,
+)
 from langflow.services.database.organisation import OrganizationService
 from langflow.services.deps import get_settings_service
 
@@ -12,6 +18,14 @@ async def create_organisation():
     settings_service = get_settings_service()
     if not settings_service.auth_settings.CLERK_AUTH_ENABLED:
         raise HTTPException(status_code=404, detail="Not found")
+    
+    org_id = get_org_id_from_clerk_payload()
+    clerk_user_id = get_clerk_user_id_from_payload()
+    logger.info(f"Creating organisation for user {clerk_user_id} with org id {org_id}")
+    await update_clerk_organization(
+        org_id=org_id,
+        public_metadata={ORGANISATION_CREATED_BY_KEY: clerk_user_id},
+    )
 
     service = OrganizationService()
     try:

@@ -1,14 +1,117 @@
-import { Suspense, useEffect } from "react";
+import { useAuth, useOrganization } from "@clerk/clerk-react";
+import { initializePaddle } from "@paddle/paddle-js";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { RouterProvider } from "react-router-dom";
+import { IS_CLERK_AUTH } from "@/clerk/auth";
+import { api } from "@/controllers/API/api";
+import { getURL } from "@/controllers/API/helpers/constants";
 import { LoadingPage } from "./pages/LoadingPage";
 import router from "./routes";
 import { useDarkStore } from "./stores/darkStore";
-import { initializePaddle } from "@paddle/paddle-js";
 
-const PADDLE_ENVIRONMENT = (import.meta.env.VITE_PADDLE_ENVIRONMENT)=="staging" ? "sandbox" : "production";
+const PADDLE_ENVIRONMENT =
+  import.meta.env.VITE_PADDLE_ENVIRONMENT === "staging"
+    ? "sandbox"
+    : "production";
 const PADDLE_TOKEN = import.meta.env.VITE_PADDLE_CLIENT_KEY;
+
+function closePaddleCheckoutModal() {
+  try {
+    const paddle = (window as any)?.Paddle;
+    if (paddle?.Checkout?.close) {
+      paddle.Checkout.close();
+      console.log("Closed Paddle checkout modal before subscription sync");
+    }
+  } catch (error) {
+    console.warn("Unable to close Paddle checkout modal", error);
+  }
+}
+
 export default function App() {
   const dark = useDarkStore((state) => state.dark);
+  const { organization } = IS_CLERK_AUTH
+    ? useOrganization()
+    : { organization: undefined };
+  const { getToken } = IS_CLERK_AUTH
+    ? useAuth()
+    : { getToken: async () => null };
+
+  const [isCheckingSubscription, setIsCheckingSubscription] = useState(false);
+
+  const fetchPaddleSubscription = useCallback(async () => {
+    if (!IS_CLERK_AUTH) {
+      console.warn(
+        "Skipping Paddle subscription lookup because Clerk auth is disabled",
+      );
+      return;
+    }
+
+    setIsCheckingSubscription(true);
+
+    try {
+      const clerkToken = await getToken();
+
+      if (!clerkToken) {
+        console.warn(
+          "Unable to resolve Clerk token for Paddle subscription lookup",
+        );
+        return;
+      }
+
+      await new Promise((resolve) => {
+        setTimeout(resolve, 3000);
+      });
+
+      const { data } = await api.post(
+        getURL("GET_PADDLE_SUBSCRIPTION"),
+        undefined,
+        {
+          headers: {
+            Authorization: `Bearer ${clerkToken}`,
+          },
+        },
+      );
+
+      console.log("Resolved Paddle subscription from backend:", data);
+
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const refreshedToken = await getToken({
+          skipCache: true,
+          organizationId: organization?.id,
+        });
+
+        if (!refreshedToken) {
+          console.warn(
+            "Unable to resolve refreshed Clerk token for org access check",
+          );
+          break;
+        }
+
+        const accessResponse = await api.get(getURL("BILLING_ACCESS"), {
+          headers: {
+            Authorization: `Bearer ${refreshedToken}`,
+          },
+        });
+
+        const hasAccess = accessResponse.data?.has_access === true;
+        console.log("Resolved org access from backend:", accessResponse.data);
+
+        if (hasAccess) {
+          window.location.href = "/flows";
+          return;
+        }
+
+        // Give backend webhooks/claims propagation a moment before retrying.
+        await new Promise((resolve) => {
+          setTimeout(resolve, 1200);
+        });
+      }
+    } catch (error) {
+      console.error("Failed to fetch Paddle subscription from backend", error);
+    }finally {
+      setIsCheckingSubscription(false);
+    }
+  }, [getToken, organization?.id]);
 
   // Dark mode + dynamic css import
   useEffect(() => {
@@ -21,36 +124,42 @@ export default function App() {
   }, [dark]);
 
   useEffect(() => {
-  initializePaddle({
-    environment: PADDLE_ENVIRONMENT,
-    token: PADDLE_TOKEN,
-    eventCallback: (event) => {
-      console.log("Paddle event:", event);
+    initializePaddle({
+      environment: PADDLE_ENVIRONMENT,
+      token: PADDLE_TOKEN,
+      eventCallback: (event) => {
+        console.log("Paddle event:", event);
 
-      // Checkout completed
-      if (event.name === "checkout.completed") {
-        const subscriptionId = (event.data as any)?.subscription?.id;
-        console.log("Subscription ID:", subscriptionId);
-         // navigate on success
-      }
+        if (event.name === "checkout.completed") {
+          const customerId = (event.data as any)?.customer?.id;
+          const subscriptionId = (event.data as any)?.subscription?.id;
 
-      // Checkout closed
-      if (event.name === "checkout.closed") {
-        console.log("Checkout closed");
-      }
-    },
-    checkout: {
-      // you can set global default settings here
-      settings: {
-        allowLogout: false,
+          console.log("Paddle checkout completed", {
+            customerId,
+            subscriptionId,
+          });
+          closePaddleCheckoutModal();
+          void fetchPaddleSubscription();
+        }
+
+        if (event.name === "checkout.closed") {
+          console.log("Checkout closed");
+        }
       },
-    },
-  });
-}, []);
+      checkout: {
+        settings: {
+          allowLogout: false,
+        },
+      },
+    });
+  }, [fetchPaddleSubscription]);
 
   return (
-    <Suspense fallback={<LoadingPage />}>
-      <RouterProvider router={router} />
-    </Suspense>
+    <>
+      <Suspense fallback={<LoadingPage />}>
+        <RouterProvider router={router} />
+      </Suspense>
+      {isCheckingSubscription && <LoadingPage overlay />}
+    </>
   );
 }

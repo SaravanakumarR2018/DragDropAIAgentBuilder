@@ -1,19 +1,26 @@
 from fastapi import APIRouter, HTTPException
+from langflow.services.auth.clerk_metadata_constants import PADDLE_SUBSCRIPTION_ID_KEY
 from lfx.log.logger import logger
 from pydantic import BaseModel
 
 from langflow.api.utils import CurrentActiveUser
 from langflow.services.auth.clerk_utils import (
     get_clerk_user_id_from_payload,
+    get_org_id_from_clerk_payload,
     get_organisation_created_by_from_clerk_payload,
     get_paddle_customer_id_from_clerk_payload,
     get_paddle_subscription_id_from_clerk_payload,
+    update_clerk_organization,
 )
 from langflow.services.deps import get_settings_service
 from langflow.services.paddle.provisioning import get_paddle_prices
 from langflow.services.paddle.subscriptions import (
     ensure_paddle_customer_for_user,
+    fetch_active_subscription,
+    get_subscriptions_by_customer_id,
     has_active_subscription,
+    pick_active_subscription,
+    retry_with_backoff,
 )
 
 router = APIRouter(tags=["Billing"], prefix="/billing")
@@ -114,3 +121,49 @@ async def list_paddle_prices():
     except Exception as exc: #noqa: BLE001
         logger.exception(f"Error fetching Paddle prices {exc}")
         raise HTTPException(status_code=500, detail="Internal server error") #noqa: B904
+
+
+@router.post("/get-subscriptions")
+async def get_subscriptions_by_customer(
+    current_user: CurrentActiveUser,
+) -> dict:
+
+    if not get_settings_service().auth_settings.CLERK_AUTH_ENABLED:
+        raise HTTPException(status_code=400, detail="Clerk auth not enabled")
+
+    customer_id = await get_paddle_customer_id_from_clerk_payload()
+    org_id = get_org_id_from_clerk_payload()
+
+    if not customer_id:
+        raise HTTPException(status_code=400, detail="Missing paddle_customer_id")
+    
+    subscriptions = await get_subscriptions_by_customer_id(customer_id=customer_id)
+    active_sub_id = pick_active_subscription(subscriptions, org_id=org_id)
+    if not active_sub_id:
+        try:
+            active_sub_id, subscriptions = await retry_with_backoff(
+                lambda: fetch_active_subscription(customer_id, org_id),
+                retries=3,
+                base_delay=2,
+                max_delay=5,
+                retry_exceptions=(ValueError,),  # retry only for this
+            )
+
+        except ValueError:
+            return {
+                "updated": False,
+                "reason": "no_active_subscription",
+                "subscriptions": subscriptions,
+            }
+
+    # 3️⃣ Update Clerk org metadata
+    await update_clerk_organization(
+        org_id=org_id,
+        public_metadata={PADDLE_SUBSCRIPTION_ID_KEY: active_sub_id},
+    )
+
+    return {
+        "updated": True,
+        "subscription_id": active_sub_id,
+        "total_subscriptions": len(subscriptions),
+    }
