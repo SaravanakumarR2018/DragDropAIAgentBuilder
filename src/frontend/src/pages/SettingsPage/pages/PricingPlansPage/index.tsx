@@ -202,7 +202,7 @@ export default function PricingPlansPage() {
       if (String(msg).toLowerCase().includes("already")) {
         setAlreadyCancelled(true);
         setCancelError(
-          `You already cancelled your subscription. You still have access ${accessEndsMessage}.`,
+          `Subscription Cancelled Successfully. You still have access ${accessEndsMessage}.`,
         );
       } else {
         setCancelError(String(msg));
