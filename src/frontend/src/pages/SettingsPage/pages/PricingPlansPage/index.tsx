@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { IS_CLERK_AUTH } from "@/clerk/auth";
 import ForwardedIconComponent from "@/components/common/genericIconComponent";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -60,9 +59,7 @@ function SelectedPlan({ billing }: { billing: BillingAccessResponse | null }) {
   return (
     <div className="rounded-xl border bg-background p-4">
       <p className="text-sm text-muted-foreground">Selected plan</p>
-      <p className="mt-1 text-xl font-semibold">
-        {selectedPlan}
-      </p>
+      <p className="mt-1 text-xl font-semibold">{selectedPlan}</p>
       <div className="mt-3 space-y-1 text-sm text-muted-foreground">
         <p>Subscription status: {billing?.subscription_status ?? "not available"}</p>
         <p>Subscription ID: {billing?.paddle_subscription_id ?? "not available"}</p>
@@ -79,7 +76,6 @@ export default function PricingPlansPage() {
   const [billing, setBilling] = useState<BillingAccessResponse | null>(null);
 
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
-  const [cancelImmediately, setCancelImmediately] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
 
   const [cancelError, setCancelError] = useState<string | null>(null);
@@ -106,10 +102,11 @@ export default function PricingPlansPage() {
 
   const isCancelScheduled = Boolean(billing?.cancel_scheduled);
 
-  // ✅ FIXED: allow button even if scheduled (so user can "Cancel Now")
   const canCancelSubscription =
     Boolean(billing?.paddle_subscription_id) &&
-    !isCancelledState;
+    !isCancelledState &&
+    !isCancelScheduled &&
+    !alreadyCancelled;
 
   useEffect(() => {
     if (!IS_CLERK_AUTH) {
@@ -143,7 +140,9 @@ export default function PricingPlansPage() {
     };
 
     void load();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [getToken]);
 
   useEffect(() => {
@@ -165,9 +164,9 @@ export default function PricingPlansPage() {
   ]);
 
   const handleCancelSubscription = async () => {
-    if ((alreadyCancelled || isCancelScheduled) && !cancelImmediately) {
+    if (alreadyCancelled || isCancelScheduled) {
       setCancelError(
-        `You already cancelled your subscription. Access continues ${accessEndsMessage}.`,
+        `Subscription Cancelled Successfully. Access continues ${accessEndsMessage}.`,
       );
       setCancelModalOpen(false);
       return;
@@ -182,28 +181,18 @@ export default function PricingPlansPage() {
 
       await api.post(
         getURL("CANCEL_PADDLE_SUBSCRIPTION"),
-        { effective_from_immediately: cancelImmediately },
+        { effective_from_immediately: false },
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
-      // ✅ IMMEDIATE CANCEL → redirect instantly
-      if (cancelImmediately) {
-        navigate("/pricing", { replace: true });
-        return;
-      }
-
-      // scheduled cancel
       setAlreadyCancelled(true);
-
       setCancelModalOpen(false);
-      setCancelImmediately(false);
 
       const res = await api.get(getURL("BILLING_ACCESS"), {
         headers: { Authorization: `Bearer ${token}` },
       });
 
       setBilling(res.data ?? null);
-
     } catch (error: any) {
       const msg =
         error?.response?.data?.detail ??
@@ -280,21 +269,6 @@ export default function PricingPlansPage() {
                   You have access {accessEndsMessage}
                 </DialogDescription>
               </DialogHeader>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="cancel-now"
-                  checked={cancelImmediately}
-                  onCheckedChange={(checked) =>
-                    setCancelImmediately(Boolean(checked))
-                  }
-                />
-                <label
-                  htmlFor="cancel-now"
-                  className="text-sm text-muted-foreground cursor-pointer"
-                >
-                  Cancel now (no refund)
-                </label>
-              </div>
               <DialogFooter>
                 <Button onClick={() => setCancelModalOpen(false)}>
                   Keep subscription
