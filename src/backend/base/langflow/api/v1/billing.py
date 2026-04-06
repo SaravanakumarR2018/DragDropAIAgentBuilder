@@ -15,6 +15,7 @@ from langflow.services.auth.clerk_utils import (
 from langflow.services.deps import get_settings_service
 from langflow.services.paddle.provisioning import get_paddle_prices
 from langflow.services.paddle.subscriptions import (
+    cancel_subscription,
     ensure_paddle_customer_for_user,
     fetch_active_subscription,
     get_subscriptions_by_customer_id,
@@ -167,3 +168,46 @@ async def get_subscriptions_by_customer(
         "subscription_id": active_sub_id,
         "total_subscriptions": len(subscriptions),
     }
+
+class CancelSubscriptionRequest(BaseModel):
+    effective_from_immediately: bool = False
+
+
+@router.post("/cancel-subscription")
+async def cancel_subscription_api(
+    body: CancelSubscriptionRequest,
+    current_user: CurrentActiveUser,
+) -> dict:
+    """Cancel subscription using Paddle"""
+
+    if not get_settings_service().auth_settings.CLERK_AUTH_ENABLED:
+        raise HTTPException(status_code=400, detail="Clerk auth not enabled")
+
+    # Get subscription_id from Clerk metadata (JWT)
+    subscription_id = await get_paddle_subscription_id_from_clerk_payload()
+
+    if not subscription_id:
+        raise HTTPException(status_code=400, detail="Missing paddle_subscription_id")
+
+    logger.info(
+        f"Cancel request for subscription {subscription_id}, "
+        f"immediate={body.effective_from_immediately}"
+    )
+
+    try:
+        result = await cancel_subscription(
+            subscription_id=subscription_id,
+            effective_from_immediately=body.effective_from_immediately,
+        )
+
+        return {
+            "success": True,
+            "message": "Subscription cancellation triggered",
+            **result,
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to cancel subscription: {str(e)}",
+        )
