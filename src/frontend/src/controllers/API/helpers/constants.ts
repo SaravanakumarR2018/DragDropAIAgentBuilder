@@ -35,6 +35,7 @@ export const URLs = {
   GET_PADDLE_PRICES: `billing/paddle-prices`,
   GET_PADDLE_SUBSCRIPTION: `billing/get-subscriptions`,
   CANCEL_PADDLE_SUBSCRIPTION: `billing/cancel-subscription`,
+  CHANGE_SUBSCRIPTION: `billing/change-subscription`,
 } as const;
 
 // IMPORTANT: FOLDERS endpoint now points to 'projects' for backward compatibility

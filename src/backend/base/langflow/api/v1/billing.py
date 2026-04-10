@@ -16,11 +16,10 @@ from langflow.services.deps import get_settings_service
 from langflow.services.paddle.provisioning import get_paddle_prices
 from langflow.services.paddle.subscriptions import (
     cancel_subscription,
+    change_subscription,
     ensure_paddle_customer_for_user,
     fetch_active_subscription,
-    get_subscriptions_by_customer_id,
     has_active_subscription,
-    pick_active_subscription,
     retry_with_backoff,
 )
 
@@ -29,6 +28,11 @@ router = APIRouter(tags=["Billing"], prefix="/billing")
 
 class EnsurePaddleCustomerRequest(BaseModel):
     email: str | None = None
+
+class ChangeSubscriptionRequest(BaseModel):
+    price_id: str
+    quantity: int = 1
+    is_upgrade: bool
 
 @router.post("/ensure-paddle-customer")
 async def ensure_paddle_customer(
@@ -138,8 +142,13 @@ async def get_subscriptions_by_customer(
     if not customer_id:
         raise HTTPException(status_code=400, detail="Missing paddle_customer_id")
     
-    subscriptions = await get_subscriptions_by_customer_id(customer_id=customer_id)
-    active_sub_id = pick_active_subscription(subscriptions, org_id=org_id)
+    subscriptions = []
+    active_sub_id = None
+
+    try:
+        active_sub_id, subscriptions = await fetch_active_subscription(customer_id, org_id)
+    except ValueError:
+        pass
     if not active_sub_id:
         try:
             active_sub_id, subscriptions = await retry_with_backoff(
@@ -210,4 +219,56 @@ async def cancel_subscription_api(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to cancel subscription: {str(e)}",
+        )
+
+@router.post("/change-subscription")
+async def change_subscription_api(
+    body: ChangeSubscriptionRequest,
+    current_user: CurrentActiveUser,
+) -> dict:
+    """Change subscription (Starter -> Pro)"""
+
+    logger.info(f"Change subscription API called by user {current_user.id}")
+
+    if not get_settings_service().auth_settings.CLERK_AUTH_ENABLED:
+        raise HTTPException(status_code=400, detail="Clerk auth not enabled")
+
+    # 1️⃣ Get subscription_id from Clerk metadata
+    subscription_id = await get_paddle_subscription_id_from_clerk_payload()
+
+    if not subscription_id:
+        raise HTTPException(status_code=400, detail="Missing paddle_subscription_id")
+
+    logger.info(
+        f"Upgrade request for subscription {subscription_id} "
+        f"to price {body.price_id}"
+    )
+
+    try:
+        result = await change_subscription(
+            subscription_id=subscription_id,
+            new_price_id=body.price_id,
+            quantity=body.quantity,
+            is_upgrade=body.is_upgrade,
+        )
+
+        logger.info(
+            f"Successfully changed subscription {subscription_id} "
+            f"to price {body.price_id}, status: {result.get('status')}"
+        )
+
+        return {
+            "success": True,
+            "message": "Subscription changed successfully",
+            **result,
+        }
+
+    except Exception as e:
+        logger.info(
+            f"Failed to upgrade subscription {subscription_id} "
+            f"for user {current_user.id}: {str(e)}"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to upgrade subscription: {str(e)}",
         )

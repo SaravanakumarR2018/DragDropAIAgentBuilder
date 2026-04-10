@@ -11,8 +11,10 @@ from lfx.log.logger import logger
 from paddle_billing import Client  #noqa: TCH002
 from paddle_billing.Entities.Shared import CustomData
 from paddle_billing.Resources.Customers.Operations import CreateCustomer, UpdateCustomer
-from paddle_billing.Resources.Subscriptions.Operations import ListSubscriptions, CancelSubscription
-from paddle_billing.Entities.Subscriptions import SubscriptionEffectiveFrom
+from paddle_billing.Resources.Subscriptions.Operations import ListSubscriptions, CancelSubscription, UpdateSubscription
+from paddle_billing.Entities.Subscriptions import SubscriptionEffectiveFrom, SubscriptionProrationBillingMode
+from paddle_billing.Resources.Subscriptions.Operations.Update import SubscriptionUpdateItem
+
 
 from langflow.services.auth.clerk_metadata_constants import (
     ORGANISATION_CREATED_BY_KEY,
@@ -511,3 +513,56 @@ async def cancel_subscription(
     except Exception as e:
         logger.exception(f"Error cancelling subscription {subscription_id}: {e}")
         raise
+
+async def change_subscription(
+    *,
+    subscription_id: str,
+    new_price_id: str,
+    quantity: int = 1,
+    is_upgrade: bool,
+    client: Client | None = None,
+):
+    paddle_client = client or get_paddle_client()
+
+    subscription = await asyncio.to_thread(
+        paddle_client.subscriptions.get,
+        subscription_id,
+    )
+
+    status = str(getattr(subscription, "status", "")).lower()
+
+    if is_upgrade:
+        if status == "trialing":
+            proration_mode = SubscriptionProrationBillingMode.DoNotBill
+        else:
+            proration_mode = SubscriptionProrationBillingMode.ProratedImmediately
+    else:
+        proration_mode = SubscriptionProrationBillingMode.DoNotBill
+
+    plan_key = "pro_pack_monthly" if is_upgrade else "starter_pack_monthly"
+
+    operation = UpdateSubscription(
+        items=[
+            SubscriptionUpdateItem(
+                price_id=new_price_id,
+                quantity=quantity,
+            )
+        ],
+        proration_billing_mode=proration_mode,
+        custom_data=CustomData({
+            "plan_key": plan_key,
+        }),
+    )
+
+    updated = await asyncio.to_thread(
+        paddle_client.subscriptions.update,
+        subscription_id,
+        operation,
+    )
+
+    return {
+        "subscription_id": subscription_id,
+        "status": getattr(updated, "status", None),
+        "price_id": new_price_id,
+        "proration_mode": str(proration_mode),
+    }
