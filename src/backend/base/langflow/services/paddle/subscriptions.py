@@ -11,7 +11,10 @@ from lfx.log.logger import logger
 from paddle_billing import Client  #noqa: TCH002
 from paddle_billing.Entities.Shared import CustomData
 from paddle_billing.Resources.Customers.Operations import CreateCustomer, UpdateCustomer
-from paddle_billing.Resources.Subscriptions.Operations import ListSubscriptions
+from paddle_billing.Resources.Subscriptions.Operations import ListSubscriptions, CancelSubscription, UpdateSubscription
+from paddle_billing.Entities.Subscriptions import SubscriptionEffectiveFrom, SubscriptionProrationBillingMode
+from paddle_billing.Resources.Subscriptions.Operations.Update import SubscriptionUpdateItem
+
 
 from langflow.services.auth.clerk_metadata_constants import (
     ORGANISATION_CREATED_BY_KEY,
@@ -75,6 +78,9 @@ async def has_active_subscription(
             "subscription_plan_key": None,
             "paddle_subscription_id": None,
             "organisation_created_by": created_by,
+            "next_billed_at": None,
+            "current_period_end": None,
+            "cancel_scheduled": False,
         }
 
     paddle_client = client or get_paddle_client()
@@ -82,6 +88,7 @@ async def has_active_subscription(
         paddle_client.subscriptions.get,
         sub_id,
     )
+
     status = getattr(subscription, "status", None)
     if status:
         status = str(status).lower()
@@ -92,13 +99,35 @@ async def has_active_subscription(
     plan_key = subscription_custom_data.get("plan_key")
     if plan_key is not None:
         plan_key = str(plan_key)
-    logger.info(f"Subscription {sub_id} - status: {status}, has_access: {has_access}, active_statuses: {ACTIVE_SUBSCRIPTION_STATUSES}")
+
+    next_billed_at = getattr(subscription, "next_billed_at", None)
+
+    current_period = getattr(subscription, "current_billing_period", None)
+    current_period_end = None
+    if current_period:
+        current_period_end = getattr(current_period, "ends_at", None)
+
+    scheduled_change = getattr(subscription, "scheduled_change", None)
+    cancel_scheduled = False
+    if scheduled_change:
+        action = getattr(scheduled_change, "action", None)
+        cancel_scheduled = str(action).lower() == "cancel"
+
+    logger.info(
+        f"Subscription {sub_id} - status: {status}, "
+        f"has_access: {has_access}, next_billed_at: {next_billed_at}, "
+        f"cancel_scheduled: {cancel_scheduled}"
+    )
+
     return {
         "has_access": has_access,
         "subscription_status": status,
         "subscription_plan_key": plan_key,
         "paddle_subscription_id": sub_id,
         "organisation_created_by": created_by,
+        "next_billed_at": next_billed_at,
+        "current_period_end": current_period_end,
+        "cancel_scheduled": cancel_scheduled,
     }
 
 
@@ -433,3 +462,107 @@ async def retry_with_backoff(
             await asyncio.sleep(delay)
 
     raise last_exception
+
+
+async def cancel_subscription(
+    *,
+    subscription_id: str,
+    effective_from_immediately: bool = False,
+    client: Client | None = None,
+):
+    """
+    Cancel a Paddle subscription.
+
+    Args:
+        subscription_id: Paddle subscription ID (sub_xxx)
+        effective_from_immediately: 
+            True  -> cancel immediately
+            False -> cancel at next billing period (default)
+    """
+    paddle_client = client or get_paddle_client()
+
+    # Map boolean -> Paddle enum
+    effective_from = (
+        SubscriptionEffectiveFrom.IMMEDIATELY
+        if effective_from_immediately
+        else SubscriptionEffectiveFrom.NEXT_BILLING_PERIOD
+    )
+
+    operation = CancelSubscription(
+        effective_from=effective_from
+    )
+
+    try:
+        subscription = await asyncio.to_thread(
+            paddle_client.subscriptions.cancel,
+            subscription_id,
+            operation,
+        )
+
+        logger.info(
+            f"Cancelled subscription {subscription_id} "
+            f"(effective_from={effective_from})"
+        )
+
+        return {
+            "subscription_id": subscription_id,
+            "status": getattr(subscription, "status", None),
+            "effective_from": str(effective_from),
+        }
+
+    except Exception as e:
+        logger.exception(f"Error cancelling subscription {subscription_id}: {e}")
+        raise
+
+async def change_subscription(
+    *,
+    subscription_id: str,
+    new_price_id: str,
+    quantity: int = 1,
+    is_upgrade: bool,
+    client: Client | None = None,
+):
+    paddle_client = client or get_paddle_client()
+
+    subscription = await asyncio.to_thread(
+        paddle_client.subscriptions.get,
+        subscription_id,
+    )
+
+    status = str(getattr(subscription, "status", "")).lower()
+
+    if is_upgrade:
+        if status == "trialing":
+            proration_mode = SubscriptionProrationBillingMode.DoNotBill
+        else:
+            proration_mode = SubscriptionProrationBillingMode.ProratedImmediately
+    else:
+        proration_mode = SubscriptionProrationBillingMode.DoNotBill
+
+    plan_key = "pro_pack_monthly" if is_upgrade else "starter_pack_monthly"
+
+    operation = UpdateSubscription(
+        items=[
+            SubscriptionUpdateItem(
+                price_id=new_price_id,
+                quantity=quantity,
+            )
+        ],
+        proration_billing_mode=proration_mode,
+        custom_data=CustomData({
+            "plan_key": plan_key,
+        }),
+    )
+
+    updated = await asyncio.to_thread(
+        paddle_client.subscriptions.update,
+        subscription_id,
+        operation,
+    )
+
+    return {
+        "subscription_id": subscription_id,
+        "status": getattr(updated, "status", None),
+        "price_id": new_price_id,
+        "proration_mode": str(proration_mode),
+    }
