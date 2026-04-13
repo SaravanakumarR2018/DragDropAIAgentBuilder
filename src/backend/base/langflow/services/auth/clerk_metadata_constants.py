@@ -37,3 +37,16 @@ PADDLE_CUSTOM_DATA_USER_ID_KEY = "user_id"  # Clerk user ID
 # ============================================================================
 
 ORG_ID_KEY = "org_id"  # Organization ID key (used in multiple contexts)
+
+# ============================================================================
+# Additional Constants
+# ============================================================================
+
+HAS_ACCESS_KEY = "has_access"
+SUBSCRIPTION_STATUS_KEY = "subscription_status"
+SUBSCRIPTION_PLAN_KEY = "subscription_plan_key"
+PADDLE_SUBSCRIPTION_ID = "paddle_subscription_id"
+ORGANISATION_CREATED_BY = "organisation_created_by"
+NEXT_BILLED_AT_KEY = "next_billed_at"
+CURRENT_PERIOD_END_KEY = "current_period_end"
+CANCEL_SCHEDULED_KEY = "cancel_scheduled"
