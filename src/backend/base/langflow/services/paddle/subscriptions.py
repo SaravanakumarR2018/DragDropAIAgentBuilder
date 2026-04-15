@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from http.client import HTTPException
 import re
 from typing import Callable, Any, Awaitable
 import random
@@ -17,15 +18,25 @@ from paddle_billing.Resources.Subscriptions.Operations.Update import Subscriptio
 
 
 from langflow.services.auth.clerk_metadata_constants import (
+    ORGANISATION_CREATED_BY,
     ORGANISATION_CREATED_BY_KEY,
     PADDLE_CUSTOM_DATA_ORG_ID_KEY,
     PADDLE_CUSTOM_DATA_USER_ID_KEY,
     PADDLE_CUSTOMER_ID_KEY,
+    PADDLE_SUBSCRIPTION_ID,
     PADDLE_SUBSCRIPTION_ID_KEY,
+    HAS_ACCESS_KEY,
+    SUBSCRIPTION_STATUS_KEY,
+    SUBSCRIPTION_PLAN_KEY,
+    NEXT_BILLED_AT_KEY,
+    CURRENT_PERIOD_END_KEY,
+    CANCEL_SCHEDULED_KEY,
+
 )
 from langflow.services.auth.clerk_utils import (
     get_clerk_user_id_from_payload,
     get_email_from_clerk_payload,
+    get_org_id_from_clerk_payload,
     get_organisation_created_by_from_clerk_payload,
     get_paddle_customer_id_from_clerk_payload,
     get_paddle_subscription_id_from_clerk_payload,
@@ -37,6 +48,46 @@ from langflow.services.paddle.client import get_paddle_client
 _PADDLE_CUSTOMER_ID_RE = re.compile(r"(ctm_[a-z0-9]+)", re.IGNORECASE)
 
 ACTIVE_SUBSCRIPTION_STATUSES = {"active", "trialing"}
+
+async def _ensure_admin_user() -> None:
+    clerk_current_user_id = get_clerk_user_id_from_payload()
+    organization_created_by = await get_organisation_created_by_from_clerk_payload()
+    if not organization_created_by or organization_created_by.strip() != clerk_current_user_id.strip():
+        logger.info(f"User {clerk_current_user_id} is not the organization creator, denying subscription change")
+        raise HTTPException(status_code=403, detail="Only the organization creator can change the subscription")
+
+def _get_enabled_plan_monthly_price_map() -> dict[str, int]:
+    from langflow.services.paddle.provisioning import _load_plan_config
+
+    plan_price_map: dict[str, int] = {}
+    for plan in _load_plan_config().get("plans", []):
+        if not isinstance(plan, dict):
+            continue
+        paddle = plan.get("paddle")
+        if not isinstance(paddle, dict) or not paddle.get("enabled"):
+            continue
+
+        plan_key = paddle.get("plan_key")
+        monthly_price_usd_cents = paddle.get("monthly_price_usd_cents")
+        if isinstance(plan_key, str) and isinstance(monthly_price_usd_cents, int):
+            plan_price_map[plan_key] = monthly_price_usd_cents
+
+    return plan_price_map
+
+
+async def _get_plan_key_for_price(
+    *,
+    price_id: str,
+    client: Client,
+) -> str | None:
+    price = await asyncio.to_thread(
+        client.prices.get,
+        price_id,
+    )
+
+    price_custom_data = _normalize_custom_data(getattr(price, "custom_data", None))
+    plan_key = price_custom_data.get("plan_key")
+    return str(plan_key) if plan_key is not None else None
 
 
 async def get_subscription_status(
@@ -73,14 +124,14 @@ async def has_active_subscription(
     if not sub_id:
         logger.info("No subscription ID found, denying access")
         return {
-            "has_access": False,
-            "subscription_status": None,
-            "subscription_plan_key": None,
-            "paddle_subscription_id": None,
-            "organisation_created_by": created_by,
-            "next_billed_at": None,
-            "current_period_end": None,
-            "cancel_scheduled": False,
+            HAS_ACCESS_KEY: False,
+            SUBSCRIPTION_STATUS_KEY: None,
+            SUBSCRIPTION_PLAN_KEY: None,
+            PADDLE_SUBSCRIPTION_ID: None,
+            ORGANISATION_CREATED_BY: created_by,
+            NEXT_BILLED_AT_KEY: None,
+            CURRENT_PERIOD_END_KEY: None,
+            CANCEL_SCHEDULED_KEY: False,
         }
 
     paddle_client = client or get_paddle_client()
@@ -120,14 +171,14 @@ async def has_active_subscription(
     )
 
     return {
-        "has_access": has_access,
-        "subscription_status": status,
-        "subscription_plan_key": plan_key,
-        "paddle_subscription_id": sub_id,
-        "organisation_created_by": created_by,
-        "next_billed_at": next_billed_at,
-        "current_period_end": current_period_end,
-        "cancel_scheduled": cancel_scheduled,
+        HAS_ACCESS_KEY: has_access,
+        SUBSCRIPTION_STATUS_KEY: status,
+        SUBSCRIPTION_PLAN_KEY: plan_key,
+        PADDLE_SUBSCRIPTION_ID: sub_id,
+        ORGANISATION_CREATED_BY: created_by,
+        NEXT_BILLED_AT_KEY: next_billed_at,
+        CURRENT_PERIOD_END_KEY: current_period_end,
+        CANCEL_SCHEDULED_KEY: cancel_scheduled,
     }
 
 
@@ -524,6 +575,13 @@ async def change_subscription(
 ):
     paddle_client = client or get_paddle_client()
 
+    org_id = get_org_id_from_clerk_payload()
+
+    new_plan_key = await _get_plan_key_for_price(
+        price_id=new_price_id,
+        client=paddle_client,
+    )
+
     subscription = await asyncio.to_thread(
         paddle_client.subscriptions.get,
         subscription_id,
@@ -531,7 +589,25 @@ async def change_subscription(
 
     status = str(getattr(subscription, "status", "")).lower()
 
-    if is_upgrade:
+    current_plan_key = _normalize_custom_data(
+        getattr(subscription, "custom_data", None)
+    ).get("plan_key")
+    if current_plan_key is not None:
+        current_plan_key = str(current_plan_key)
+
+    resolved_is_upgrade = is_upgrade
+    plan_price_map = _get_enabled_plan_monthly_price_map()
+    if (
+        isinstance(current_plan_key, str)
+        and isinstance(new_plan_key, str)
+        and current_plan_key in plan_price_map
+        and new_plan_key in plan_price_map
+    ):
+        resolved_is_upgrade = (
+            plan_price_map[new_plan_key] > plan_price_map[current_plan_key]
+        )
+
+    if resolved_is_upgrade:
         if status == "trialing":
             proration_mode = SubscriptionProrationBillingMode.DoNotBill
         else:
@@ -539,7 +615,7 @@ async def change_subscription(
     else:
         proration_mode = SubscriptionProrationBillingMode.DoNotBill
 
-    plan_key = "pro_pack_monthly" if is_upgrade else "starter_pack_monthly"
+    plan_key = new_plan_key or current_plan_key
 
     operation = UpdateSubscription(
         items=[
@@ -549,9 +625,7 @@ async def change_subscription(
             )
         ],
         proration_billing_mode=proration_mode,
-        custom_data=CustomData({
-            "plan_key": plan_key,
-        }),
+        custom_data=CustomData({"plan_key": plan_key, PADDLE_CUSTOM_DATA_ORG_ID_KEY: org_id}),
     )
 
     updated = await asyncio.to_thread(
