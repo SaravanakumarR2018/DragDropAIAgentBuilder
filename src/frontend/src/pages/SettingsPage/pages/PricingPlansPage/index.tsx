@@ -123,7 +123,8 @@ export default function PricingPlansPage() {
     Boolean(billing?.paddle_subscription_id) &&
     !isCancelledState &&
     !isCancelScheduled &&
-    !alreadyCancelled;
+    !alreadyCancelled &&
+    Boolean(billing?.is_admin);
 
   const currentPlanKey = (billing?.subscription_plan_key ?? "").toLowerCase();
   const isProPlan = currentPlanKey === PRO_PLAN_KEY;
@@ -131,7 +132,8 @@ export default function PricingPlansPage() {
   const canChangeSubscription =
     Boolean(billing?.paddle_subscription_id) &&
     !isCancelledState &&
-    !isCancelScheduled;
+    !isCancelScheduled &&
+    Boolean(billing?.is_admin);
 
   useEffect(() => {
     if (!IS_CLERK_AUTH) {
@@ -350,7 +352,7 @@ export default function PricingPlansPage() {
             </Button>
           )}
 
-          {billing?.paddle_subscription_id && (
+          {canChangeSubscription && (
             <Button
               onClick={() => setUpgradeModalOpen(true)}
               disabled={upgradeLoading}
