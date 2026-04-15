@@ -1,7 +1,7 @@
-import {useOrganization, useUser } from "@clerk/clerk-react";
+import { useOrganization, useUser } from "@clerk/clerk-react";
 import axios from "axios";
 import type { SVGProps } from "react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import planConfigData from "../../../public/plan_config.json";
 import { getURL } from "../../controllers/API/helpers/constants";
@@ -9,6 +9,9 @@ import { getURL } from "../../controllers/API/helpers/constants";
 const MIN_SEATS = 1;
 const PADDLE_PRICE_CACHE_KEY = "pricing_page_paddle_prices";
 const PADDLE_PRICE_CACHE_TTL_MS = 60 * 60 * 1000;
+const PADDLE_STATUS_STORAGE_KEY = "paddle_checkout_status";
+const PADDLE_TRANSACTION_ID_STORAGE_KEY = "paddle_checkout_transaction_id";
+const PADDLE_CHECKOUT_ORG_ID_STORAGE_KEY = "paddle_checkout_org_id";
 
 type PlanKey = "starter" | "pro" | "enterprise";
 
@@ -99,6 +102,30 @@ function CheckIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+function SuccessStatusIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
+      <circle cx="12" cy="12" r="10" fill="currentColor" />
+      <path
+        d="M17.207 8.793a1 1 0 0 1 0 1.414l-5.5 5.5a1 1 0 0 1-1.414 0l-2.5-2.5a1 1 0 1 1 1.414-1.414l1.793 1.793 4.793-4.793a1 1 0 0 1 1.414 0z"
+        fill="white"
+      />
+    </svg>
+  );
+}
+
+function FailedStatusIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" {...props}>
+      <circle cx="12" cy="12" r="10" fill="currentColor" />
+      <path
+        d="M8.707 8.707a1 1 0 0 1 1.414 0L12 10.586l1.879-1.879a1 1 0 1 1 1.414 1.414L13.414 12l1.879 1.879a1 1 0 0 1-1.414 1.414L12 13.414l-1.879 1.879a1 1 0 0 1-1.414-1.414L10.586 12 8.707 10.121a1 1 0 0 1 0-1.414z"
+        fill="white"
+      />
+    </svg>
+  );
+}
+
 export default function PricingPage() {
   const navigate = useNavigate();
   const { user } = useUser();
@@ -118,6 +145,84 @@ export default function PricingPage() {
 
   const [priceMap, setPriceMap] = useState<Record<string, string>>({});
   const [loadingPrices, setLoadingPrices] = useState(true);
+  const [checkoutStatus, setCheckoutStatus] = useState<
+    "idle" | "processing" | "success" | "failed"
+  >("idle");
+  const [transactionId, setTransactionId] = useState<string | null>(null);
+  const [redirectCountdown, setRedirectCountdown] = useState(3);
+  const currentOrganizationId = organization?.id ?? null;
+
+  const clearCheckoutState = useCallback(() => {
+    window.sessionStorage.removeItem(PADDLE_STATUS_STORAGE_KEY);
+    window.sessionStorage.removeItem(PADDLE_TRANSACTION_ID_STORAGE_KEY);
+    window.sessionStorage.removeItem(PADDLE_CHECKOUT_ORG_ID_STORAGE_KEY);
+    setCheckoutStatus("idle");
+    setTransactionId(null);
+  }, []);
+
+  useEffect(() => {
+    const storedOrganizationId = window.sessionStorage.getItem(
+      PADDLE_CHECKOUT_ORG_ID_STORAGE_KEY,
+    );
+
+    if (
+      storedOrganizationId &&
+      currentOrganizationId &&
+      storedOrganizationId !== currentOrganizationId
+    ) {
+      clearCheckoutState();
+      return;
+    }
+
+    const statusFromStorage =
+      window.sessionStorage.getItem(PADDLE_STATUS_STORAGE_KEY) ?? "idle";
+    if (
+      statusFromStorage === "processing" ||
+      statusFromStorage === "success" ||
+      statusFromStorage === "failed"
+    ) {
+      setCheckoutStatus(statusFromStorage);
+    } else {
+      setCheckoutStatus("idle");
+    }
+
+    const storedTransactionId = window.sessionStorage.getItem(
+      PADDLE_TRANSACTION_ID_STORAGE_KEY,
+    );
+    setTransactionId(storedTransactionId);
+  }, [clearCheckoutState, currentOrganizationId]);
+
+  useEffect(() => {
+    const onStatusChange = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        status: "idle" | "processing" | "success" | "failed";
+        transactionId: string | null;
+        organizationId: string | null;
+      }>;
+      const status = customEvent.detail?.status ?? "idle";
+      const latestTransactionId = customEvent.detail?.transactionId ?? null;
+      const eventOrganizationId = customEvent.detail?.organizationId ?? null;
+
+      if (
+        eventOrganizationId &&
+        currentOrganizationId &&
+        eventOrganizationId !== currentOrganizationId
+      ) {
+        return;
+      }
+
+      setCheckoutStatus(status);
+      setTransactionId(latestTransactionId);
+    };
+
+    window.addEventListener("paddle-checkout-status", onStatusChange as EventListener);
+    return () => {
+      window.removeEventListener(
+        "paddle-checkout-status",
+        onStatusChange as EventListener,
+      );
+    };
+  }, [currentOrganizationId]);
 
   useEffect(() => {
     const fetchPrices = async () => {
@@ -143,24 +248,44 @@ export default function PricingPage() {
     fetchPrices();
   }, []);
 
-  const handleDecrement = (planKey: PlanKey) => {
-    setSeatsByPlan((prev) => ({
-      ...prev,
-      [planKey]: Math.max(MIN_SEATS, prev[planKey] - 1),
-    }));
+  useEffect(() => {
+    if (checkoutStatus !== "success") {
+      setRedirectCountdown(3);
+      return;
+    }
+
+    setRedirectCountdown(3);
+    const intervalId = window.setInterval(() => {
+      setRedirectCountdown((prev) => {
+        if (prev <= 1) {
+          window.clearInterval(intervalId);
+          clearCheckoutState();
+          navigate("/flows");
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [checkoutStatus, clearCheckoutState, navigate]);
+
+  const handleCloseFailureModal = () => {
+    clearCheckoutState();
   };
 
-  const handleIncrement = (planKey: PlanKey) => {
-    setSeatsByPlan((prev) => ({
-      ...prev,
-      [planKey]: prev[planKey] + 1,
-    }));
+  const handleContinueToFlows = () => {
+    clearCheckoutState();
+    navigate("/flows");
   };
 
   const handleSelectPlan = async (plan: PlanConfig) => {
     const seats = seatsByPlan[plan.key];
     setSelectedPlan(plan.key);
     setShowEnterpriseContactMessage(false);
+    clearCheckoutState();
 
     if (plan.key === "enterprise") {
       setShowEnterpriseContactMessage(true);
@@ -208,6 +333,50 @@ export default function PricingPage() {
         org_id: organization?.id,
       },
     });
+  };
+
+  useEffect(() => {
+    if (checkoutStatus !== "failed") {
+      return;
+    }
+
+    const statusFromStorage = window.sessionStorage.getItem(PADDLE_STATUS_STORAGE_KEY);
+    if (statusFromStorage !== "failed") {
+      return;
+    }
+
+    const storedOrganizationId = window.sessionStorage.getItem(
+      PADDLE_CHECKOUT_ORG_ID_STORAGE_KEY,
+    );
+    if (
+      storedOrganizationId &&
+      currentOrganizationId &&
+      storedOrganizationId !== currentOrganizationId
+    ) {
+      clearCheckoutState();
+      return;
+    }
+
+    const storedTransactionId = window.sessionStorage.getItem(
+      PADDLE_TRANSACTION_ID_STORAGE_KEY,
+    );
+    if (storedTransactionId) {
+      setTransactionId(storedTransactionId);
+    }
+  }, [checkoutStatus, clearCheckoutState, currentOrganizationId]);
+
+  const handleDecrement = (planKey: PlanKey) => {
+    setSeatsByPlan((prev) => ({
+      ...prev,
+      [planKey]: Math.max(MIN_SEATS, prev[planKey] - 1),
+    }));
+  };
+
+  const handleIncrement = (planKey: PlanKey) => {
+    setSeatsByPlan((prev) => ({
+      ...prev,
+      [planKey]: prev[planKey] + 1,
+    }));
   };
 
   return (
@@ -335,6 +504,71 @@ export default function PricingPage() {
           </div>
         </div>
       </div>
+      {checkoutStatus === "processing" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="text-xl font-semibold text-slate-900">
+              Payment is processing
+            </h2>
+            <p className="mt-3 text-sm text-slate-600">
+              Please wait while we confirm your subscription status.
+            </p>
+            <div className="mt-6 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+              <div className="h-full w-1/2 animate-pulse rounded-full bg-slate-900" />
+            </div>
+          </div>
+        </div>
+      )}
+      {(checkoutStatus === "success" || checkoutStatus === "failed") && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="text-xl font-semibold text-slate-900">
+              {checkoutStatus === "success"
+                ? "Payment successful"
+                : "Payment failed"}
+            </h2>
+            <div className="mb-4 flex justify-center">
+              {checkoutStatus === "success" ? (
+                <SuccessStatusIcon className="h-12 w-12 text-emerald-500" />
+              ) : (
+                <FailedStatusIcon className="h-12 w-12 text-red-500" />
+              )}
+            </div>
+            <p className="mt-3 text-sm text-slate-600">
+              {checkoutStatus === "success"
+                ? `Redirecting to flows in ${redirectCountdown} seconds.`
+                : "We couldn't verify an active subscription for this payment."}
+            </p>
+            {checkoutStatus === "failed" && transactionId && (
+              <p className="mt-2 text-xs text-slate-500">
+                Transaction ID: {transactionId}
+              </p>
+            )}
+            <div className="mt-6 flex justify-end gap-3">
+              {checkoutStatus === "failed" && (
+                <button
+                  type="button"
+                  onClick={handleCloseFailureModal}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-sky-300 hover:text-sky-700"
+                >
+                  Stay on pricing
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={
+                  checkoutStatus === "success"
+                    ? handleContinueToFlows
+                    : handleCloseFailureModal
+                }
+                className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+              >
+                {checkoutStatus === "success" ? "Go to flows" : "Close"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
