@@ -15,6 +15,7 @@ from langflow.services.auth.clerk_utils import (
 from langflow.services.deps import get_settings_service
 from langflow.services.paddle.provisioning import get_paddle_prices
 from langflow.services.paddle.subscriptions import (
+    _ensure_admin_user,
     cancel_subscription,
     change_subscription,
     ensure_paddle_customer_for_user,
@@ -191,6 +192,8 @@ async def cancel_subscription_api(
 
     if not get_settings_service().auth_settings.CLERK_AUTH_ENABLED:
         raise HTTPException(status_code=400, detail="Clerk auth not enabled")
+    
+    await _ensure_admin_user()
 
     # Get subscription_id from Clerk metadata (JWT)
     subscription_id = await get_paddle_subscription_id_from_clerk_payload()
@@ -232,6 +235,8 @@ async def change_subscription_api(
 
     if not get_settings_service().auth_settings.CLERK_AUTH_ENABLED:
         raise HTTPException(status_code=400, detail="Clerk auth not enabled")
+    
+    await _ensure_admin_user()
 
     # 1️⃣ Get subscription_id from Clerk metadata
     subscription_id = await get_paddle_subscription_id_from_clerk_payload()

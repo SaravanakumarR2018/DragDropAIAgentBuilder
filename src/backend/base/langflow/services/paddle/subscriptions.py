@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from http.client import HTTPException
 import re
 from typing import Callable, Any, Awaitable
 import random
@@ -35,6 +36,7 @@ from langflow.services.auth.clerk_metadata_constants import (
 from langflow.services.auth.clerk_utils import (
     get_clerk_user_id_from_payload,
     get_email_from_clerk_payload,
+    get_org_id_from_clerk_payload,
     get_organisation_created_by_from_clerk_payload,
     get_paddle_customer_id_from_clerk_payload,
     get_paddle_subscription_id_from_clerk_payload,
@@ -46,6 +48,13 @@ from langflow.services.paddle.client import get_paddle_client
 _PADDLE_CUSTOMER_ID_RE = re.compile(r"(ctm_[a-z0-9]+)", re.IGNORECASE)
 
 ACTIVE_SUBSCRIPTION_STATUSES = {"active", "trialing"}
+
+async def _ensure_admin_user() -> None:
+    clerk_current_user_id = get_clerk_user_id_from_payload()
+    organization_created_by = await get_organisation_created_by_from_clerk_payload()
+    if not organization_created_by or organization_created_by.strip() != clerk_current_user_id.strip():
+        logger.info(f"User {clerk_current_user_id} is not the organization creator, denying subscription change")
+        raise HTTPException(status_code=403, detail="Only the organization creator can change the subscription")
 
 def _get_enabled_plan_monthly_price_map() -> dict[str, int]:
     from langflow.services.paddle.provisioning import _load_plan_config
@@ -566,6 +575,8 @@ async def change_subscription(
 ):
     paddle_client = client or get_paddle_client()
 
+    org_id = get_org_id_from_clerk_payload()
+
     new_plan_key = await _get_plan_key_for_price(
         price_id=new_price_id,
         client=paddle_client,
@@ -614,7 +625,7 @@ async def change_subscription(
             )
         ],
         proration_billing_mode=proration_mode,
-        custom_data=CustomData({"plan_key": plan_key}) if plan_key else None,
+        custom_data=CustomData({"plan_key": plan_key, PADDLE_CUSTOM_DATA_ORG_ID_KEY: org_id}),
     )
 
     updated = await asyncio.to_thread(
