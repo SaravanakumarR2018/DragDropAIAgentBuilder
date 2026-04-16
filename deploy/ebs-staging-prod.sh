@@ -148,6 +148,7 @@ service_active() { systemctl is-active --quiet "$1"; }
 docker_safe_rm() { docker rm -f "$1" >/dev/null 2>&1 || true; }
 docker_exists()  { docker ps -a --format '{{.Names}}' | grep -Fxq "$1"; }
 docker_running() { docker ps --format '{{.Names}}' | grep -Fxq "$1"; }
+port_in_use()    { ss -ltn "( sport = :$1 )" | awk 'NR>1 {print}' | grep -q .; }
 
 http_ok() {
   local url="$1"
@@ -484,6 +485,36 @@ stop_active_container() {
   fi
 }
 
+ensure_host_port_available() {
+  step "Ensuring host port ${HOST_PORT} is available"
+
+  if ! port_in_use "${HOST_PORT}"; then
+    ok "Host port ${HOST_PORT} is available"
+    return 0
+  fi
+
+  warn "Host port ${HOST_PORT} is currently in use; attempting to free common proxy services"
+  for svc in nginx apache2 caddy haproxy traefik; do
+    if service_active "${svc}"; then
+      warn "Stopping service using host networking: ${svc}"
+      systemctl stop "${svc}" || true
+      systemctl disable "${svc}" >/dev/null 2>&1 || true
+    fi
+  done
+
+  if ! port_in_use "${HOST_PORT}"; then
+    ok "Host port ${HOST_PORT} is now free"
+    return 0
+  fi
+
+  err "Host port ${HOST_PORT} is still in use"
+  warn "Active listeners:"
+  ss -ltnp "( sport = :${HOST_PORT} )" || true
+  warn "Containers publishing host port ${HOST_PORT}:"
+  docker ps --filter "publish=${HOST_PORT}" --format ' - {{.Names}} ({{.Ports}})' || true
+  return 1
+}
+
 start_target_container() {
   step "Launching target ${TARGET_COLOR} container: ${TARGET_NAME} on host port ${TARGET_PORT}"
   docker_safe_rm "${TARGET_NAME}"
@@ -600,6 +631,7 @@ ensure_ebs_volume
 
  # 1) Stop active (frees CPU/RAM/port)
 stop_active_container
+ensure_host_port_available
 prepare_langflow_env
 ensure_postgres
 
