@@ -7,7 +7,7 @@
         "enabled": true,
         "plan_key": "starter_pack_monthly",
         "monthly_price_usd_cents": 2000,
-        "trial_days": 7
+        "trial_days": null
       },
       "default_seats": 1,
       "features": [
