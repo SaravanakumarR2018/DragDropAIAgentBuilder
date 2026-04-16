@@ -31,10 +31,22 @@ warn()     { printf "\033[0;33m⚠️  %s\033[0m\n" "$*"; }
 err()      { printf "\033[0;31m❌ %s\033[0m\n" "$*"; }
 step()     { CURRENT_STEP="$*"; log "$*"; }
 
+run_cleanup_if_defined() {
+  if declare -F cleanup_on_failure >/dev/null 2>&1; then
+    cleanup_on_failure
+  fi
+}
+
+run_report_if_defined() {
+  if declare -F report_status >/dev/null 2>&1; then
+    report_status
+  fi
+}
+
 # Traps: run cleanup on errors/interrupts/abnormal exit
-trap 'err "Failed during: ${CURRENT_STEP:-unknown step}"; cleanup_on_failure; exit 1' ERR
-trap 'warn "Interrupted (SIGINT/SIGTERM)"; cleanup_on_failure; exit 130' SIGINT SIGTERM
-trap 'if [[ "$DEPLOY_SUCCESS" -ne 1 ]]; then warn "Exiting without success"; cleanup_on_failure; fi; report_status' EXIT
+trap 'err "Failed during: ${CURRENT_STEP:-unknown step}"; run_cleanup_if_defined; exit 1' ERR
+trap 'warn "Interrupted (SIGINT/SIGTERM)"; run_cleanup_if_defined; exit 130' SIGINT SIGTERM
+trap 'if [[ "$DEPLOY_SUCCESS" -ne 1 ]]; then warn "Exiting without success"; run_cleanup_if_defined; fi; run_report_if_defined' EXIT
 
 # ---------- Defaults ----------
 APP_NAME="app"
@@ -43,6 +55,7 @@ DOCKER_IMAGE=""           # e.g. saravanakr/langflow:2.0.4
 DOCKERHUB_USERNAME=""     # optional
 DOCKERHUB_TOKEN=""        # optional
 DOMAIN=""                 # optional; used only to infer staging/prod
+EMAIL=""                  # optional legacy arg; ignored when deploying direct
 CONTAINER_ENV_FILE=""     # passed to docker via --env-file
 CONTAINER_PORT="7860"     # internal port inside container
 HOST_PORT="80"            # host port exposed directly on server
@@ -61,7 +74,7 @@ usage() {
 Usage: $0 [--config <file>] [--image <repo:tag>] [--domain <domain>]
           [--docker-username <user>] [--docker-token <token>]
           [--env-file <path>] [--container-port <port>] [--host-port <port>]
-          [--health-path </health>]
+          [--health-path </health>] [--email <you@domain>]
           [--db-user <user>] [--db-password <pass>] [--db-name <db>]
           [--volume-name <volume>] [--app-name <name>] [--prune-old]
 USAGE
@@ -79,6 +92,7 @@ while [[ $# -gt 0 ]]; do
     --container-port)   CONTAINER_PORT="${2:-}"; shift 2;;
     --host-port)        HOST_PORT="${2:-}"; shift 2;;
     --health-path)      HEALTH_PATH="${2:-}"; shift 2;;
+    --email)            EMAIL="${2:-}"; shift 2;;
     --db-user)         DB_USER="${2:-}"; shift 2;;
     --db-password)     DB_PASSWORD="${2:-}"; shift 2;;
     --db-name)         DB_NAME="${2:-}"; shift 2;;
@@ -89,6 +103,10 @@ while [[ $# -gt 0 ]]; do
     *) err "Unknown option: $1"; usage;;
   esac
 done
+
+if [[ -n "${EMAIL}" ]]; then
+  warn "--email is accepted for backward compatibility and is ignored in direct deploy mode"
+fi
 
 # ---------- Load script config .env (optional) ----------
 # Allows: DOCKER_IMAGE=..., DOCKERHUB_USERNAME=..., DOCKERHUB_TOKEN=..., CONTAINER_ENV_FILE=..., etc.
