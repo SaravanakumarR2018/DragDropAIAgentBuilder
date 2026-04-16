@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 #############################################
-# Stop-First Docker Deploy w/ Nginx + TLS
+# Stop-First Docker Deploy (Direct-to-Server, no Nginx)
 # - Minimizes CPU/RAM: only one app container at a time
 # - Safe rollback: restarts old container if new fails
 # - Idempotent & CI/CD friendly
@@ -42,12 +42,10 @@ CONFIG_FILE=""            # Script config .env (DOCKER_IMAGE, DOMAIN, etc)
 DOCKER_IMAGE=""           # e.g. saravanakr/langflow:2.0.4
 DOCKERHUB_USERNAME=""     # optional
 DOCKERHUB_TOKEN=""        # optional
-DOMAIN=""                 # e.g. demo.example.com
-EMAIL=""                  # certbot email, default: admin@DOMAIN
+DOMAIN=""                 # optional; used only to infer staging/prod
 CONTAINER_ENV_FILE=""     # passed to docker via --env-file
 CONTAINER_PORT="7860"     # internal port inside container
-BLUE_PORT="7861"          # host port for blue
-GREEN_PORT="7862"         # host port for green
+HOST_PORT="80"            # host port exposed directly on server
 HEALTH_PATH="/health"     # path checked over HTTP
 HEALTH_TIMEOUT="300"      # seconds
 RETRY_MAX="5"
@@ -62,9 +60,8 @@ usage() {
   cat <<USAGE
 Usage: $0 [--config <file>] [--image <repo:tag>] [--domain <domain>]
           [--docker-username <user>] [--docker-token <token>]
-          [--env-file <path>] [--container-port <port>]
-          [--blue-port <port>] [--green-port <port>]
-          [--health-path </health>] [--email <you@domain>]
+          [--env-file <path>] [--container-port <port>] [--host-port <port>]
+          [--health-path </health>]
           [--db-user <user>] [--db-password <pass>] [--db-name <db>]
           [--volume-name <volume>] [--app-name <name>] [--prune-old]
 USAGE
@@ -80,10 +77,8 @@ while [[ $# -gt 0 ]]; do
     --docker-token)     DOCKERHUB_TOKEN="${2:-}"; shift 2;;
     --env-file)         CONTAINER_ENV_FILE="${2:-}"; shift 2;;
     --container-port)   CONTAINER_PORT="${2:-}"; shift 2;;
-    --blue-port)        BLUE_PORT="${2:-}"; shift 2;;
-    --green-port)       GREEN_PORT="${2:-}"; shift 2;;
+    --host-port)        HOST_PORT="${2:-}"; shift 2;;
     --health-path)      HEALTH_PATH="${2:-}"; shift 2;;
-    --email)            EMAIL="${2:-}"; shift 2;;
     --db-user)         DB_USER="${2:-}"; shift 2;;
     --db-password)     DB_PASSWORD="${2:-}"; shift 2;;
     --db-name)         DB_NAME="${2:-}"; shift 2;;
@@ -96,7 +91,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # ---------- Load script config .env (optional) ----------
-# Allows: DOCKER_IMAGE=..., DOMAIN=..., DOCKERHUB_USERNAME=..., DOCKERHUB_TOKEN=..., CONTAINER_ENV_FILE=..., etc.
+# Allows: DOCKER_IMAGE=..., DOCKERHUB_USERNAME=..., DOCKERHUB_TOKEN=..., CONTAINER_ENV_FILE=..., etc.
 if [[ -n "${CONFIG_FILE}" ]]; then
   step "Loading config from ${CONFIG_FILE}"
   if [[ -f "${CONFIG_FILE}" ]]; then
@@ -110,9 +105,7 @@ fi
 
 # ---------- Validate required inputs ----------
 [[ -z "${DOCKER_IMAGE}" ]] && { err "--image (DOCKER_IMAGE) is required"; usage; }
-[[ -z "${DOMAIN}" ]] && { err "--domain (DOMAIN) is required"; usage; }
 [[ -z "${VOLUME_NAME}" ]] && { err "--volume-name is required"; usage; }
-[[ -z "${EMAIL}" ]] && EMAIL="admin@${DOMAIN#www.}"
 
 # ---------- Root check ----------
 if [[ $EUID -ne 0 ]]; then
@@ -226,7 +219,7 @@ ensure_ebs_volume() {
     step "Ensuring EBS volume is mounted and configured"
 
     # 1️ Detect environment and pick correct volume
-    if [[ "$DOMAIN" == *"staging."* ]]; then
+    if [[ -n "${DOMAIN}" && "$DOMAIN" == *"staging."* ]]; then
         ENVIRONMENT="staging"
     else
         ENVIRONMENT="prod"
@@ -293,17 +286,8 @@ ensure_ebs_volume() {
 }
 
 
-# Paths used by Nginx toggling
-NGINX_SITE="/etc/nginx/sites-available/${APP_NAME}.conf"
-NGINX_SITE_LINK="/etc/nginx/sites-enabled/${APP_NAME}.conf"
-SNIPPETS_DIR="/etc/nginx/snippets"
-UP_BLUE="${SNIPPETS_DIR}/${APP_NAME}-upstream-blue.conf"
-UP_GREEN="${SNIPPETS_DIR}/${APP_NAME}-upstream-green.conf"
-UP_ACTIVE="${SNIPPETS_DIR}/${APP_NAME}-upstream-active.conf"
-PROXY_SNIPPET="${SNIPPETS_DIR}/${APP_NAME}-proxy.conf"
-CERT_ROOT="/var/www/certbot"
-
 ACTIVE_FILE="/var/run/${APP_NAME}-active-color" # stores "blue" or "green"
+
 
 # ---------- Install system deps (idempotent) ----------
 step "Updating apt package index"; apt-get update -y; ok "apt updated"
@@ -321,17 +305,12 @@ install_if_missing() {
 
 install_if_missing curl
 install_if_missing jq
-install_if_missing nginx
-install_if_missing certbot
-install_if_missing python3-certbot-nginx
 install_if_missing docker.io
 
-step "Enabling & starting Docker and Nginx"
+step "Enabling & starting Docker"
 systemctl enable docker >/dev/null 2>&1 || true
 systemctl start docker || true
-systemctl enable nginx >/dev/null 2>&1 || true
-service_active nginx || systemctl start nginx
-ok "Services ensured"
+ok "Docker service ensured"
 
 # ---------- Docker login (optional) ----------
 if [[ -n "${DOCKERHUB_USERNAME}" && -n "${DOCKERHUB_TOKEN}" ]]; then
@@ -354,10 +333,6 @@ ok "Image pulled"
 
 # ---------- Determine colors & names ----------
 get_symlink_color() {
-  if [[ -L "${UP_ACTIVE}" ]]; then
-    readlink -f "${UP_ACTIVE}" | grep -q "blue" && echo "blue" && return
-    readlink -f "${UP_ACTIVE}" | grep -q "green" && echo "green" && return
-  fi
   echo ""
 }
 
@@ -367,10 +342,11 @@ ACTIVE_COLOR=""
 [[ -z "${ACTIVE_COLOR}" ]] && ACTIVE_COLOR="green"   # default first active
 
 if [[ "${ACTIVE_COLOR}" == "blue" ]]; then
-  TARGET_COLOR="green"; TARGET_PORT="${GREEN_PORT}"
+  TARGET_COLOR="green"
 else
-  TARGET_COLOR="blue";  TARGET_PORT="${BLUE_PORT}"
+  TARGET_COLOR="blue"
 fi
+TARGET_PORT="${HOST_PORT}"
 
 ACTIVE_NAME="${APP_NAME}_${ACTIVE_COLOR}"
 TARGET_NAME="${APP_NAME}_${TARGET_COLOR}"
@@ -379,297 +355,32 @@ docker_exists "${ACTIVE_NAME}" && HAD_ACTIVE=1 || HAD_ACTIVE=0
 
 ok "Active color: ${ACTIVE_COLOR:-none} (container: ${ACTIVE_NAME}); Target: ${TARGET_COLOR} on port ${TARGET_PORT}"
 
-# ---------- SSL helpers & Nginx ----------
-ensure_ssl_support_files() {
-  if [[ ! -f "/etc/letsencrypt/options-ssl-nginx.conf" ]]; then
-    step "Downloading options-ssl-nginx.conf"
-    curl -fsSL https://raw.githubusercontent.com/certbot/certbot/master/certbot-nginx/certbot_nginx/_internal/tls_configs/options-ssl-nginx.conf \
-      -o /etc/letsencrypt/options-ssl-nginx.conf
-    ok "Downloaded options-ssl-nginx.conf"
-  fi
-  if [[ ! -f "/etc/letsencrypt/ssl-dhparams.pem" ]]; then
-    step "Downloading ssl-dhparams.pem"
-    curl -fsSL https://raw.githubusercontent.com/certbot/certbot/master/certbot/certbot/ssl-dhparams.pem \
-      -o /etc/letsencrypt/ssl-dhparams.pem
-    ok "Downloaded ssl-dhparams.pem"
-  fi
-}
-
-ensure_snippets() {
-  step "Ensuring Nginx upstream & proxy snippets"
-  mkdir -p "${SNIPPETS_DIR}" "${CERT_ROOT}"
-
-  cat > "${UP_BLUE}" <<EOF
-upstream ${APP_NAME}_upstream {
-    server 127.0.0.1:${BLUE_PORT};
-    keepalive 32;
-}
-EOF
-  cat > "${UP_GREEN}" <<EOF
-upstream ${APP_NAME}_upstream {
-    server 127.0.0.1:${GREEN_PORT};
-    keepalive 32;
-}
-EOF
-  cat > "${PROXY_SNIPPET}" <<'EOF'
-proxy_http_version 1.1;
-proxy_set_header Connection "";
-proxy_set_header Host $host;
-proxy_set_header X-Real-IP $remote_addr;
-proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-proxy_set_header X-Forwarded-Proto $scheme;
-proxy_read_timeout 300;
-proxy_send_timeout 300;
-EOF
-
-  [[ ! -L "${UP_ACTIVE}" ]] && ln -sf "${UP_GREEN}" "${UP_ACTIVE}"
-  ok "Snippets ready"
-}
-
-write_site_http_only() {
-  cat > "${NGINX_SITE}" <<EOF
-include ${UP_ACTIVE};
-server {
-    listen 80;
-    server_name ${DOMAIN} www.${DOMAIN};
-    location ^~ /.well-known/acme-challenge/ { root ${CERT_ROOT}; }
-    location / { return 301 https://\$host\$request_uri; }
-}
-EOF
-}
-
-write_site_https() {
-  cat > "${NGINX_SITE}" <<EOF
-include ${UP_ACTIVE};
-
-server {
-  listen 80;
-  server_name ${DOMAIN} www.${DOMAIN};
-  location ^~ /.well-known/acme-challenge/ { root ${CERT_ROOT}; }
-  location / { return 301 https://\$host\$request_uri; }
-}
-
-server {
-  listen 443 ssl; http2 on;
-  server_name ${DOMAIN};
-  ssl_certificate     /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
-  ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
-  include /etc/letsencrypt/options-ssl-nginx.conf;
-  ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
-
-  location / {
-    proxy_pass http://${APP_NAME}_upstream;
-    include ${PROXY_SNIPPET};
-  }
-}
-
-server {
-  listen 443 ssl; http2 on;
-  server_name www.${DOMAIN};
-  ssl_certificate     /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
-  ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
-  include /etc/letsencrypt/options-ssl-nginx.conf;
-  ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
-  return 301 https://${DOMAIN}\$request_uri;
-}
-EOF
-}
-
-ensure_nginx() {
-  ensure_snippets
-  mkdir -p "$(dirname "${NGINX_SITE}")" /etc/nginx/sites-enabled
-  local have_cert="0"
-  [[ -f "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" ]] && have_cert="1"
-
-  step "Writing Nginx site config (certs present: ${have_cert})"
-  if [[ "${have_cert}" == "1" ]]; then
-    ensure_ssl_support_files
-    write_site_https
-  else
-    write_site_http_only
-  fi
-
-  ln -sf "${NGINX_SITE}" "${NGINX_SITE_LINK}"
-  rm -f /etc/nginx/sites-enabled/default || true
-
-  step "Testing Nginx config"
-  nginx -t
-  if service_active nginx; then systemctl reload nginx; else systemctl start nginx; fi
-  ok "Nginx config applied"
-}
-
-# ---------- Certbot timer (robust) ----------
-ensure_certbot_timer() {
-  step "Ensuring Certbot auto-renewal timer"
-
-  _any_timer_active() {
-    systemctl is-active --quiet certbot.timer && return 0
-    systemctl is-active --quiet snap.certbot.renew.timer && return 0
-    systemctl is-active --quiet certbot-renew.timer && return 0
-    return 1
-  }
-
-  # Already active?
-  if _any_timer_active; then
-    ok "Certbot auto-renewal timer already active"
-    return 0
-  fi
-
-  # Ensure /usr/bin/certbot exists (snap installs to /snap/bin/certbot)
-  if [[ ! -x /usr/bin/certbot && -x /snap/bin/certbot ]]; then
-    ln -sf /snap/bin/certbot /usr/bin/certbot
-  fi
-
-  # Try enabling known timers
-  if systemctl list-unit-files --no-pager | grep -q '^certbot.timer'; then
-    systemctl enable --now certbot.timer
-  elif systemctl list-unit-files --no-pager | grep -q '^snap.certbot.renew.timer'; then
-    systemctl enable --now snap.certbot.renew.timer
-  else
-    # Fallback: create our own twice-daily timer
-    warn "No built-in Certbot timer found; creating certbot-renew.timer"
-    cat >/etc/systemd/system/certbot-renew.service <<'EOF'
-[Unit]
-Description=Certbot Renew
-
-[Service]
-Type=oneshot
-ExecStart=/usr/bin/certbot -q renew
-EOF
-
-    cat >/etc/systemd/system/certbot-renew.timer <<'EOF'
-[Unit]
-Description=Run certbot renew twice daily
-
-[Timer]
-OnCalendar=*-*-* 00,12:00:00
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-EOF
-
-    systemctl daemon-reload
-    systemctl enable --now certbot-renew.timer
-  fi
-
-  # Final verification
-  if _any_timer_active; then
-    ok "Certbot auto-renewal timer active"
-    return 0
-  fi
-
-  # Last resort: start again and recheck
-  systemctl start certbot.timer 2>/dev/null || true
-  systemctl start snap.certbot.renew.timer 2>/dev/null || true
-  systemctl start certbot-renew.timer 2>/dev/null || true
-  sleep 1
-
-  if _any_timer_active; then
-    ok "Certbot auto-renewal timer active"
-  else
-    err "Certbot auto-renewal timer NOT active"
-    systemctl list-timers --no-pager --all | sed -n '1,200p' || true
-    exit 1
-  fi
-}
-
-ensure_certbot_deploy_hook() {
-  step "Ensuring Certbot deploy hook reloads Nginx"
-  local hook_dir="/etc/letsencrypt/renewal-hooks/deploy"
-  local hook_file="${hook_dir}/000-reload-nginx.sh"
-
-  mkdir -p "${hook_dir}"
-
-  cat > "${hook_file}" <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-systemctl reload nginx
-EOF
-
-  chmod +x "${hook_file}"
-  ok "Certbot deploy hook installed: ${hook_file}"
-}
-
-issue_cert_if_needed() {
-  if [[ -f "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" ]]; then
-    ok "TLS certificate already exists"
-    ensure_certbot_timer
-    ensure_certbot_deploy_hook
-    step "Verifying certbot timer"
-    if systemctl is-active --quiet certbot.timer || \
-       systemctl is-active --quiet snap.certbot.renew.timer || \
-       systemctl is-active --quiet certbot-renew.timer; then
-      ok "Certbot auto-renewal timer active"
-    else
-      err "Certbot auto-renewal timer NOT active"
-      systemctl list-timers --no-pager --all | sed -n '1,200p' || true
-      exit 1
-    fi
-    return
-  fi
-
-  step "Issuing Let's Encrypt certificate (webroot)"
-  ensure_nginx
-  certbot certonly --webroot -w "${CERT_ROOT}" -d "${DOMAIN}" -d "www.${DOMAIN}" \
-    --email "${EMAIL}" --agree-tos --non-interactive
-  ok "Certificate issued"
-  ensure_ssl_support_files
-  ensure_nginx
-
-  ensure_certbot_timer
-  ensure_certbot_deploy_hook
-  step "Verifying certbot timer"
-  if systemctl is-active --quiet certbot.timer || \
-     systemctl is-active --quiet snap.certbot.renew.timer || \
-     systemctl is-active --quiet certbot-renew.timer; then
-    ok "Certbot auto-renewal timer active"
-  else
-    err "Certbot auto-renewal timer NOT active"
-    systemctl list-timers --no-pager --all | sed -n '1,200p' || true
-    exit 1
-  fi
-}
-
-# ---------- Traffic switching (only after health passes) ----------
+# ---------- Activation marker (no Nginx proxy) ----------
 switch_traffic() {
-  step "Switching Nginx upstream to ${TARGET_COLOR} (port ${TARGET_PORT})"
-  if [[ "${TARGET_COLOR}" == "blue" ]]; then
-    ln -sf "${UP_BLUE}" "${UP_ACTIVE}"
-  else
-    ln -sf "${UP_GREEN}" "${UP_ACTIVE}"
-  fi
+  step "Marking active deployment color as ${TARGET_COLOR}"
   echo "${TARGET_COLOR}" > "${ACTIVE_FILE}"
-  nginx -t
-  systemctl reload nginx
-  ok "Switched traffic to ${TARGET_COLOR}"
+  ok "Active color updated to ${TARGET_COLOR}"
   SWITCHED=1
 }
 
 verify_domain() {
-  step "Verifying domain is serving over HTTPS: https://${DOMAIN}"
+  step "Verifying service is reachable directly on server port ${HOST_PORT}"
   local deadline=$((SECONDS + 120))
   while (( SECONDS < deadline )); do
-    if http_ok "https://${DOMAIN}"; then
-      ok "Domain reachable over HTTPS"
+    if http_ok "http://127.0.0.1:${HOST_PORT}${HEALTH_PATH}" || http_ok "http://127.0.0.1:${HOST_PORT}"; then
+      ok "Service reachable on host port ${HOST_PORT}"
       return 0
     fi
     sleep 2
   done
-  err "Domain did not become healthy over HTTPS"
+  err "Service did not become reachable on host port ${HOST_PORT}"
   return 1
 }
 
 rollback_switch() {
-  step "Rolling back Nginx to ${ACTIVE_COLOR}"
-  if [[ "${ACTIVE_COLOR}" == "blue" ]]; then
-    ln -sf "${UP_BLUE}" "${UP_ACTIVE}"
-  else
-    ln -sf "${UP_GREEN}" "${UP_ACTIVE}"
-  fi
-  nginx -t
-  systemctl reload nginx
-  ok "Rollback complete"
+  step "Rolling back active deployment marker to ${ACTIVE_COLOR}"
+  echo "${ACTIVE_COLOR}" > "${ACTIVE_FILE}"
+  ok "Rollback marker updated"
 }
 
 cleanup_old_container() {
@@ -764,7 +475,7 @@ start_target_container() {
     --name "${TARGET_NAME}"
     -l "app=${APP_NAME}"
     -l "color=${TARGET_COLOR}"
-    -p "${TARGET_PORT}:${CONTAINER_PORT}"
+    -p "${HOST_PORT}:${CONTAINER_PORT}"
     --network langflow-net
     -v /app/ebsstorage/langflowstorage:/app/langflow
   )
@@ -820,7 +531,7 @@ cleanup_on_failure() {
   CLEANED_UP=1
   warn "Running failure cleanup"
 
-  # If we switched traffic already, roll back Nginx to previous color
+  # If we switched marker already, roll it back to previous color
   if [[ "${SWITCHED}" -eq 1 ]]; then
     rollback_switch || true
   fi
@@ -867,12 +578,9 @@ report_status() {
 }
 
 # ---------- Execute flow (STOP-FIRST) ----------
-ensure_nginx
-issue_cert_if_needed
 ensure_ebs_volume
 
-# Prepare but DO NOT switch Nginx yet. We will switch only after new target is healthy.
-# 1) Stop active (frees CPU/RAM/port)
+ # 1) Stop active (frees CPU/RAM/port)
 stop_active_container
 prepare_langflow_env
 ensure_postgres
@@ -881,7 +589,7 @@ ensure_postgres
 start_target_container
 wait_until_healthy
 
-# 3) Switch traffic and finalize
+# 3) Mark active deployment and finalize
 switch_traffic
 verify_domain
 
