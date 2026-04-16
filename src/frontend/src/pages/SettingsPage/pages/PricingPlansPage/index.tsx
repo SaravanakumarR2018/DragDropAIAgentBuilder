@@ -25,10 +25,22 @@ type BillingAccessResponse = {
   paddle_subscription_id?: string | null;
   next_billed_at?: string | null;
   current_period_end?: string | null;
+  current_period_start?: string | null;
   cancel_scheduled?: boolean;
+  subscription_seats?: number | null;
+  seats?: number | null;
+  quantity?: number | null;
 };
 
 type PaddlePricesResponse = Record<string, string>;
+type PlanStatus = "Active" | "Not Active";
+
+type PlanDetails = {
+  key: string;
+  name: string;
+  paddlePlanKey: string;
+  monthlyPriceUsdCents: number;
+};
 
 const PLAN_NAME_BY_KEY = Object.fromEntries(
   (planConfigData.plans ?? []).map((plan) => [
@@ -43,9 +55,18 @@ const PRO_PLAN_KEY = (
 ).toLowerCase();
 
 const STARTER_PLAN_KEY = (
-  planConfigData.plans?.find((plan) => plan?.key === "starter")?.paddle?.plan_key ??
-  "starter_pack_monthly"
+  planConfigData.plans?.find((plan) => plan?.key === "starter")?.paddle
+    ?.plan_key ?? "starter_pack_monthly"
 ).toLowerCase();
+
+const AVAILABLE_PLANS: PlanDetails[] = (planConfigData.plans ?? []).map(
+  (plan) => ({
+    key: String(plan?.key ?? ""),
+    name: String(plan?.name ?? "").trim(),
+    paddlePlanKey: String(plan?.paddle?.plan_key ?? "").toLowerCase(),
+    monthlyPriceUsdCents: Number(plan?.paddle?.monthly_price_usd_cents ?? 0),
+  }),
+);
 
 function formatPlanKey(planKey: string): string {
   return planKey
@@ -55,8 +76,27 @@ function formatPlanKey(planKey: string): string {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function formatDate(value?: string | null): string {
+  if (!value) return "Not available";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Not available";
+
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(
+    date,
+  );
+}
+
+function formatCurrencyFromCents(cents: number): string {
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  }).format(cents / 100);
+}
+
 function SelectedPlan({ billing }: { billing: BillingAccessResponse | null }) {
-  const selectedPlan = useMemo(() => {
+  const selectedPlanDetails = useMemo(() => {
     if (!billing?.has_access) return "Free";
 
     const planKey = (billing.subscription_plan_key ?? "").toLowerCase();
@@ -68,13 +108,79 @@ function SelectedPlan({ billing }: { billing: BillingAccessResponse | null }) {
     return status === "trialing" ? "Paid (Trialing)" : "Paid";
   }, [billing]);
 
+  const normalizedStatus = (billing?.subscription_status ?? "").toLowerCase();
+  const isActiveStatus = ["active", "trialing", "past_due"].includes(
+    normalizedStatus,
+  );
+  const currentStatus: PlanStatus =
+    billing?.has_access && isActiveStatus ? "Active" : "Not Active";
+
+  const monthlyAmount = useMemo(() => {
+    const planKey = (billing?.subscription_plan_key ?? "").toLowerCase();
+    const matchedPlan = AVAILABLE_PLANS.find(
+      (plan) => plan.paddlePlanKey === planKey,
+    );
+    if (!matchedPlan) return "Not available";
+    return `${formatCurrencyFromCents(matchedPlan.monthlyPriceUsdCents)} / month`;
+  }, [billing?.subscription_plan_key]);
+
+  const seatCount = useMemo(() => {
+    const firstAvailableSeatValue =
+      billing?.subscription_seats ??
+      billing?.seats ??
+      billing?.quantity ??
+      null;
+    if (
+      firstAvailableSeatValue === null ||
+      firstAvailableSeatValue === undefined
+    ) {
+      return "Not available";
+    }
+
+    return String(firstAvailableSeatValue);
+  }, [billing?.quantity, billing?.seats, billing?.subscription_seats]);
+
   return (
     <div className="rounded-xl border bg-background p-4">
-      <p className="text-sm text-muted-foreground">Selected plan</p>
-      <p className="mt-1 text-xl font-semibold">{selectedPlan}</p>
+      <p className="text-sm text-muted-foreground">Current plan details</p>
+      <p className="mt-1 text-xl font-semibold">{selectedPlanDetails}</p>
+      <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+        <div className="rounded-lg border bg-muted/20 p-3">
+          <p className="text-xs text-muted-foreground">Plan Name</p>
+          <p className="mt-1 font-medium">{selectedPlanDetails}</p>
+        </div>
+        <div className="rounded-lg border bg-muted/20 p-3">
+          <p className="text-xs text-muted-foreground">Current Status</p>
+          <p className="mt-1 font-medium">{currentStatus}</p>
+        </div>
+        <div className="rounded-lg border bg-muted/20 p-3">
+          <p className="text-xs text-muted-foreground">Plan Start Date</p>
+          <p className="mt-1 font-medium">
+            {formatDate(billing?.current_period_start)}
+          </p>
+        </div>
+        <div className="rounded-lg border bg-muted/20 p-3">
+          <p className="text-xs text-muted-foreground">Plan End Date</p>
+          <p className="mt-1 font-medium">
+            {formatDate(billing?.next_billed_at ?? billing?.current_period_end)}
+          </p>
+        </div>
+        <div className="rounded-lg border bg-muted/20 p-3 sm:col-span-2">
+          <p className="text-xs text-muted-foreground">Amount per Month</p>
+          <p className="mt-1 font-medium">{monthlyAmount}</p>
+        </div>
+        <div className="rounded-lg border bg-muted/20 p-3 sm:col-span-2">
+          <p className="text-xs text-muted-foreground">Seats</p>
+          <p className="mt-1 font-medium">{seatCount}</p>
+        </div>
+      </div>
       <div className="mt-3 space-y-1 text-sm text-muted-foreground">
-        <p>Subscription status: {billing?.subscription_status ?? "not available"}</p>
-        <p>Subscription ID: {billing?.paddle_subscription_id ?? "not available"}</p>
+        <p>
+          Subscription status: {billing?.subscription_status ?? "not available"}
+        </p>
+        <p>
+          Subscription ID: {billing?.paddle_subscription_id ?? "not available"}
+        </p>
       </div>
     </div>
   );
@@ -105,7 +211,9 @@ export default function PricingPlansPage() {
     const d = new Date(nextDateRaw);
     if (Number.isNaN(d.getTime())) return null;
 
-    return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(d);
+    return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(
+      d,
+    );
   }, [billing?.current_period_end, billing?.next_billed_at]);
 
   const accessEndsMessage = formattedNextBillingDate
@@ -173,7 +281,10 @@ export default function PricingPlansPage() {
   }, [getToken]);
 
   useEffect(() => {
-    if (isCancelScheduled || (isCancelledState && billing?.has_access !== false)) {
+    if (
+      isCancelScheduled ||
+      (isCancelledState && billing?.has_access !== false)
+    ) {
       setAlreadyCancelled(true);
     }
 
@@ -277,8 +388,8 @@ export default function PricingPlansPage() {
       setBilling(res.data ?? null);
       setUpgradeSuccess(
         isProPlan
-          ? "Subscription will be downgraded at next billing cycle."
-          : "Subscription upgraded successfully.",
+          ? "Plan change scheduled for your next billing cycle."
+          : "Plan changed successfully.",
       );
     } catch (error: any) {
       const msg =
@@ -353,17 +464,17 @@ export default function PricingPlansPage() {
           )}
 
           {canChangeSubscription && (
-            <Button
-              onClick={() => setUpgradeModalOpen(true)}
-              disabled={upgradeLoading}
-              className="ml-2"
-            >
-              {upgradeLoading
-                ? "Processing..."
-                : isProPlan
-                ? "Downgrade to Starter"
-                : "Upgrade to Pro"}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                onClick={() => setUpgradeModalOpen(true)}
+                disabled={upgradeLoading}
+              >
+                {upgradeLoading ? "Processing..." : "Change Plan"}
+              </Button>
+              <Button variant="outline" onClick={() => navigate("/pricing")}>
+                Change Seats
+              </Button>
+            </div>
           )}
 
           <Dialog open={cancelModalOpen} onOpenChange={setCancelModalOpen}>
@@ -391,13 +502,10 @@ export default function PricingPlansPage() {
           <Dialog open={upgradeModalOpen} onOpenChange={setUpgradeModalOpen}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>
-                  {isProPlan ? "Downgrade to Starter" : "Upgrade to Pro"}
-                </DialogTitle>
+                <DialogTitle>Change Plan</DialogTitle>
                 <DialogDescription>
-                  {isProPlan
-                    ? "Your plan will be downgraded at the next billing cycle."
-                    : "You will be charged a prorated amount today based on your remaining billing period."}
+                  Update your plan. Pricing adjustments will be applied based on
+                  your current billing cycle.
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>
@@ -411,11 +519,7 @@ export default function PricingPlansPage() {
                   }}
                   disabled={upgradeLoading}
                 >
-                  {upgradeLoading
-                    ? "Processing..."
-                    : isProPlan
-                    ? "Confirm Downgrade"
-                    : "Confirm Upgrade"}
+                  {upgradeLoading ? "Processing..." : "Confirm Plan Change"}
                 </Button>
               </DialogFooter>
             </DialogContent>

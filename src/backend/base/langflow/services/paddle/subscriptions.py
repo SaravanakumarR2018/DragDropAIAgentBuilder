@@ -30,7 +30,9 @@ from langflow.services.auth.clerk_metadata_constants import (
     SUBSCRIPTION_PLAN_KEY,
     NEXT_BILLED_AT_KEY,
     CURRENT_PERIOD_END_KEY,
+    CURRENT_PERIOD_START_KEY,
     CANCEL_SCHEDULED_KEY,
+    SUBSCRIPTION_SEATS_KEY,
 
 )
 from langflow.services.auth.clerk_utils import (
@@ -131,7 +133,9 @@ async def has_active_subscription(
             ORGANISATION_CREATED_BY: created_by,
             NEXT_BILLED_AT_KEY: None,
             CURRENT_PERIOD_END_KEY: None,
+            CURRENT_PERIOD_START_KEY: None,
             CANCEL_SCHEDULED_KEY: False,
+            SUBSCRIPTION_SEATS_KEY: None,
         }
 
     paddle_client = client or get_paddle_client()
@@ -154,9 +158,19 @@ async def has_active_subscription(
     next_billed_at = getattr(subscription, "next_billed_at", None)
 
     current_period = getattr(subscription, "current_billing_period", None)
+    current_period_start = None
     current_period_end = None
     if current_period:
+        current_period_start = getattr(current_period, "starts_at", None)
         current_period_end = getattr(current_period, "ends_at", None)
+
+    seats = None
+    items = getattr(subscription, "items", None)
+    if items:
+        first_item = items[0]
+        quantity = getattr(first_item, "quantity", None)
+        if quantity is not None:
+            seats = int(quantity)
 
     scheduled_change = getattr(subscription, "scheduled_change", None)
     cancel_scheduled = False
@@ -178,7 +192,9 @@ async def has_active_subscription(
         ORGANISATION_CREATED_BY: created_by,
         NEXT_BILLED_AT_KEY: next_billed_at,
         CURRENT_PERIOD_END_KEY: current_period_end,
+        CURRENT_PERIOD_START_KEY: current_period_start,
         CANCEL_SCHEDULED_KEY: cancel_scheduled,
+        SUBSCRIPTION_SEATS_KEY: seats,
     }
 
 

@@ -1,5 +1,16 @@
 from fastapi import APIRouter, HTTPException
-from langflow.services.auth.clerk_metadata_constants import PADDLE_SUBSCRIPTION_ID_KEY
+from langflow.services.auth.clerk_metadata_constants import (
+    CANCEL_SCHEDULED_KEY,
+    CURRENT_PERIOD_END_KEY,
+    CURRENT_PERIOD_START_KEY,
+    HAS_ACCESS_KEY,
+    NEXT_BILLED_AT_KEY,
+    ORGANISATION_CREATED_BY,
+    PADDLE_SUBSCRIPTION_ID,
+    PADDLE_SUBSCRIPTION_ID_KEY,
+    SUBSCRIPTION_SEATS_KEY,
+    SUBSCRIPTION_STATUS_KEY,
+)
 from lfx.log.logger import logger
 from pydantic import BaseModel
 
@@ -77,23 +88,33 @@ async def get_org_access(
     if not organisation_created_by:
         logger.info("Organisation created by missing, denying access")
         return {
-            "has_access": False,
+            HAS_ACCESS_KEY: False,
             "is_admin": True,
             "reason": "organisation_created_by_missing",
-            "organisation_created_by": None,
-            "paddle_subscription_id": paddle_subscription_id,
-            "subscription_status": None,
+            ORGANISATION_CREATED_BY: None,
+            PADDLE_SUBSCRIPTION_ID: paddle_subscription_id,
+            SUBSCRIPTION_STATUS_KEY: None,
+            CURRENT_PERIOD_START_KEY: None,
+            CURRENT_PERIOD_END_KEY: None,
+            NEXT_BILLED_AT_KEY: None,
+            CANCEL_SCHEDULED_KEY: False,
+            SUBSCRIPTION_SEATS_KEY: None,
         }
 
     if not paddle_subscription_id:
         logger.info("Paddle subscription id missing, denying access")
         return {
-            "has_access": False,
+            HAS_ACCESS_KEY: False,
             "is_admin": is_admin,
             "reason": "paddle_subscription_id_missing",
-            "organisation_created_by": organisation_created_by,
-            "paddle_subscription_id": None,
-            "subscription_status": None,
+            ORGANISATION_CREATED_BY: organisation_created_by,
+            PADDLE_SUBSCRIPTION_ID: None,
+            SUBSCRIPTION_STATUS_KEY: None,
+            CURRENT_PERIOD_START_KEY: None,
+            CURRENT_PERIOD_END_KEY: None,
+            NEXT_BILLED_AT_KEY: None,
+            CANCEL_SCHEDULED_KEY: False,
+            SUBSCRIPTION_SEATS_KEY: None,
         }
 
     logger.info(f"Checking subscription status for subscription {paddle_subscription_id}")
@@ -277,3 +298,4 @@ async def change_subscription_api(
             status_code=500,
             detail=f"Failed to upgrade subscription: {str(e)}",
         )
+
