@@ -32,7 +32,10 @@ from langflow.services.paddle.subscriptions import (
     ensure_paddle_customer_for_user,
     fetch_active_subscription,
     has_active_subscription,
+    preview_subscription_update,
     retry_with_backoff,
+    update_subscription_plan,
+    update_subscription_seats,
 )
 
 router = APIRouter(tags=["Billing"], prefix="/billing")
@@ -45,6 +48,17 @@ class ChangeSubscriptionRequest(BaseModel):
     price_id: str
     quantity: int = 1
     is_upgrade: bool
+
+class ChangePlanRequest(BaseModel):
+    price_id: str
+    seats: int
+
+class ChangeSeatsRequest(BaseModel):
+    seats: int
+
+class PreviewChangeRequest(BaseModel):
+    price_id: str | None = None
+    seats: int
 
 @router.post("/ensure-paddle-customer")
 async def ensure_paddle_customer(
@@ -299,3 +313,77 @@ async def change_subscription_api(
             detail=f"Failed to upgrade subscription: {str(e)}",
         )
 
+
+@router.post("/preview-change")
+async def preview_change_api(
+    body: PreviewChangeRequest,
+    current_user: CurrentActiveUser,
+):
+    if not get_settings_service().auth_settings.CLERK_AUTH_ENABLED:
+        raise HTTPException(status_code=400, detail="Clerk auth not enabled")
+
+    await _ensure_admin_user()
+
+    subscription_id = await get_paddle_subscription_id_from_clerk_payload()
+
+    if not subscription_id:
+        raise HTTPException(status_code=400, detail="Missing subscription_id")
+
+    return await preview_subscription_update(
+        subscription_id=subscription_id,
+        new_price_id=body.price_id,
+        new_quantity=body.seats,
+    )
+
+@router.post("/change-plan")
+async def change_plan_api(
+    body: ChangePlanRequest,
+    current_user: CurrentActiveUser,
+):
+    if not get_settings_service().auth_settings.CLERK_AUTH_ENABLED:
+        raise HTTPException(status_code=400, detail="Clerk auth not enabled")
+
+    await _ensure_admin_user()
+
+    subscription_id = await get_paddle_subscription_id_from_clerk_payload()
+
+    if not subscription_id:
+        raise HTTPException(status_code=400, detail="Missing subscription_id")
+
+    result = await update_subscription_plan(
+        subscription_id=subscription_id,
+        new_price_id=body.price_id,
+        quantity=body.seats,
+    )
+
+    return {
+        "success": True,
+        "message": "Plan updated successfully",
+        **result,
+    }
+
+@router.post("/change-seats")
+async def change_seats_api(
+    body: ChangeSeatsRequest,
+    current_user: CurrentActiveUser,
+):
+    if not get_settings_service().auth_settings.CLERK_AUTH_ENABLED:
+        raise HTTPException(status_code=400, detail="Clerk auth not enabled")
+
+    await _ensure_admin_user()
+
+    subscription_id = await get_paddle_subscription_id_from_clerk_payload()
+
+    if not subscription_id:
+        raise HTTPException(status_code=400, detail="Missing subscription_id")
+
+    result = await update_subscription_seats(
+        subscription_id=subscription_id,
+        new_quantity=body.seats,
+    )
+
+    return {
+        "success": True,
+        "message": "Seats updated successfully",
+        **result,
+    }

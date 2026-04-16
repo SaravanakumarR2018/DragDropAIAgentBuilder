@@ -656,3 +656,123 @@ async def change_subscription(
         "price_id": new_price_id,
         "proration_mode": str(proration_mode),
     }
+
+async def _update_subscription(
+    *,
+    subscription_id: str,
+    price_id: str,
+    quantity: int,
+):
+    paddle_client = get_paddle_client()
+
+    subscription = await asyncio.to_thread(
+        paddle_client.subscriptions.get,
+        subscription_id,
+    )
+
+    status = str(getattr(subscription, "status", "")).lower()
+
+    if status == "trialing":
+        proration_mode = SubscriptionProrationBillingMode.DoNotBill
+    else:
+        proration_mode = SubscriptionProrationBillingMode.ProratedImmediately
+
+    operation = UpdateSubscription(
+        items=[
+            SubscriptionUpdateItem(
+                price_id=price_id,
+                quantity=quantity,
+            )
+        ],
+        proration_billing_mode=proration_mode,
+    )
+
+    updated = await asyncio.to_thread(
+        paddle_client.subscriptions.update,
+        subscription_id,
+        operation,
+    )
+
+    return {
+        "subscription_id": subscription_id,
+        "status": getattr(updated, "status", None),
+        "price_id": price_id,
+        "quantity": quantity,
+        "proration_mode": str(proration_mode),
+    }
+
+async def update_subscription_plan(
+    *,
+    subscription_id: str,
+    new_price_id: str,
+    quantity: int,
+):
+    return await _update_subscription(
+        subscription_id=subscription_id,
+        price_id=new_price_id,
+        quantity=quantity,
+    )
+
+async def update_subscription_seats(
+    *,
+    subscription_id: str,
+    new_quantity: int,
+):
+    paddle_client = get_paddle_client()
+
+    subscription = await asyncio.to_thread(
+        paddle_client.subscriptions.get,
+        subscription_id,
+    )
+
+    current_items = getattr(subscription, "items", [])
+    if not current_items:
+        raise ValueError("No subscription items found")
+
+    current_price_id = current_items[0].price_id
+
+    return await _update_subscription(
+        subscription_id=subscription_id,
+        price_id=current_price_id,
+        quantity=new_quantity,
+    )
+
+async def preview_subscription_update(
+    *,
+    subscription_id: str,
+    new_price_id: str | None,
+    new_quantity: int,
+):
+    paddle_client = get_paddle_client()
+
+    subscription = await asyncio.to_thread(
+        paddle_client.subscriptions.get,
+        subscription_id,
+    )
+
+    current_items = getattr(subscription, "items", [])
+    if not current_items:
+        raise ValueError("No subscription items found")
+
+    current_price_id = current_items[0].price_id
+    current_quantity = current_items[0].quantity
+
+    preview = await asyncio.to_thread(
+        paddle_client.subscriptions.preview,
+        subscription_id,
+        {
+            "effective_from": "immediately",
+            "items": [
+                {
+                    "price_id": new_price_id or current_price_id,
+                    "quantity": new_quantity or current_quantity,
+                }
+            ],
+        },
+    )
+
+    return {
+        "immediate_transaction": getattr(preview, "immediate_transaction", None),
+        "next_transaction": getattr(preview, "next_transaction", None),
+        "update_summary": getattr(preview, "update_summary", None),
+    }
