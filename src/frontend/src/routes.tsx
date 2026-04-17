@@ -95,6 +95,7 @@ const TermsOfServicePage = lazy(() => import("./pages/TermsOfServicePage"));
 const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage"));
 const RefundPolicyPage = lazy(() => import("./pages/RefundPolicyPage"));
 const PricingPage = lazy(() => import("./pages/PricingPage"));
+const ChangePlansPage = lazy(() => import("./pages/ChangePlansPage"));
 
 // ---- Router ----
 const router = createBrowserRouter(
@@ -419,6 +420,16 @@ const router = createBrowserRouter(
             <Suspense fallback={<LoadingPage />}>
               <ProtectedRoute>
                 <PricingPage />
+              </ProtectedRoute>
+            </Suspense>
+          }
+        />
+        <Route
+          path="change-plans"
+          element={
+            <Suspense fallback={<LoadingPage />}>
+              <ProtectedRoute>
+                <ChangePlansPage />
               </ProtectedRoute>
             </Suspense>
           }

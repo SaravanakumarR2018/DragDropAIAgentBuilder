@@ -36,6 +36,9 @@ export const URLs = {
   GET_PADDLE_SUBSCRIPTION: `billing/get-subscriptions`,
   CANCEL_PADDLE_SUBSCRIPTION: `billing/cancel-subscription`,
   CHANGE_SUBSCRIPTION: `billing/change-subscription`,
+  PREVIEW_BILLING_CHANGE: `billing/preview-change`,
+  CHANGE_PLAN: `billing/change-plan`,
+  CHANGE_SEATS: `billing/change-seats`,
 } as const;
 
 // IMPORTANT: FOLDERS endpoint now points to 'projects' for backward compatibility

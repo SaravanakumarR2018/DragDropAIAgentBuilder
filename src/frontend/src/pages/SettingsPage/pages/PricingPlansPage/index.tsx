@@ -32,7 +32,6 @@ type BillingAccessResponse = {
   quantity?: number | null;
 };
 
-type PaddlePricesResponse = Record<string, string>;
 type PlanStatus = "Active" | "Not Active";
 
 type PlanDetails = {
@@ -48,16 +47,6 @@ const PLAN_NAME_BY_KEY = Object.fromEntries(
     String(plan?.name ?? "").trim(),
   ]),
 ) as Record<string, string>;
-
-const PRO_PLAN_KEY = (
-  planConfigData.plans?.find((plan) => plan?.key === "pro")?.paddle?.plan_key ??
-  "pro_pack_monthly"
-).toLowerCase();
-
-const STARTER_PLAN_KEY = (
-  planConfigData.plans?.find((plan) => plan?.key === "starter")?.paddle
-    ?.plan_key ?? "starter_pack_monthly"
-).toLowerCase();
 
 const AVAILABLE_PLANS: PlanDetails[] = (planConfigData.plans ?? []).map(
   (plan) => ({
@@ -198,12 +187,6 @@ export default function PricingPlansPage() {
 
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [alreadyCancelled, setAlreadyCancelled] = useState(false);
-  const [upgradeLoading, setUpgradeLoading] = useState(false);
-  const [upgradeError, setUpgradeError] = useState<string | null>(null);
-  const [upgradeSuccess, setUpgradeSuccess] = useState<string | null>(null);
-
-  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
-
   const formattedNextBillingDate = useMemo(() => {
     const nextDateRaw = billing?.next_billed_at ?? billing?.current_period_end;
     if (!nextDateRaw) return null;
@@ -233,9 +216,6 @@ export default function PricingPlansPage() {
     !isCancelScheduled &&
     !alreadyCancelled &&
     Boolean(billing?.is_admin);
-
-  const currentPlanKey = (billing?.subscription_plan_key ?? "").toLowerCase();
-  const isProPlan = currentPlanKey === PRO_PLAN_KEY;
 
   const canChangeSubscription =
     Boolean(billing?.paddle_subscription_id) &&
@@ -350,58 +330,6 @@ export default function PricingPlansPage() {
     }
   };
 
-  const handleChangeSubscription = async () => {
-    setUpgradeLoading(true);
-    setUpgradeError(null);
-    setUpgradeSuccess(null);
-
-    try {
-      const token = await getToken();
-      if (!token) throw new Error("Missing auth token");
-
-      const { data: priceData } = await api.get<PaddlePricesResponse>(
-        getURL("GET_PADDLE_PRICES"),
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-
-      const targetPlanKey = isProPlan ? STARTER_PLAN_KEY : PRO_PLAN_KEY;
-      const targetPriceId = priceData?.[targetPlanKey];
-
-      if (!targetPriceId) {
-        throw new Error("Unable to find target price ID");
-      }
-
-      await api.post(
-        getURL("CHANGE_SUBSCRIPTION"),
-        {
-          price_id: targetPriceId,
-          quantity: 1,
-          is_upgrade: !isProPlan,
-        },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-
-      const res = await api.get(getURL("BILLING_ACCESS"), {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      setBilling(res.data ?? null);
-      setUpgradeSuccess(
-        isProPlan
-          ? "Plan change scheduled for your next billing cycle."
-          : "Plan changed successfully.",
-      );
-    } catch (error: any) {
-      const msg =
-        error?.response?.data?.detail ??
-        error?.message ??
-        "Failed to change subscription.";
-      setUpgradeError(String(msg));
-    } finally {
-      setUpgradeLoading(false);
-    }
-  };
-
   return (
     <div className="flex h-full w-full flex-col gap-6">
       <div className="flex flex-col">
@@ -435,18 +363,6 @@ export default function PricingPlansPage() {
             </div>
           )}
 
-          {upgradeError && (
-            <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-              {upgradeError}
-            </div>
-          )}
-
-          {upgradeSuccess && (
-            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300">
-              {upgradeSuccess}
-            </div>
-          )}
-
           {alreadyCancelled && (
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
               You already cancelled your subscription. You still have access{" "}
@@ -466,12 +382,14 @@ export default function PricingPlansPage() {
           {canChangeSubscription && (
             <div className="flex flex-wrap gap-2">
               <Button
-                onClick={() => setUpgradeModalOpen(true)}
-                disabled={upgradeLoading}
+                onClick={() => navigate("/change-plans?mode=plan")}
               >
-                {upgradeLoading ? "Processing..." : "Change Plan"}
+                Change Plan
               </Button>
-              <Button variant="outline" onClick={() => navigate("/pricing")}>
+              <Button
+                variant="outline"
+                onClick={() => navigate("/change-plans?mode=seats")}
+              >
                 Change Seats
               </Button>
             </div>
@@ -499,31 +417,6 @@ export default function PricingPlansPage() {
             </DialogContent>
           </Dialog>
 
-          <Dialog open={upgradeModalOpen} onOpenChange={setUpgradeModalOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Change Plan</DialogTitle>
-                <DialogDescription>
-                  Update your plan. Pricing adjustments will be applied based on
-                  your current billing cycle.
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button onClick={() => setUpgradeModalOpen(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={async () => {
-                    setUpgradeModalOpen(false);
-                    await handleChangeSubscription();
-                  }}
-                  disabled={upgradeLoading}
-                >
-                  {upgradeLoading ? "Processing..." : "Confirm Plan Change"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
         </div>
       )}
     </div>

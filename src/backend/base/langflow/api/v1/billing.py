@@ -28,7 +28,6 @@ from langflow.services.paddle.provisioning import get_paddle_prices
 from langflow.services.paddle.subscriptions import (
     _ensure_admin_user,
     cancel_subscription,
-    change_subscription,
     ensure_paddle_customer_for_user,
     fetch_active_subscription,
     has_active_subscription,
@@ -258,61 +257,6 @@ async def cancel_subscription_api(
             status_code=500,
             detail=f"Failed to cancel subscription: {str(e)}",
         )
-
-@router.post("/change-subscription")
-async def change_subscription_api(
-    body: ChangeSubscriptionRequest,
-    current_user: CurrentActiveUser,
-) -> dict:
-    """Change subscription (Starter -> Pro)"""
-
-    logger.info(f"Change subscription API called by user {current_user.id}")
-
-    if not get_settings_service().auth_settings.CLERK_AUTH_ENABLED:
-        raise HTTPException(status_code=400, detail="Clerk auth not enabled")
-    
-    await _ensure_admin_user()
-
-    # 1️⃣ Get subscription_id from Clerk metadata
-    subscription_id = await get_paddle_subscription_id_from_clerk_payload()
-
-    if not subscription_id:
-        raise HTTPException(status_code=400, detail="Missing paddle_subscription_id")
-
-    logger.info(
-        f"Upgrade request for subscription {subscription_id} "
-        f"to price {body.price_id}"
-    )
-
-    try:
-        result = await change_subscription(
-            subscription_id=subscription_id,
-            new_price_id=body.price_id,
-            quantity=body.quantity,
-            is_upgrade=body.is_upgrade,
-        )
-
-        logger.info(
-            f"Successfully changed subscription {subscription_id} "
-            f"to price {body.price_id}, status: {result.get('status')}"
-        )
-
-        return {
-            "success": True,
-            "message": "Subscription changed successfully",
-            **result,
-        }
-
-    except Exception as e:
-        logger.info(
-            f"Failed to upgrade subscription {subscription_id} "
-            f"for user {current_user.id}: {str(e)}"
-        )
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to upgrade subscription: {str(e)}",
-        )
-
 
 @router.post("/preview-change")
 async def preview_change_api(
