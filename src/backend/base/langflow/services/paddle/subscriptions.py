@@ -650,6 +650,34 @@ async def _merge_custom_data(
     return merged
 
 
+def _determine_proration_mode(
+    *,
+    current_plan_key: str | None,
+    new_plan_key: str | None,
+    plan_price_map: dict[str, int],
+    status: str,
+) -> SubscriptionProrationBillingMode:
+    """Determine the appropriate proration mode based on plan upgrade status."""
+    is_upgrade = False
+    if (
+        isinstance(current_plan_key, str)
+        and isinstance(new_plan_key, str)
+        and current_plan_key in plan_price_map
+        and new_plan_key in plan_price_map
+    ):
+        is_upgrade = plan_price_map[new_plan_key] > plan_price_map[current_plan_key]
+
+    if is_upgrade:
+        if status == "trialing":
+            proration_mode = SubscriptionProrationBillingMode.DoNotBill
+        else:
+            proration_mode = SubscriptionProrationBillingMode.ProratedImmediately
+    else:
+        proration_mode = SubscriptionProrationBillingMode.DoNotBill
+
+    return proration_mode
+
+
 async def update_subscription(
     *,
     subscription_id: str,
@@ -691,22 +719,12 @@ async def update_subscription(
 
     plan_price_map = _get_enabled_plan_monthly_price_map()
 
-    is_upgrade = False
-    if (
-        isinstance(current_plan_key, str)
-        and isinstance(new_plan_key, str)
-        and current_plan_key in plan_price_map
-        and new_plan_key in plan_price_map
-    ):
-        is_upgrade = plan_price_map[new_plan_key] > plan_price_map[current_plan_key]
-
-    if is_upgrade:
-        if status == "trialing":
-            proration_mode = SubscriptionProrationBillingMode.DoNotBill
-        else:
-            proration_mode = SubscriptionProrationBillingMode.ProratedImmediately
-    else:
-        proration_mode = SubscriptionProrationBillingMode.DoNotBill
+    proration_mode = _determine_proration_mode(
+        current_plan_key=current_plan_key,
+        new_plan_key=new_plan_key,
+        plan_price_map=plan_price_map,
+        status=status,
+    )
 
     items = await _build_updated_items(
         subscription=subscription,
@@ -774,11 +792,34 @@ async def preview_subscription_update(
         paddle_client.subscriptions.get,
         subscription_id,
     )
+    status = str(getattr(subscription, "status", "")).lower()
 
     items = await _build_updated_items(
         subscription=subscription,
         new_price_id=new_price_id,
         new_quantity=new_quantity,
+    )
+
+    current_custom_data = _normalize_custom_data(
+        getattr(subscription, "custom_data", None)
+    )
+
+    current_plan_key = current_custom_data.get("plan_key")
+
+    new_plan_key = None
+    if new_price_id:
+        new_plan_key = await _get_plan_key_for_price(
+            price_id=new_price_id,
+            client=paddle_client,
+        )
+
+    plan_price_map = _get_enabled_plan_monthly_price_map()
+
+    proration_mode = _determine_proration_mode(
+        current_plan_key=current_plan_key,
+        new_plan_key=new_plan_key,
+        plan_price_map=plan_price_map,
+        status=status,
     )
 
     operation = PreviewUpdateSubscription(
@@ -789,7 +830,7 @@ async def preview_subscription_update(
             )
             for item in items
         ],
-        proration_billing_mode=SubscriptionProrationBillingMode.ProratedImmediately,
+        proration_billing_mode=proration_mode,
     )
 
     preview = await asyncio.to_thread(
