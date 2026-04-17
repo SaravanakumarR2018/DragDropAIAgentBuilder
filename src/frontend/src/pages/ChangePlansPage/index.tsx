@@ -26,6 +26,7 @@ type BillingAccessResponse = {
   subscription_seats?: number | null;
   seats?: number | null;
   quantity?: number | null;
+  next_billed_at?: string | null;
 };
 
 type PaddlePricesResponse = Record<string, string>;
@@ -207,6 +208,25 @@ export default function ChangePlansPage() {
     setPendingSeats((prev) => prev + 1);
   };
 
+  function buildPreviewMessage(previewData: any, nextBillingDate?: string): string | null {
+    if (!previewData) return null;
+
+    const hasImmediateCharge = Boolean(previewData?.immediate_transaction);
+    const amount = extractPreviewAmount(previewData);
+
+    if (hasImmediateCharge && amount !== null) {
+      return `You will be charged ${toCurrency(amount)} today.`;
+    }
+
+    if (nextBillingDate) {
+      const date = new Date(nextBillingDate);
+      const formatted = date.toLocaleDateString(undefined, { dateStyle: "medium" });
+      return `Your plan will change on ${formatted}. No charge today.`;
+    }
+
+    return "This change will take effect on your next billing date. No charge today.";
+  }
+
   const handlePlanSelect = async (planKey: string) => {
     if (mode !== "plan" || actionsBlocked || planKey === currentPlanKey) {
       return;
@@ -232,7 +252,7 @@ export default function ChangePlansPage() {
       const amount = extractPreviewAmount(preview);
       setPreviewData(preview);
       setPreviewMessage(
-        amount === null ? null : `You will be charged ${toCurrency(amount)} today.`,
+        buildPreviewMessage(preview, billing?.next_billed_at)
       );
       setSummaryMessage(
         `Plan change: ${currentPlanKey || "current"} → ${planKey} (${currentSeats} seats).`,
@@ -257,7 +277,7 @@ export default function ChangePlansPage() {
         const amount = extractPreviewAmount(preview);
         setPreviewData(preview);
         setPreviewMessage(
-          amount === null ? null : `You will be charged ${toCurrency(amount)} today.`,
+          buildPreviewMessage(preview, billing?.next_billed_at)
         );
       } else {
         const selected = STATIC_PLANS.find((plan) => plan.key === selectedPlanKey);
@@ -275,7 +295,7 @@ export default function ChangePlansPage() {
         const amount = extractPreviewAmount(preview);
         setPreviewData(preview);
         setPreviewMessage(
-          amount === null ? null : `You will be charged ${toCurrency(amount)} today.`,
+          buildPreviewMessage(preview, billing?.next_billed_at)
         );
         setSummaryMessage(
           `Plan change: ${currentPlanKey || "current"} → ${selectedPlanKey} (${currentSeats} seats).`,

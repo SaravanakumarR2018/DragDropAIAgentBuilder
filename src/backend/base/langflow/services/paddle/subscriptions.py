@@ -792,6 +792,8 @@ async def preview_subscription_update(
         paddle_client.subscriptions.get,
         subscription_id,
     )
+    current_quantity = subscription.items[0].quantity
+
     status = str(getattr(subscription, "status", "")).lower()
 
     items = await _build_updated_items(
@@ -815,12 +817,18 @@ async def preview_subscription_update(
 
     plan_price_map = _get_enabled_plan_monthly_price_map()
 
-    proration_mode = _determine_proration_mode(
-        current_plan_key=current_plan_key,
-        new_plan_key=new_plan_key,
-        plan_price_map=plan_price_map,
-        status=status,
-    )
+    if new_quantity > current_quantity and not new_price_id:
+        if status == "trialing":
+            proration_mode = SubscriptionProrationBillingMode.DoNotBill
+        else:
+            proration_mode = SubscriptionProrationBillingMode.ProratedImmediately
+    else:
+        proration_mode = _determine_proration_mode(
+            current_plan_key=current_plan_key,
+            new_plan_key=new_plan_key,
+            plan_price_map=plan_price_map,
+            status=status,
+        )
 
     operation = PreviewUpdateSubscription(
         items=[
