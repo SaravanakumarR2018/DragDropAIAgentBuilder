@@ -40,6 +40,10 @@ http {
         location /api {
             proxy_pass ${BACKEND_URL};
         }
+        location /new/landingpage/api/ {
+            rewrite ^/new/landingpage/(.*)$ /$1 break;
+            proxy_pass ${BACKEND_URL};
+        }
         location /health_check {
             proxy_pass ${BACKEND_URL};
         }
