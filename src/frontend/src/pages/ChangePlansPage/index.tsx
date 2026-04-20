@@ -40,6 +40,7 @@ type PlanConfig = {
 };
 
 const MIN_SEATS = 1;
+const ENTERPRISE_PLAN_KEY: PlanKey = "enterprise";
 
 const STATIC_PLANS: PlanConfig[] = (planConfigData.plans ?? []).map((plan) => ({
   key: String(plan?.key ?? "") as PlanKey,
@@ -235,6 +236,13 @@ export default function ChangePlansPage() {
     setSelectedPlanKey(planKey);
     setErrorMessage(null);
     setSummaryMessage(null);
+    setPreviewData(null);
+    setPreviewMessage(null);
+
+    if (planKey === ENTERPRISE_PLAN_KEY) {
+      setSummaryMessage("Please contact us to switch to the Enterprise plan.");
+      return;
+    }
 
     try {
       const selected = STATIC_PLANS.find((plan) => plan.key === planKey);
@@ -280,6 +288,11 @@ export default function ChangePlansPage() {
           buildPreviewMessage(preview, billing?.next_billed_at)
         );
       } else {
+        if (selectedPlanKey === ENTERPRISE_PLAN_KEY) {
+          setSummaryMessage("Please contact us to switch to the Enterprise plan.");
+          return;
+        }
+
         const selected = STATIC_PLANS.find((plan) => plan.key === selectedPlanKey);
         const selectedPriceId = selected ? priceMap[selected.paddlePlanKey] : undefined;
 
@@ -327,6 +340,12 @@ export default function ChangePlansPage() {
         await changeSeats({ seats: pendingSeats });
         setCurrentSeats(pendingSeats);
       } else {
+        if (selectedPlanKey === ENTERPRISE_PLAN_KEY) {
+          setSummaryMessage("Please contact us to switch to the Enterprise plan.");
+          setConfirmOpen(false);
+          return;
+        }
+
         const selected = STATIC_PLANS.find((plan) => plan.key === selectedPlanKey);
         const selectedPriceId = selected ? priceMap[selected.paddlePlanKey] : undefined;
 
@@ -355,7 +374,11 @@ export default function ChangePlansPage() {
   const canSubmitSeatMode =
     mode === "seats" && !actionsBlocked && pendingSeats >= MIN_SEATS && pendingSeats !== currentSeats;
   const canSubmitPlanMode =
-    mode === "plan" && !actionsBlocked && Boolean(selectedPlanKey) && selectedPlanKey !== currentPlanKey;
+    mode === "plan" &&
+    !actionsBlocked &&
+    Boolean(selectedPlanKey) &&
+    selectedPlanKey !== currentPlanKey &&
+    selectedPlanKey !== ENTERPRISE_PLAN_KEY;
 
   return (
     <div className="w-full overflow-x-hidden">
