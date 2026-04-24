@@ -1,9 +1,13 @@
 import { useAuth, useOrganization, useUser } from "@clerk/clerk-react";
 import axios from "axios";
+import { motion } from "framer-motion";
+import { AlertCircle, CreditCard } from "lucide-react";
 import type { SVGProps } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import planConfigData from "../../../public/plan_config.json";
+import { IS_CLERK_AUTH } from "../../clerk/auth";
+import Loading from "../../components/ui/loading";
 import { getURL } from "../../controllers/API/helpers/constants";
 
 const MIN_SEATS = 1;
@@ -45,6 +49,18 @@ interface CheckoutSelectionSummary {
 interface BillingSummary {
   next_billed_at?: string | null;
 }
+
+interface BillingAccessResponse {
+  has_access?: boolean;
+  is_admin?: boolean;
+  subscription_status?: string | null;
+}
+
+const ACTIVE_SUBSCRIPTION_STATUSES = new Set([
+  "active",
+  "trialing",
+  "past_due",
+]);
 
 function getCachedPriceMap(): Record<string, string> | null {
   try {
@@ -136,6 +152,37 @@ function FailedStatusIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+function NoSubscriptionEmptyState() {
+  return (
+    <div className="flex min-h-[calc(100vh-12rem)] w-full items-center justify-center px-6 py-10">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: "easeOut" }}
+        className="w-full max-w-xl rounded-3xl border bg-white p-10 text-center shadow-sm"
+      >
+        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-slate-100 text-slate-700">
+          <CreditCard className="h-10 w-10" strokeWidth={1.8} />
+        </div>
+        <h2 className="mt-6 text-2xl font-semibold tracking-tight text-slate-900">
+          No Active Subscription
+        </h2>
+        <p className="mt-3 text-sm leading-6 text-slate-600">
+          Your organization does not have an active subscription. Please contact
+          your admin to get access.
+        </p>
+        <button
+          type="button"
+          className="mt-8 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-500"
+          disabled
+        >
+          Contact Admin
+        </button>
+      </motion.div>
+    </div>
+  );
+}
+
 export default function PricingPage() {
   const navigate = useNavigate();
   const { getToken } = useAuth();
@@ -166,7 +213,79 @@ export default function PricingPage() {
   const [billingSummary, setBillingSummary] = useState<BillingSummary | null>(
     null,
   );
+  const [billingAccessLoading, setBillingAccessLoading] =
+    useState(IS_CLERK_AUTH);
+  const [billingAccessError, setBillingAccessError] = useState<string | null>(
+    null,
+  );
+  const [billingAccess, setBillingAccess] =
+    useState<BillingAccessResponse | null>(null);
   const currentOrganizationId = organization?.id ?? null;
+
+  useEffect(() => {
+    if (!IS_CLERK_AUTH) {
+      setBillingAccessLoading(false);
+      return;
+    }
+
+    let mounted = true;
+
+    const loadBillingAccess = async () => {
+      try {
+        setBillingAccessError(null);
+        const token = await getToken();
+
+        if (!token) {
+          if (mounted) {
+            setBillingAccess(null);
+            setBillingAccessError(
+              "Unable to load billing access. Please sign in again.",
+            );
+            setBillingAccessLoading(false);
+          }
+          return;
+        }
+
+        const { data } = await axios.get(getURL("BILLING_ACCESS"), {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (mounted) setBillingAccess((data ?? null) as BillingAccessResponse);
+      } catch (error: any) {
+        if (mounted) {
+          setBillingAccess(null);
+          setBillingAccessError(
+            error?.response?.data?.detail ??
+              error?.message ??
+              "Failed to load billing details.",
+          );
+        }
+      } finally {
+        if (mounted) setBillingAccessLoading(false);
+      }
+    };
+
+    void loadBillingAccess();
+
+    return () => {
+      mounted = false;
+    };
+  }, [getToken]);
+
+  const isAdmin = Boolean(billingAccess?.is_admin);
+  const normalizedSubscriptionStatus = (
+    billingAccess?.subscription_status ?? ""
+  ).toLowerCase();
+  const hasActiveSubscription =
+    billingAccess?.has_access === true ||
+    ACTIVE_SUBSCRIPTION_STATUSES.has(normalizedSubscriptionStatus);
+  const showNoSubscriptionEmptyState =
+    IS_CLERK_AUTH &&
+    !billingAccessLoading &&
+    !isAdmin &&
+    !hasActiveSubscription;
+  const disableBillingActions =
+    IS_CLERK_AUTH && !billingAccessLoading && !isAdmin;
 
   const formatBillingDate = (value?: string | null): string => {
     if (!value) return "Not available";
@@ -356,6 +475,10 @@ export default function PricingPage() {
   };
 
   const handleSelectPlan = async (plan: PlanConfig) => {
+    if (disableBillingActions) {
+      return;
+    }
+
     const seats = seatsByPlan[plan.key];
     setSelectedPlan(plan.key);
     setShowEnterpriseContactMessage(false);
@@ -467,129 +590,156 @@ export default function PricingPage() {
 
   return (
     <div className="w-full overflow-x-hidden">
-      <div className="min-h-screen px-4 py-12 text-slate-900">
-        <div className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-lg">
-            <div className="text-center">
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-semibold">
-                Simple, scalable pricing
-              </h1>
-            </div>
-
-            <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {STATIC_PLANS.map((plan) => {
-                const seats = seatsByPlan[plan.key];
-                const total = seats * plan.pricePerSeat;
-
-                return (
-                  <div
-                    key={plan.key}
-                    className={`flex flex-col rounded-2xl border p-5 sm:p-6 transition-all ${
-                      selectedPlan === plan.key
-                        ? "border-sky-400 bg-sky-50/80 shadow-[0_18px_45px_rgba(14,165,233,0.12)]"
-                        : "border-slate-200 bg-white shadow-sm"
-                    }`}
-                  >
-                    <div className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500">
-                      {plan.name}
-                    </div>
-                    <div className="mt-2 text-3xl font-semibold text-slate-900">
-                      ${plan.pricePerSeat}/seat/month
-                    </div>
-
-                    {plan.hasTrial && (
-                      <div className="mt-1 text-sm font-medium text-sky-700">
-                        {plan.trialDays}-day free trial
-                      </div>
-                    )}
-
-                    <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                        Seats
-                      </div>
-
-                      <div className="mt-2 flex items-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => handleDecrement(plan.key)}
-                          className="h-9 w-9 rounded-xl border border-slate-200 bg-white text-lg text-slate-700 transition hover:border-sky-300 hover:text-sky-700"
-                        >
-                          -
-                        </button>
-
-                        <span className="min-w-8 text-center text-xl font-semibold text-slate-900">
-                          {seats}
-                        </span>
-
-                        <button
-                          type="button"
-                          onClick={() => handleIncrement(plan.key)}
-                          className="h-9 w-9 rounded-xl border border-slate-200 bg-white text-lg text-slate-700 transition hover:border-sky-300 hover:text-sky-700"
-                        >
-                          +
-                        </button>
-                      </div>
-
-                      <div className="mt-3 text-sm text-slate-500">
-                        Estimated monthly total
-                      </div>
-                      <div className="text-2xl font-semibold text-slate-900">
-                        ${total} USD
-                      </div>
-                    </div>
-
-                    <ul className="mt-5 space-y-3 text-sm text-slate-600">
-                      {plan.features.map((feature) => (
-                        <li key={feature} className="flex items-center gap-2">
-                          <CheckIcon className="h-4 w-4 text-sky-600" />
-                          {feature}
-                        </li>
-                      ))}
-                    </ul>
-
-                    <button
-                      type="button"
-                      onClick={() => handleSelectPlan(plan)}
-                      className={`mt-6 rounded-xl px-4 py-3 text-sm font-semibold transition ${
-                        plan.key === "enterprise"
-                          ? "border border-slate-200 bg-white text-slate-700 hover:border-sky-300 hover:text-sky-700"
-                          : "bg-slate-900 text-white hover:bg-slate-800"
-                      }`}
-                    >
-                      Select {plan.name}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="mt-8 flex flex-wrap justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  navigate("/flows?pricing_bypass=1");
-                }}
-                className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
-              >
-                Go to flows
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate("/organization")}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-sky-300 hover:text-sky-700"
-              >
-                Back to organization
-              </button>
-            </div>
-
-            {showEnterpriseContactMessage && (
-              <p className="mt-5 text-center text-sm font-medium text-sky-700">
-                For Enterprise plans, please contact us.
-              </p>
-            )}
+      {billingAccessLoading ? (
+        <div className="flex min-h-[60vh] w-full items-center justify-center px-4 py-12">
+          <Loading />
+        </div>
+      ) : billingAccessError ? (
+        <div className="flex min-h-[60vh] w-full items-center justify-center px-4 py-12">
+          <div className="w-full max-w-md rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
+            <AlertCircle className="mx-auto h-8 w-8 text-red-600" />
+            <h2 className="mt-3 text-lg font-semibold text-slate-900">
+              Billing Unavailable
+            </h2>
+            <p className="mt-2 text-sm text-slate-600">{billingAccessError}</p>
           </div>
         </div>
-      </div>
+      ) : showNoSubscriptionEmptyState ? (
+        <NoSubscriptionEmptyState />
+      ) : (
+        <div className="min-h-screen px-4 py-12 text-slate-900">
+          <div className="mx-auto w-full max-w-5xl px-4 sm:px-6 lg:px-8">
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-lg sm:p-8">
+              <div className="text-center">
+                <h1 className="text-2xl font-semibold sm:text-3xl lg:text-4xl">
+                  Simple, scalable pricing
+                </h1>
+              </div>
+
+              {disableBillingActions && (
+                <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-3 text-center text-sm text-amber-800">
+                  Only organization admins can make billing changes.
+                </div>
+              )}
+
+              <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {STATIC_PLANS.map((plan) => {
+                  const seats = seatsByPlan[plan.key];
+                  const total = seats * plan.pricePerSeat;
+
+                  return (
+                    <div
+                      key={plan.key}
+                      className={`flex flex-col rounded-2xl border p-5 transition-all sm:p-6 ${
+                        selectedPlan === plan.key
+                          ? "border-sky-400 bg-sky-50/80 shadow-[0_18px_45px_rgba(14,165,233,0.12)]"
+                          : "border-slate-200 bg-white shadow-sm"
+                      }`}
+                    >
+                      <div className="text-sm font-medium uppercase tracking-[0.18em] text-slate-500">
+                        {plan.name}
+                      </div>
+                      <div className="mt-2 text-3xl font-semibold text-slate-900">
+                        ${plan.pricePerSeat}/seat/month
+                      </div>
+
+                      {plan.hasTrial && (
+                        <div className="mt-1 text-sm font-medium text-sky-700">
+                          {plan.trialDays}-day free trial
+                        </div>
+                      )}
+
+                      <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                        <div className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                          Seats
+                        </div>
+
+                        <div className="mt-2 flex items-center gap-3">
+                          <button
+                            type="button"
+                            onClick={() => handleDecrement(plan.key)}
+                            disabled={disableBillingActions}
+                            className="h-9 w-9 rounded-xl border border-slate-200 bg-white text-lg text-slate-700 transition hover:border-sky-300 hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            -
+                          </button>
+
+                          <span className="min-w-8 text-center text-xl font-semibold text-slate-900">
+                            {seats}
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={() => handleIncrement(plan.key)}
+                            disabled={disableBillingActions}
+                            className="h-9 w-9 rounded-xl border border-slate-200 bg-white text-lg text-slate-700 transition hover:border-sky-300 hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            +
+                          </button>
+                        </div>
+
+                        <div className="mt-3 text-sm text-slate-500">
+                          Estimated monthly total
+                        </div>
+                        <div className="text-2xl font-semibold text-slate-900">
+                          ${total} USD
+                        </div>
+                      </div>
+
+                      <ul className="mt-5 space-y-3 text-sm text-slate-600">
+                        {plan.features.map((feature) => (
+                          <li key={feature} className="flex items-center gap-2">
+                            <CheckIcon className="h-4 w-4 text-sky-600" />
+                            {feature}
+                          </li>
+                        ))}
+                      </ul>
+
+                      <button
+                        type="button"
+                        onClick={() => handleSelectPlan(plan)}
+                        disabled={disableBillingActions}
+                        className={`mt-6 rounded-xl px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                          plan.key === "enterprise"
+                            ? "border border-slate-200 bg-white text-slate-700 hover:border-sky-300 hover:text-sky-700"
+                            : "bg-slate-900 text-white hover:bg-slate-800"
+                        }`}
+                      >
+                        Select {plan.name}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-8 flex flex-wrap justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigate("/flows?pricing_bypass=1");
+                  }}
+                  className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
+                >
+                  Go to flows
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/organization")}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-sky-300 hover:text-sky-700"
+                >
+                  Back to organization
+                </button>
+              </div>
+
+              {showEnterpriseContactMessage && (
+                <p className="mt-5 text-center text-sm font-medium text-sky-700">
+                  For Enterprise plans, please contact us.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       {checkoutStatus === "processing" && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">

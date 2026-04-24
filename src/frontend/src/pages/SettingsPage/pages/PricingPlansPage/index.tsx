@@ -1,6 +1,4 @@
 import { useAuth } from "@clerk/clerk-react";
-import { motion } from "framer-motion";
-import { AlertCircle, CreditCard } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { IS_CLERK_AUTH } from "@/clerk/auth";
@@ -46,12 +44,6 @@ type PlanDetails = {
   paddlePlanKey: string;
   monthlyPriceUsdCents: number;
 };
-
-const ACTIVE_SUBSCRIPTION_STATUSES = new Set([
-  "active",
-  "trialing",
-  "past_due",
-]);
 
 const PLAN_NAME_BY_KEY = Object.fromEntries(
   (planConfigData.plans ?? []).map((plan) => [
@@ -214,40 +206,12 @@ function SelectedPlan({ billing }: { billing: BillingAccessResponse | null }) {
   );
 }
 
-function NoSubscriptionEmptyState() {
-  return (
-    <div className="flex min-h-[calc(100vh-12rem)] w-full items-center justify-center px-6 py-10">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 8 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: "easeOut" }}
-        className="w-full max-w-xl rounded-3xl border bg-background/95 p-10 text-center shadow-sm backdrop-blur"
-      >
-        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 text-primary">
-          <CreditCard className="h-10 w-10" strokeWidth={1.8} />
-        </div>
-        <h2 className="mt-6 text-2xl font-semibold tracking-tight">
-          No Active Subscription
-        </h2>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          Your organization does not have an active subscription. Please contact
-          your admin to get access.
-        </p>
-        <Button className="mt-8" variant="outline" disabled>
-          Contact Admin
-        </Button>
-      </motion.div>
-    </div>
-  );
-}
-
 export default function PricingPlansPage() {
   const { getToken } = useAuth();
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
   const [billing, setBilling] = useState<BillingAccessResponse | null>(null);
-  const [billingError, setBillingError] = useState<string | null>(null);
 
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
@@ -300,14 +264,10 @@ export default function PricingPlansPage() {
 
     const load = async () => {
       try {
-        setBillingError(null);
         const token = await getToken();
         if (!token) {
           if (mounted) {
             setBilling(null);
-            setBillingError(
-              "Unable to load billing access. Please sign in again.",
-            );
             setLoading(false);
           }
           return;
@@ -318,15 +278,8 @@ export default function PricingPlansPage() {
         });
 
         if (mounted) setBilling(res.data ?? null);
-      } catch (error: any) {
-        if (mounted) {
-          setBilling(null);
-          setBillingError(
-            error?.response?.data?.detail ??
-              error?.message ??
-              "Failed to load billing details.",
-          );
-        }
+      } catch {
+        if (mounted) setBilling(null);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -408,53 +361,31 @@ export default function PricingPlansPage() {
     }
   };
 
-  const isAdmin = Boolean(billing?.is_admin);
-  const normalizedSubscriptionStatus = (
-    billing?.subscription_status ?? ""
-  ).toLowerCase();
-  const hasActiveSubscription =
-    billing?.has_access === true ||
-    ACTIVE_SUBSCRIPTION_STATUSES.has(normalizedSubscriptionStatus);
-  const showNoSubscriptionEmptyState =
-    IS_CLERK_AUTH && !loading && !isAdmin && !hasActiveSubscription;
-
   return (
     <div className="flex h-full w-full flex-col gap-6">
+      <div className="flex flex-col">
+        <h2 className="flex items-center text-lg font-semibold tracking-tight">
+          Pricing Plans
+          <ForwardedIconComponent
+            name="BadgeDollarSign"
+            className="ml-2 h-5 w-5 text-primary"
+          />
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Review your current workspace plan and subscription status.
+        </p>
+      </div>
+
       {loading ? (
-        <div className="flex h-full min-h-[60vh] w-full items-center justify-center">
+        <div className="flex h-full w-full items-center justify-center">
           <Loading />
         </div>
-      ) : billingError ? (
-        <div className="flex min-h-[60vh] w-full items-center justify-center px-4">
-          <div className="w-full max-w-md rounded-2xl border border-destructive/30 bg-destructive/10 p-6 text-center">
-            <AlertCircle className="mx-auto h-8 w-8 text-destructive" />
-            <h2 className="mt-3 text-lg font-semibold text-foreground">
-              Billing Unavailable
-            </h2>
-            <p className="mt-2 text-sm text-muted-foreground">{billingError}</p>
-          </div>
-        </div>
-      ) : showNoSubscriptionEmptyState ? (
-        <NoSubscriptionEmptyState />
       ) : !IS_CLERK_AUTH ? (
         <div className="rounded-xl border bg-background p-4 text-sm text-muted-foreground">
           Pricing plans are only available when Clerk billing is enabled.
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="flex flex-col">
-            <h2 className="flex items-center text-lg font-semibold tracking-tight">
-              Pricing Plans
-              <ForwardedIconComponent
-                name="BadgeDollarSign"
-                className="ml-2 h-5 w-5 text-primary"
-              />
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Review your current workspace plan and subscription status.
-            </p>
-          </div>
-
           <SelectedPlan billing={billing} />
 
           {cancelError && (
