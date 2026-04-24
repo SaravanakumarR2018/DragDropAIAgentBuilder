@@ -165,18 +165,42 @@ async def has_active_subscription(
         current_period_end = getattr(current_period, "ends_at", None)
 
     seats = None
+    current_price_id = None
+    current_price_plan_key = None
     items = getattr(subscription, "items", None)
     if items:
         first_item = items[0]
         quantity = getattr(first_item, "quantity", None)
         if quantity is not None:
             seats = int(quantity)
+        price = getattr(first_item, "price", None)
+        current_price_id = getattr(price, "id", None)
+        if current_price_id:
+            current_price_plan_key = await _get_plan_key_for_price(
+                price_id=str(current_price_id),
+                client=paddle_client,
+            )
 
     scheduled_change = getattr(subscription, "scheduled_change", None)
     cancel_scheduled = False
+    scheduled_change_action = None
+    scheduled_change_effective_at = None
+    pending_price_id = None
+    pending_plan_key = None
     if scheduled_change:
         action = getattr(scheduled_change, "action", None)
-        cancel_scheduled = str(action).lower() == "cancel"
+        scheduled_change_action = str(action).lower() if action else None
+        cancel_scheduled = scheduled_change_action == "cancel"
+        scheduled_change_effective_at = getattr(scheduled_change, "effective_at", None)
+        scheduled_items = getattr(scheduled_change, "items", None)
+        if scheduled_items:
+            first_scheduled_item = scheduled_items[0]
+            pending_price_id = getattr(first_scheduled_item, "price_id", None)
+            if pending_price_id:
+                pending_plan_key = await _get_plan_key_for_price(
+                    price_id=str(pending_price_id),
+                    client=paddle_client,
+                )
 
     logger.info(
         f"Subscription {sub_id} - status: {status}, "
@@ -195,6 +219,12 @@ async def has_active_subscription(
         CURRENT_PERIOD_START_KEY: current_period_start,
         CANCEL_SCHEDULED_KEY: cancel_scheduled,
         SUBSCRIPTION_SEATS_KEY: seats,
+        "current_price_id": current_price_id,
+        "current_price_plan_key": current_price_plan_key,
+        "scheduled_change_action": scheduled_change_action,
+        "scheduled_change_effective_at": scheduled_change_effective_at,
+        "pending_price_id": pending_price_id,
+        "pending_plan_key": pending_plan_key,
     }
 
 

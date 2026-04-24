@@ -1,4 +1,4 @@
-import { useOrganization, useUser } from "@clerk/clerk-react";
+import { useAuth, useOrganization, useUser } from "@clerk/clerk-react";
 import axios from "axios";
 import type { SVGProps } from "react";
 import { useCallback, useEffect, useState } from "react";
@@ -12,6 +12,7 @@ const PADDLE_PRICE_CACHE_TTL_MS = 60 * 60 * 1000;
 const PADDLE_STATUS_STORAGE_KEY = "paddle_checkout_status";
 const PADDLE_TRANSACTION_ID_STORAGE_KEY = "paddle_checkout_transaction_id";
 const PADDLE_CHECKOUT_ORG_ID_STORAGE_KEY = "paddle_checkout_org_id";
+const PADDLE_CHECKOUT_SELECTION_KEY = "paddle_checkout_selection";
 
 type PlanKey = "starter" | "pro" | "enterprise";
 
@@ -34,6 +35,15 @@ interface SharedPlanConfig {
 interface CachedPriceMap {
   fetchedAt: number;
   prices: Record<string, string>;
+}
+
+interface CheckoutSelectionSummary {
+  planName: string;
+  seats: number;
+}
+
+interface BillingSummary {
+  next_billed_at?: string | null;
 }
 
 function getCachedPriceMap(): Record<string, string> | null {
@@ -128,6 +138,7 @@ function FailedStatusIcon(props: SVGProps<SVGSVGElement>) {
 
 export default function PricingPage() {
   const navigate = useNavigate();
+  const { getToken } = useAuth();
   const { user } = useUser();
   const { organization } = useOrganization();
   const email = user?.primaryEmailAddress?.emailAddress;
@@ -150,14 +161,31 @@ export default function PricingPage() {
   >("idle");
   const [transactionId, setTransactionId] = useState<string | null>(null);
   const [redirectCountdown, setRedirectCountdown] = useState(3);
+  const [checkoutSelection, setCheckoutSelection] =
+    useState<CheckoutSelectionSummary | null>(null);
+  const [billingSummary, setBillingSummary] = useState<BillingSummary | null>(
+    null,
+  );
   const currentOrganizationId = organization?.id ?? null;
+
+  const formatBillingDate = (value?: string | null): string => {
+    if (!value) return "Not available";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return "Not available";
+    return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(
+      parsed,
+    );
+  };
 
   const clearCheckoutState = useCallback(() => {
     window.sessionStorage.removeItem(PADDLE_STATUS_STORAGE_KEY);
     window.sessionStorage.removeItem(PADDLE_TRANSACTION_ID_STORAGE_KEY);
     window.sessionStorage.removeItem(PADDLE_CHECKOUT_ORG_ID_STORAGE_KEY);
+    window.sessionStorage.removeItem(PADDLE_CHECKOUT_SELECTION_KEY);
     setCheckoutStatus("idle");
     setTransactionId(null);
+    setCheckoutSelection(null);
+    setBillingSummary(null);
   }, []);
 
   useEffect(() => {
@@ -190,6 +218,19 @@ export default function PricingPage() {
       PADDLE_TRANSACTION_ID_STORAGE_KEY,
     );
     setTransactionId(storedTransactionId);
+
+    const rawSelection = window.sessionStorage.getItem(
+      PADDLE_CHECKOUT_SELECTION_KEY,
+    );
+    if (rawSelection) {
+      try {
+        setCheckoutSelection(
+          JSON.parse(rawSelection) as CheckoutSelectionSummary,
+        );
+      } catch {
+        window.sessionStorage.removeItem(PADDLE_CHECKOUT_SELECTION_KEY);
+      }
+    }
   }, [clearCheckoutState, currentOrganizationId]);
 
   useEffect(() => {
@@ -215,7 +256,10 @@ export default function PricingPage() {
       setTransactionId(latestTransactionId);
     };
 
-    window.addEventListener("paddle-checkout-status", onStatusChange as EventListener);
+    window.addEventListener(
+      "paddle-checkout-status",
+      onStatusChange as EventListener,
+    );
     return () => {
       window.removeEventListener(
         "paddle-checkout-status",
@@ -247,6 +291,36 @@ export default function PricingPage() {
 
     fetchPrices();
   }, []);
+
+  useEffect(() => {
+    if (checkoutStatus !== "success") {
+      setBillingSummary(null);
+      return;
+    }
+
+    let mounted = true;
+    const fetchBillingSummary = async () => {
+      try {
+        const token = await getToken();
+        if (!token) return;
+        const { data } = await axios.get(getURL("BILLING_ACCESS"), {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!mounted) return;
+        setBillingSummary((data ?? null) as BillingSummary | null);
+      } catch (error) {
+        console.warn(
+          "Failed to fetch billing summary for checkout success modal",
+          error,
+        );
+      }
+    };
+
+    void fetchBillingSummary();
+    return () => {
+      mounted = false;
+    };
+  }, [checkoutStatus, getToken]);
 
   useEffect(() => {
     if (checkoutStatus !== "success") {
@@ -314,6 +388,16 @@ export default function PricingPage() {
       return;
     }
 
+    const nextSelection = {
+      planName: plan.name,
+      seats,
+    };
+    setCheckoutSelection(nextSelection);
+    window.sessionStorage.setItem(
+      PADDLE_CHECKOUT_SELECTION_KEY,
+      JSON.stringify(nextSelection),
+    );
+
     window.Paddle.Checkout.open({
       items: [
         {
@@ -340,7 +424,9 @@ export default function PricingPage() {
       return;
     }
 
-    const statusFromStorage = window.sessionStorage.getItem(PADDLE_STATUS_STORAGE_KEY);
+    const statusFromStorage = window.sessionStorage.getItem(
+      PADDLE_STATUS_STORAGE_KEY,
+    );
     if (statusFromStorage !== "failed") {
       return;
     }
@@ -539,6 +625,26 @@ export default function PricingPage() {
                 ? `Redirecting to flows in ${redirectCountdown} seconds.`
                 : "We couldn't verify an active subscription for this payment."}
             </p>
+            {checkoutStatus === "success" && (
+              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                <p>
+                  <span className="font-medium text-slate-900">
+                    Selected plan:
+                  </span>{" "}
+                  {checkoutSelection?.planName ?? "Not available"}
+                </p>
+                <p>
+                  <span className="font-medium text-slate-900">Seats:</span>{" "}
+                  {checkoutSelection?.seats ?? "Not available"}
+                </p>
+                <p>
+                  <span className="font-medium text-slate-900">
+                    Next billing:
+                  </span>{" "}
+                  {formatBillingDate(billingSummary?.next_billed_at)}
+                </p>
+              </div>
+            )}
             {checkoutStatus === "failed" && transactionId && (
               <p className="mt-2 text-xs text-slate-500">
                 Transaction ID: {transactionId}
