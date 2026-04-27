@@ -52,7 +52,11 @@ const STATIC_PLANS: PlanConfig[] = (planConfigData.plans ?? []).map((plan) => ({
 
 function CheckIcon() {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-4 w-4 text-sky-600">
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      className="h-4 w-4 text-sky-600"
+    >
       <path
         d="M20.285 6.709a1 1 0 0 1 0 1.414l-9.192 9.192a1 1 0 0 1-1.414 0L3.715 11.55a1 1 0 0 1 1.414-1.415l5.136 5.136 8.485-8.485a1 1 0 0 1 1.535-.077z"
         fill="currentColor"
@@ -111,6 +115,23 @@ export default function ChangePlansPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
+  const getPlanByKey = (planKey: string) =>
+    STATIC_PLANS.find((plan) => plan.key === planKey) ?? null;
+
+  const isDowngradePlanSelection = (nextPlanKey: string) => {
+    const currentPlan = getPlanByKey(currentPlanKey);
+    const nextPlan = getPlanByKey(nextPlanKey);
+
+    if (!currentPlan || !nextPlan) {
+      return false;
+    }
+
+    return nextPlan.monthlyPriceUsdCents < currentPlan.monthlyPriceUsdCents;
+  };
+
+  const downgradePlanMessage =
+    "You are currently on a higher plan. Please cancel your current subscription to switch plans at the end of the billing cycle.";
+
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const nextMode = params.get("mode") === "seats" ? "seats" : "plan";
@@ -159,7 +180,8 @@ export default function ChangePlansPage() {
           return;
         }
 
-        const billingData = (billingRes.data ?? null) as BillingAccessResponse | null;
+        const billingData = (billingRes.data ??
+          null) as BillingAccessResponse | null;
         setBilling(billingData);
 
         const subscribedPaddlePlanKey = String(
@@ -174,7 +196,10 @@ export default function ChangePlansPage() {
         const normalizedPlanKey = matchedPlan?.key ?? subscribedPaddlePlanKey;
         const seats =
           Number(
-            billingData?.subscription_seats ?? billingData?.seats ?? billingData?.quantity ?? MIN_SEATS,
+            billingData?.subscription_seats ??
+              billingData?.seats ??
+              billingData?.quantity ??
+              MIN_SEATS,
           ) || MIN_SEATS;
 
         setCurrentPlanKey(normalizedPlanKey);
@@ -185,7 +210,11 @@ export default function ChangePlansPage() {
       } catch (error: any) {
         if (mounted) {
           setErrorMessage(
-            String(error?.response?.data?.detail ?? error?.message ?? "Failed to load billing data."),
+            String(
+              error?.response?.data?.detail ??
+                error?.message ??
+                "Failed to load billing data.",
+            ),
           );
         }
       } finally {
@@ -209,7 +238,10 @@ export default function ChangePlansPage() {
     setPendingSeats((prev) => prev + 1);
   };
 
-  function buildPreviewMessage(previewData: any, nextBillingDate?: string): string | null {
+  function buildPreviewMessage(
+    previewData: any,
+    nextBillingDate?: string,
+  ): string | null {
     if (!previewData) return null;
 
     const hasImmediateCharge = Boolean(previewData?.immediate_transaction);
@@ -221,7 +253,9 @@ export default function ChangePlansPage() {
 
     if (nextBillingDate) {
       const date = new Date(nextBillingDate);
-      const formatted = date.toLocaleDateString(undefined, { dateStyle: "medium" });
+      const formatted = date.toLocaleDateString(undefined, {
+        dateStyle: "medium",
+      });
       return `Your plan will change on ${formatted}. No charge today.`;
     }
 
@@ -244,9 +278,16 @@ export default function ChangePlansPage() {
       return;
     }
 
+    if (isDowngradePlanSelection(planKey)) {
+      setSummaryMessage(downgradePlanMessage);
+      return;
+    }
+
     try {
       const selected = STATIC_PLANS.find((plan) => plan.key === planKey);
-      const selectedPriceId = selected ? priceMap[selected.paddlePlanKey] : undefined;
+      const selectedPriceId = selected
+        ? priceMap[selected.paddlePlanKey]
+        : undefined;
 
       if (!selectedPriceId) {
         throw new Error("Missing price id for selected plan.");
@@ -257,17 +298,18 @@ export default function ChangePlansPage() {
         seats: currentSeats,
       });
 
-      const amount = extractPreviewAmount(preview);
       setPreviewData(preview);
-      setPreviewMessage(
-        buildPreviewMessage(preview, billing?.next_billed_at)
-      );
+      setPreviewMessage(buildPreviewMessage(preview, billing?.next_billed_at));
       setSummaryMessage(
         `Plan change: ${currentPlanKey || "current"} → ${planKey} (${currentSeats} seats).`,
       );
     } catch (error: any) {
       setErrorMessage(
-        String(error?.response?.data?.detail ?? error?.message ?? "Failed to preview plan change."),
+        String(
+          error?.response?.data?.detail ??
+            error?.message ??
+            "Failed to preview plan change.",
+        ),
       );
     }
   };
@@ -282,19 +324,29 @@ export default function ChangePlansPage() {
     try {
       if (mode === "seats") {
         const preview = await previewChange({ seats: pendingSeats });
-        const amount = extractPreviewAmount(preview);
         setPreviewData(preview);
         setPreviewMessage(
-          buildPreviewMessage(preview, billing?.next_billed_at)
+          buildPreviewMessage(preview, billing?.next_billed_at),
         );
       } else {
         if (selectedPlanKey === ENTERPRISE_PLAN_KEY) {
-          setSummaryMessage("Please contact us to switch to the Enterprise plan.");
+          setSummaryMessage(
+            "Please contact us to switch to the Enterprise plan.",
+          );
           return;
         }
 
-        const selected = STATIC_PLANS.find((plan) => plan.key === selectedPlanKey);
-        const selectedPriceId = selected ? priceMap[selected.paddlePlanKey] : undefined;
+        if (isDowngradePlanSelection(selectedPlanKey)) {
+          setSummaryMessage(downgradePlanMessage);
+          return;
+        }
+
+        const selected = STATIC_PLANS.find(
+          (plan) => plan.key === selectedPlanKey,
+        );
+        const selectedPriceId = selected
+          ? priceMap[selected.paddlePlanKey]
+          : undefined;
 
         if (!selectedPriceId) {
           throw new Error("Missing price id for selected plan.");
@@ -305,10 +357,9 @@ export default function ChangePlansPage() {
           seats: currentSeats,
         });
 
-        const amount = extractPreviewAmount(preview);
         setPreviewData(preview);
         setPreviewMessage(
-          buildPreviewMessage(preview, billing?.next_billed_at)
+          buildPreviewMessage(preview, billing?.next_billed_at),
         );
         setSummaryMessage(
           `Plan change: ${currentPlanKey || "current"} → ${selectedPlanKey} (${currentSeats} seats).`,
@@ -341,13 +392,19 @@ export default function ChangePlansPage() {
         setCurrentSeats(pendingSeats);
       } else {
         if (selectedPlanKey === ENTERPRISE_PLAN_KEY) {
-          setSummaryMessage("Please contact us to switch to the Enterprise plan.");
+          setSummaryMessage(
+            "Please contact us to switch to the Enterprise plan.",
+          );
           setConfirmOpen(false);
           return;
         }
 
-        const selected = STATIC_PLANS.find((plan) => plan.key === selectedPlanKey);
-        const selectedPriceId = selected ? priceMap[selected.paddlePlanKey] : undefined;
+        const selected = STATIC_PLANS.find(
+          (plan) => plan.key === selectedPlanKey,
+        );
+        const selectedPriceId = selected
+          ? priceMap[selected.paddlePlanKey]
+          : undefined;
 
         if (!selectedPriceId) {
           throw new Error("Missing price id for selected plan.");
@@ -364,7 +421,11 @@ export default function ChangePlansPage() {
       navigate("/settings/pricing-plans", { replace: true });
     } catch (error: any) {
       setErrorMessage(
-        String(error?.response?.data?.detail ?? error?.message ?? "Failed to apply billing change."),
+        String(
+          error?.response?.data?.detail ??
+            error?.message ??
+            "Failed to apply billing change.",
+        ),
       );
     } finally {
       setSubmitting(false);
@@ -372,12 +433,16 @@ export default function ChangePlansPage() {
   };
 
   const canSubmitSeatMode =
-    mode === "seats" && !actionsBlocked && pendingSeats >= MIN_SEATS && pendingSeats !== currentSeats;
+    mode === "seats" &&
+    !actionsBlocked &&
+    pendingSeats >= MIN_SEATS &&
+    pendingSeats !== currentSeats;
   const canSubmitPlanMode =
     mode === "plan" &&
     !actionsBlocked &&
     Boolean(selectedPlanKey) &&
     selectedPlanKey !== currentPlanKey &&
+    !isDowngradePlanSelection(selectedPlanKey) &&
     selectedPlanKey !== ENTERPRISE_PLAN_KEY;
 
   return (
@@ -404,7 +469,8 @@ export default function ChangePlansPage() {
               <>
                 {actionsBlocked && (
                   <div className="mt-6 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-700">
-                    Actions are disabled because your subscription is cancelled or you are not an admin.
+                    Actions are disabled because your subscription is cancelled
+                    or you are not an admin.
                   </div>
                 )}
 
@@ -430,8 +496,10 @@ export default function ChangePlansPage() {
                   {STATIC_PLANS.map((plan) => {
                     const isCurrentPlan = plan.key === currentPlanKey;
                     const isSelectedPlan = plan.key === selectedPlanKey;
-                    const planDisabledInSeatMode = mode === "seats" && !isCurrentPlan;
-                    const isDisabledPlan = actionsBlocked || planDisabledInSeatMode;
+                    const planDisabledInSeatMode =
+                      mode === "seats" && !isCurrentPlan;
+                    const isDisabledPlan =
+                      actionsBlocked || planDisabledInSeatMode;
 
                     const borderClass = isCurrentPlan
                       ? "border-emerald-500"
@@ -439,15 +507,20 @@ export default function ChangePlansPage() {
                         ? "border-sky-400"
                         : "border-slate-200";
 
-                    const cardOpacity = mode === "seats" && !isCurrentPlan ? "opacity-50" : "opacity-100";
+                    const cardOpacity =
+                      mode === "seats" && !isCurrentPlan
+                        ? "opacity-50"
+                        : "opacity-100";
 
-                    const seatsForCard = isCurrentPlan ? pendingSeats : currentSeats;
-                    const total = (seatsForCard * plan.monthlyPriceUsdCents) / 100;
-                    const canEditSeats = mode === "seats" && isCurrentPlan && !actionsBlocked;
+                    const seatsForCard = isCurrentPlan
+                      ? pendingSeats
+                      : currentSeats;
+                    const total =
+                      (seatsForCard * plan.monthlyPriceUsdCents) / 100;
+                    const canEditSeats =
+                      mode === "seats" && isCurrentPlan && !actionsBlocked;
                     const buttonDisabled =
-                      isDisabledPlan ||
-                      mode === "seats" ||
-                      isCurrentPlan;
+                      isDisabledPlan || mode === "seats" || isCurrentPlan;
 
                     return (
                       <div
@@ -458,11 +531,14 @@ export default function ChangePlansPage() {
                           {plan.name}
                         </div>
                         <div className="mt-2 text-3xl font-semibold text-slate-900">
-                          {(plan.monthlyPriceUsdCents / 100).toLocaleString("en-US", {
-                            style: "currency",
-                            currency: "USD",
-                            maximumFractionDigits: 0,
-                          })}
+                          {(plan.monthlyPriceUsdCents / 100).toLocaleString(
+                            "en-US",
+                            {
+                              style: "currency",
+                              currency: "USD",
+                              maximumFractionDigits: 0,
+                            },
+                          )}
                           /seat/month
                         </div>
 
@@ -506,7 +582,9 @@ export default function ChangePlansPage() {
                             </button>
                           </div>
 
-                          <div className="mt-3 text-sm text-slate-500">Estimated monthly total</div>
+                          <div className="mt-3 text-sm text-slate-500">
+                            Estimated monthly total
+                          </div>
                           <div className="text-2xl font-semibold text-slate-900">
                             {toCurrency(total)} USD
                           </div>
@@ -514,7 +592,10 @@ export default function ChangePlansPage() {
 
                         <ul className="mt-5 space-y-3 text-sm text-slate-600">
                           {plan.features.map((feature) => (
-                            <li key={feature} className="flex items-center gap-2">
+                            <li
+                              key={feature}
+                              className="flex items-center gap-2"
+                            >
                               <CheckIcon />
                               {feature}
                             </li>
@@ -527,7 +608,9 @@ export default function ChangePlansPage() {
                           disabled={buttonDisabled}
                           className="mt-6 rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition enabled:hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                         >
-                          {isCurrentPlan ? "Current Plan" : `Select ${plan.name}`}
+                          {isCurrentPlan
+                            ? "Current Plan"
+                            : `Select ${plan.name}`}
                         </button>
                       </div>
                     );
@@ -537,18 +620,24 @@ export default function ChangePlansPage() {
                 <div className="mt-8 flex flex-wrap justify-center gap-3">
                   <Button
                     onClick={() => void handlePreviewBeforeConfirm()}
-                    disabled={mode === "seats" ? !canSubmitSeatMode : !canSubmitPlanMode}
+                    disabled={
+                      mode === "seats" ? !canSubmitSeatMode : !canSubmitPlanMode
+                    }
                   >
                     {mode === "seats" ? "Update Seats" : "Confirm Plan Change"}
                   </Button>
-                  <Button variant="outline" onClick={() => navigate("/settings/pricing-plans")}>
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate("/settings/pricing-plans")}
+                  >
                     Back
                   </Button>
                 </div>
 
                 {previewData && (
                   <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-                    Preview received. Charges shown above will be applied only after confirmation.
+                    Preview received. Charges shown above will be applied only
+                    after confirmation.
                   </div>
                 )}
               </>
@@ -564,7 +653,8 @@ export default function ChangePlansPage() {
               {mode === "seats" ? "Confirm Seat Update" : "Confirm Plan Change"}
             </DialogTitle>
             <DialogDescription>
-              {previewMessage ?? "A billing preview was generated for this change."}
+              {previewMessage ??
+                "A billing preview was generated for this change."}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
