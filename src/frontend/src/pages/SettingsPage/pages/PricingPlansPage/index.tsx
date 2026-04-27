@@ -25,10 +25,25 @@ type BillingAccessResponse = {
   paddle_subscription_id?: string | null;
   next_billed_at?: string | null;
   current_period_end?: string | null;
+  current_period_start?: string | null;
   cancel_scheduled?: boolean;
+  subscription_seats?: number | null;
+  seats?: number | null;
+  quantity?: number | null;
+  current_price_plan_key?: string | null;
+  scheduled_change_action?: string | null;
+  scheduled_change_effective_at?: string | null;
+  pending_plan_key?: string | null;
 };
 
-type PaddlePricesResponse = Record<string, string>;
+type PlanStatus = "Active" | "Not Active";
+
+type PlanDetails = {
+  key: string;
+  name: string;
+  paddlePlanKey: string;
+  monthlyPriceUsdCents: number;
+};
 
 const PLAN_NAME_BY_KEY = Object.fromEntries(
   (planConfigData.plans ?? []).map((plan) => [
@@ -37,15 +52,14 @@ const PLAN_NAME_BY_KEY = Object.fromEntries(
   ]),
 ) as Record<string, string>;
 
-const PRO_PLAN_KEY = (
-  planConfigData.plans?.find((plan) => plan?.key === "pro")?.paddle?.plan_key ??
-  "pro_pack_monthly"
-).toLowerCase();
-
-const STARTER_PLAN_KEY = (
-  planConfigData.plans?.find((plan) => plan?.key === "starter")?.paddle?.plan_key ??
-  "starter_pack_monthly"
-).toLowerCase();
+const AVAILABLE_PLANS: PlanDetails[] = (planConfigData.plans ?? []).map(
+  (plan) => ({
+    key: String(plan?.key ?? ""),
+    name: String(plan?.name ?? "").trim(),
+    paddlePlanKey: String(plan?.paddle?.plan_key ?? "").toLowerCase(),
+    monthlyPriceUsdCents: Number(plan?.paddle?.monthly_price_usd_cents ?? 0),
+  }),
+);
 
 function formatPlanKey(planKey: string): string {
   return planKey
@@ -55,26 +69,138 @@ function formatPlanKey(planKey: string): string {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function formatDate(value?: string | null): string {
+  if (!value) return "Not available";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Not available";
+
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(
+    date,
+  );
+}
+
+function formatCurrencyFromCents(cents: number): string {
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  }).format(cents / 100);
+}
+
 function SelectedPlan({ billing }: { billing: BillingAccessResponse | null }) {
-  const selectedPlan = useMemo(() => {
+  const effectivePlanKey = useMemo(() => {
+    const currentPricePlanKey = (
+      billing?.current_price_plan_key ?? ""
+    ).toLowerCase();
+    if (currentPricePlanKey) return currentPricePlanKey;
+    return (billing?.subscription_plan_key ?? "").toLowerCase();
+  }, [billing?.current_price_plan_key, billing?.subscription_plan_key]);
+
+  const selectedPlanDetails = useMemo(() => {
     if (!billing?.has_access) return "Free";
 
-    const planKey = (billing.subscription_plan_key ?? "").toLowerCase();
-    const planName = PLAN_NAME_BY_KEY[planKey];
+    const planName = PLAN_NAME_BY_KEY[effectivePlanKey];
     if (planName) return planName;
-    if (planKey) return formatPlanKey(planKey);
+    if (effectivePlanKey) return formatPlanKey(effectivePlanKey);
 
     const status = (billing.subscription_status ?? "").toLowerCase();
     return status === "trialing" ? "Paid (Trialing)" : "Paid";
-  }, [billing]);
+  }, [billing, effectivePlanKey]);
+
+  const normalizedStatus = (billing?.subscription_status ?? "").toLowerCase();
+  const isActiveStatus = ["active", "trialing", "past_due"].includes(
+    normalizedStatus,
+  );
+  const currentStatus: PlanStatus =
+    billing?.has_access && isActiveStatus ? "Active" : "Not Active";
+
+  const monthlyAmount = useMemo(() => {
+    const matchedPlan = AVAILABLE_PLANS.find(
+      (plan) => plan.paddlePlanKey === effectivePlanKey,
+    );
+    if (!matchedPlan) return "Not available";
+    return `${formatCurrencyFromCents(matchedPlan.monthlyPriceUsdCents)} / month`;
+  }, [effectivePlanKey]);
+
+  const scheduledPlanLabel = useMemo(() => {
+    const isPlanChangeScheduled =
+      (billing?.scheduled_change_action ?? "").toLowerCase() === "update";
+    const pendingPlanKey = (billing?.pending_plan_key ?? "").toLowerCase();
+    if (!isPlanChangeScheduled || !pendingPlanKey) return null;
+    if (pendingPlanKey === effectivePlanKey) return null;
+    return PLAN_NAME_BY_KEY[pendingPlanKey] ?? formatPlanKey(pendingPlanKey);
+  }, [
+    billing?.pending_plan_key,
+    billing?.scheduled_change_action,
+    effectivePlanKey,
+  ]);
+
+  const seatCount = useMemo(() => {
+    const firstAvailableSeatValue =
+      billing?.subscription_seats ??
+      billing?.seats ??
+      billing?.quantity ??
+      null;
+    if (
+      firstAvailableSeatValue === null ||
+      firstAvailableSeatValue === undefined
+    ) {
+      return "Not available";
+    }
+
+    return String(firstAvailableSeatValue);
+  }, [billing?.quantity, billing?.seats, billing?.subscription_seats]);
 
   return (
     <div className="rounded-xl border bg-background p-4">
-      <p className="text-sm text-muted-foreground">Selected plan</p>
-      <p className="mt-1 text-xl font-semibold">{selectedPlan}</p>
+      <p className="text-sm text-muted-foreground">Current plan details</p>
+      <p className="mt-1 text-xl font-semibold">{selectedPlanDetails}</p>
+      {scheduledPlanLabel && (
+        <p className="mt-1 text-sm text-muted-foreground">
+          Scheduled plan change: {scheduledPlanLabel}{" "}
+          {billing?.scheduled_change_effective_at
+            ? `on ${formatDate(billing.scheduled_change_effective_at)}`
+            : "at your next billing date"}
+        </p>
+      )}
+      <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+        <div className="rounded-lg border bg-muted/20 p-3">
+          <p className="text-xs text-muted-foreground">Plan Name</p>
+          <p className="mt-1 font-medium">{selectedPlanDetails}</p>
+        </div>
+        <div className="rounded-lg border bg-muted/20 p-3">
+          <p className="text-xs text-muted-foreground">Current Status</p>
+          <p className="mt-1 font-medium">{currentStatus}</p>
+        </div>
+        <div className="rounded-lg border bg-muted/20 p-3">
+          <p className="text-xs text-muted-foreground">Plan Start Date</p>
+          <p className="mt-1 font-medium">
+            {formatDate(billing?.current_period_start)}
+          </p>
+        </div>
+        <div className="rounded-lg border bg-muted/20 p-3">
+          <p className="text-xs text-muted-foreground">Plan End Date</p>
+          <p className="mt-1 font-medium">
+            {formatDate(billing?.next_billed_at ?? billing?.current_period_end)}
+          </p>
+        </div>
+        <div className="rounded-lg border bg-muted/20 p-3 sm:col-span-2">
+          <p className="text-xs text-muted-foreground">Amount per Month</p>
+          <p className="mt-1 font-medium">{monthlyAmount}</p>
+        </div>
+        <div className="rounded-lg border bg-muted/20 p-3 sm:col-span-2">
+          <p className="text-xs text-muted-foreground">Seats</p>
+          <p className="mt-1 font-medium">{seatCount}</p>
+        </div>
+      </div>
       <div className="mt-3 space-y-1 text-sm text-muted-foreground">
-        <p>Subscription status: {billing?.subscription_status ?? "not available"}</p>
-        <p>Subscription ID: {billing?.paddle_subscription_id ?? "not available"}</p>
+        <p>
+          Subscription status: {billing?.subscription_status ?? "not available"}
+        </p>
+        <p>
+          Subscription ID: {billing?.paddle_subscription_id ?? "not available"}
+        </p>
       </div>
     </div>
   );
@@ -92,12 +218,6 @@ export default function PricingPlansPage() {
 
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [alreadyCancelled, setAlreadyCancelled] = useState(false);
-  const [upgradeLoading, setUpgradeLoading] = useState(false);
-  const [upgradeError, setUpgradeError] = useState<string | null>(null);
-  const [upgradeSuccess, setUpgradeSuccess] = useState<string | null>(null);
-
-  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
-
   const formattedNextBillingDate = useMemo(() => {
     const nextDateRaw = billing?.next_billed_at ?? billing?.current_period_end;
     if (!nextDateRaw) return null;
@@ -105,7 +225,9 @@ export default function PricingPlansPage() {
     const d = new Date(nextDateRaw);
     if (Number.isNaN(d.getTime())) return null;
 
-    return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(d);
+    return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(
+      d,
+    );
   }, [billing?.current_period_end, billing?.next_billed_at]);
 
   const accessEndsMessage = formattedNextBillingDate
@@ -123,15 +245,14 @@ export default function PricingPlansPage() {
     Boolean(billing?.paddle_subscription_id) &&
     !isCancelledState &&
     !isCancelScheduled &&
-    !alreadyCancelled;
-
-  const currentPlanKey = (billing?.subscription_plan_key ?? "").toLowerCase();
-  const isProPlan = currentPlanKey === PRO_PLAN_KEY;
+    !alreadyCancelled &&
+    Boolean(billing?.is_admin);
 
   const canChangeSubscription =
     Boolean(billing?.paddle_subscription_id) &&
     !isCancelledState &&
-    !isCancelScheduled;
+    !isCancelScheduled &&
+    Boolean(billing?.is_admin);
 
   useEffect(() => {
     if (!IS_CLERK_AUTH) {
@@ -171,7 +292,10 @@ export default function PricingPlansPage() {
   }, [getToken]);
 
   useEffect(() => {
-    if (isCancelScheduled || (isCancelledState && billing?.has_access !== false)) {
+    if (
+      isCancelScheduled ||
+      (isCancelledState && billing?.has_access !== false)
+    ) {
       setAlreadyCancelled(true);
     }
 
@@ -237,58 +361,6 @@ export default function PricingPlansPage() {
     }
   };
 
-  const handleChangeSubscription = async () => {
-    setUpgradeLoading(true);
-    setUpgradeError(null);
-    setUpgradeSuccess(null);
-
-    try {
-      const token = await getToken();
-      if (!token) throw new Error("Missing auth token");
-
-      const { data: priceData } = await api.get<PaddlePricesResponse>(
-        getURL("GET_PADDLE_PRICES"),
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-
-      const targetPlanKey = isProPlan ? STARTER_PLAN_KEY : PRO_PLAN_KEY;
-      const targetPriceId = priceData?.[targetPlanKey];
-
-      if (!targetPriceId) {
-        throw new Error("Unable to find target price ID");
-      }
-
-      await api.post(
-        getURL("CHANGE_SUBSCRIPTION"),
-        {
-          price_id: targetPriceId,
-          quantity: 1,
-          is_upgrade: !isProPlan,
-        },
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-
-      const res = await api.get(getURL("BILLING_ACCESS"), {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      setBilling(res.data ?? null);
-      setUpgradeSuccess(
-        isProPlan
-          ? "Subscription will be downgraded at next billing cycle."
-          : "Subscription upgraded successfully.",
-      );
-    } catch (error: any) {
-      const msg =
-        error?.response?.data?.detail ??
-        error?.message ??
-        "Failed to change subscription.";
-      setUpgradeError(String(msg));
-    } finally {
-      setUpgradeLoading(false);
-    }
-  };
-
   return (
     <div className="flex h-full w-full flex-col gap-6">
       <div className="flex flex-col">
@@ -322,18 +394,6 @@ export default function PricingPlansPage() {
             </div>
           )}
 
-          {upgradeError && (
-            <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-              {upgradeError}
-            </div>
-          )}
-
-          {upgradeSuccess && (
-            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300">
-              {upgradeSuccess}
-            </div>
-          )}
-
           {alreadyCancelled && (
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
               You already cancelled your subscription. You still have access{" "}
@@ -350,18 +410,18 @@ export default function PricingPlansPage() {
             </Button>
           )}
 
-          {billing?.paddle_subscription_id && (
-            <Button
-              onClick={() => setUpgradeModalOpen(true)}
-              disabled={upgradeLoading}
-              className="ml-2"
-            >
-              {upgradeLoading
-                ? "Processing..."
-                : isProPlan
-                ? "Downgrade to Starter"
-                : "Upgrade to Pro"}
-            </Button>
+          {canChangeSubscription && (
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => navigate("/change-plans?mode=plan")}>
+                Change Plan
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => navigate("/change-plans?mode=seats")}
+              >
+                Change Seats
+              </Button>
+            </div>
           )}
 
           <Dialog open={cancelModalOpen} onOpenChange={setCancelModalOpen}>
@@ -381,39 +441,6 @@ export default function PricingPlansPage() {
                   disabled={cancelLoading}
                 >
                   Confirm cancel
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-
-          <Dialog open={upgradeModalOpen} onOpenChange={setUpgradeModalOpen}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>
-                  {isProPlan ? "Downgrade to Starter" : "Upgrade to Pro"}
-                </DialogTitle>
-                <DialogDescription>
-                  {isProPlan
-                    ? "Your plan will be downgraded at the next billing cycle."
-                    : "You will be charged a prorated amount today based on your remaining billing period."}
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button onClick={() => setUpgradeModalOpen(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={async () => {
-                    setUpgradeModalOpen(false);
-                    await handleChangeSubscription();
-                  }}
-                  disabled={upgradeLoading}
-                >
-                  {upgradeLoading
-                    ? "Processing..."
-                    : isProPlan
-                    ? "Confirm Downgrade"
-                    : "Confirm Upgrade"}
                 </Button>
               </DialogFooter>
             </DialogContent>

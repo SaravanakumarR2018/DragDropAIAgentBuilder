@@ -1,6 +1,6 @@
 import { useAuth, useOrganization } from "@clerk/clerk-react";
 import { initializePaddle } from "@paddle/paddle-js";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect } from "react";
 import { RouterProvider } from "react-router-dom";
 import { IS_CLERK_AUTH } from "@/clerk/auth";
 import { api } from "@/controllers/API/api";
@@ -14,6 +14,9 @@ const PADDLE_ENVIRONMENT =
     ? "sandbox"
     : "production";
 const PADDLE_TOKEN = import.meta.env.VITE_PADDLE_CLIENT_KEY;
+const PADDLE_STATUS_STORAGE_KEY = "paddle_checkout_status";
+const PADDLE_TRANSACTION_ID_STORAGE_KEY = "paddle_checkout_transaction_id";
+const PADDLE_CHECKOUT_ORG_ID_STORAGE_KEY = "paddle_checkout_org_id";
 
 function closePaddleCheckoutModal() {
   try {
@@ -27,6 +30,36 @@ function closePaddleCheckoutModal() {
   }
 }
 
+function publishCheckoutStatus(
+  status: "idle" | "processing" | "success" | "failed",
+  transactionId?: string | null,
+  organizationId?: string | null,
+) {
+  window.sessionStorage.setItem(PADDLE_STATUS_STORAGE_KEY, status);
+
+  if (transactionId) {
+    window.sessionStorage.setItem(PADDLE_TRANSACTION_ID_STORAGE_KEY, transactionId);
+  } else {
+    window.sessionStorage.removeItem(PADDLE_TRANSACTION_ID_STORAGE_KEY);
+  }
+
+  if (organizationId) {
+    window.sessionStorage.setItem(PADDLE_CHECKOUT_ORG_ID_STORAGE_KEY, organizationId);
+  } else {
+    window.sessionStorage.removeItem(PADDLE_CHECKOUT_ORG_ID_STORAGE_KEY);
+  }
+
+  window.dispatchEvent(
+    new CustomEvent("paddle-checkout-status", {
+      detail: {
+        status,
+        transactionId: transactionId ?? null,
+        organizationId: organizationId ?? null,
+      },
+    }),
+  );
+}
+
 export default function App() {
   const dark = useDarkStore((state) => state.dark);
   const { organization } = IS_CLERK_AUTH
@@ -36,17 +69,14 @@ export default function App() {
     ? useAuth()
     : { getToken: async () => null };
 
-  const [isCheckingSubscription, setIsCheckingSubscription] = useState(false);
-
-  const fetchPaddleSubscription = useCallback(async () => {
+  const fetchPaddleSubscription = useCallback(async (transactionId?: string) => {
     if (!IS_CLERK_AUTH) {
       console.warn(
         "Skipping Paddle subscription lookup because Clerk auth is disabled",
       );
+      publishCheckoutStatus("failed", transactionId ?? null, organization?.id ?? null);
       return;
     }
-
-    setIsCheckingSubscription(true);
 
     try {
       const clerkToken = await getToken();
@@ -55,6 +85,7 @@ export default function App() {
         console.warn(
           "Unable to resolve Clerk token for Paddle subscription lookup",
         );
+        publishCheckoutStatus("failed", transactionId ?? null, organization?.id ?? null);
         return;
       }
 
@@ -73,6 +104,12 @@ export default function App() {
       );
 
       console.log("Resolved Paddle subscription from backend:", data);
+
+      const fallbackTransactionId =
+        (data as any)?.transaction_id ??
+        (data as any)?.transactionId ??
+        transactionId ??
+        null;
 
       for (let attempt = 0; attempt < 3; attempt += 1) {
         const refreshedToken = await getToken({
@@ -97,7 +134,11 @@ export default function App() {
         console.log("Resolved org access from backend:", accessResponse.data);
 
         if (hasAccess) {
-          window.location.href = "/flows";
+          publishCheckoutStatus(
+            "success",
+            fallbackTransactionId,
+            organization?.id ?? null,
+          );
           return;
         }
 
@@ -106,10 +147,15 @@ export default function App() {
           setTimeout(resolve, 1200);
         });
       }
+
+      publishCheckoutStatus(
+        "failed",
+        fallbackTransactionId,
+        organization?.id ?? null,
+      );
     } catch (error) {
       console.error("Failed to fetch Paddle subscription from backend", error);
-    }finally {
-      setIsCheckingSubscription(false);
+      publishCheckoutStatus("failed", transactionId ?? null, organization?.id ?? null);
     }
   }, [getToken, organization?.id]);
 
@@ -131,15 +177,26 @@ export default function App() {
         console.log("Paddle event:", event);
 
         if (event.name === "checkout.completed") {
+          const transactionId =
+            (event.data as any)?.transaction_id ??
+            (event.data as any)?.transactionId ??
+            (event.data as any)?.id ??
+            null;
           const customerId = (event.data as any)?.customer?.id;
           const subscriptionId = (event.data as any)?.subscription?.id;
 
           console.log("Paddle checkout completed", {
+            transactionId,
             customerId,
             subscriptionId,
           });
+          publishCheckoutStatus(
+            "processing",
+            transactionId,
+            organization?.id ?? null,
+          );
           closePaddleCheckoutModal();
-          void fetchPaddleSubscription();
+          void fetchPaddleSubscription(transactionId ?? undefined);
         }
 
         if (event.name === "checkout.closed") {
@@ -159,7 +216,6 @@ export default function App() {
       <Suspense fallback={<LoadingPage />}>
         <RouterProvider router={router} />
       </Suspense>
-      {isCheckingSubscription && <LoadingPage overlay />}
     </>
   );
 }

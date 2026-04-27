@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from http.client import HTTPException
 import re
 from typing import Callable, Any, Awaitable
 import random
@@ -14,18 +15,30 @@ from paddle_billing.Resources.Customers.Operations import CreateCustomer, Update
 from paddle_billing.Resources.Subscriptions.Operations import ListSubscriptions, CancelSubscription, UpdateSubscription
 from paddle_billing.Entities.Subscriptions import SubscriptionEffectiveFrom, SubscriptionProrationBillingMode
 from paddle_billing.Resources.Subscriptions.Operations.Update import SubscriptionUpdateItem
-
+from paddle_billing.Resources.Subscriptions.Operations import PreviewUpdateSubscription
 
 from langflow.services.auth.clerk_metadata_constants import (
+    ORGANISATION_CREATED_BY,
     ORGANISATION_CREATED_BY_KEY,
     PADDLE_CUSTOM_DATA_ORG_ID_KEY,
     PADDLE_CUSTOM_DATA_USER_ID_KEY,
     PADDLE_CUSTOMER_ID_KEY,
+    PADDLE_SUBSCRIPTION_ID,
     PADDLE_SUBSCRIPTION_ID_KEY,
+    HAS_ACCESS_KEY,
+    SUBSCRIPTION_STATUS_KEY,
+    SUBSCRIPTION_PLAN_KEY,
+    NEXT_BILLED_AT_KEY,
+    CURRENT_PERIOD_END_KEY,
+    CURRENT_PERIOD_START_KEY,
+    CANCEL_SCHEDULED_KEY,
+    SUBSCRIPTION_SEATS_KEY,
+
 )
 from langflow.services.auth.clerk_utils import (
     get_clerk_user_id_from_payload,
     get_email_from_clerk_payload,
+    get_org_id_from_clerk_payload,
     get_organisation_created_by_from_clerk_payload,
     get_paddle_customer_id_from_clerk_payload,
     get_paddle_subscription_id_from_clerk_payload,
@@ -37,6 +50,46 @@ from langflow.services.paddle.client import get_paddle_client
 _PADDLE_CUSTOMER_ID_RE = re.compile(r"(ctm_[a-z0-9]+)", re.IGNORECASE)
 
 ACTIVE_SUBSCRIPTION_STATUSES = {"active", "trialing"}
+
+async def _ensure_admin_user() -> None:
+    clerk_current_user_id = get_clerk_user_id_from_payload()
+    organization_created_by = await get_organisation_created_by_from_clerk_payload()
+    if not organization_created_by or organization_created_by.strip() != clerk_current_user_id.strip():
+        logger.info(f"User {clerk_current_user_id} is not the organization creator, denying subscription change")
+        raise HTTPException(status_code=403, detail="Only the organization creator can change the subscription")
+
+def _get_enabled_plan_monthly_price_map() -> dict[str, int]:
+    from langflow.services.paddle.provisioning import _load_plan_config
+
+    plan_price_map: dict[str, int] = {}
+    for plan in _load_plan_config().get("plans", []):
+        if not isinstance(plan, dict):
+            continue
+        paddle = plan.get("paddle")
+        if not isinstance(paddle, dict) or not paddle.get("enabled"):
+            continue
+
+        plan_key = paddle.get("plan_key")
+        monthly_price_usd_cents = paddle.get("monthly_price_usd_cents")
+        if isinstance(plan_key, str) and isinstance(monthly_price_usd_cents, int):
+            plan_price_map[plan_key] = monthly_price_usd_cents
+
+    return plan_price_map
+
+
+async def _get_plan_key_for_price(
+    *,
+    price_id: str,
+    client: Client,
+) -> str | None:
+    price = await asyncio.to_thread(
+        client.prices.get,
+        price_id,
+    )
+
+    price_custom_data = _normalize_custom_data(getattr(price, "custom_data", None))
+    plan_key = price_custom_data.get("plan_key")
+    return str(plan_key) if plan_key is not None else None
 
 
 async def get_subscription_status(
@@ -73,14 +126,16 @@ async def has_active_subscription(
     if not sub_id:
         logger.info("No subscription ID found, denying access")
         return {
-            "has_access": False,
-            "subscription_status": None,
-            "subscription_plan_key": None,
-            "paddle_subscription_id": None,
-            "organisation_created_by": created_by,
-            "next_billed_at": None,
-            "current_period_end": None,
-            "cancel_scheduled": False,
+            HAS_ACCESS_KEY: False,
+            SUBSCRIPTION_STATUS_KEY: None,
+            SUBSCRIPTION_PLAN_KEY: None,
+            PADDLE_SUBSCRIPTION_ID: None,
+            ORGANISATION_CREATED_BY: created_by,
+            NEXT_BILLED_AT_KEY: None,
+            CURRENT_PERIOD_END_KEY: None,
+            CURRENT_PERIOD_START_KEY: None,
+            CANCEL_SCHEDULED_KEY: False,
+            SUBSCRIPTION_SEATS_KEY: None,
         }
 
     paddle_client = client or get_paddle_client()
@@ -103,15 +158,49 @@ async def has_active_subscription(
     next_billed_at = getattr(subscription, "next_billed_at", None)
 
     current_period = getattr(subscription, "current_billing_period", None)
+    current_period_start = None
     current_period_end = None
     if current_period:
+        current_period_start = getattr(current_period, "starts_at", None)
         current_period_end = getattr(current_period, "ends_at", None)
+
+    seats = None
+    current_price_id = None
+    current_price_plan_key = None
+    items = getattr(subscription, "items", None)
+    if items:
+        first_item = items[0]
+        quantity = getattr(first_item, "quantity", None)
+        if quantity is not None:
+            seats = int(quantity)
+        price = getattr(first_item, "price", None)
+        current_price_id = getattr(price, "id", None)
+        if current_price_id:
+            current_price_plan_key = await _get_plan_key_for_price(
+                price_id=str(current_price_id),
+                client=paddle_client,
+            )
 
     scheduled_change = getattr(subscription, "scheduled_change", None)
     cancel_scheduled = False
+    scheduled_change_action = None
+    scheduled_change_effective_at = None
+    pending_price_id = None
+    pending_plan_key = None
     if scheduled_change:
         action = getattr(scheduled_change, "action", None)
-        cancel_scheduled = str(action).lower() == "cancel"
+        scheduled_change_action = str(action).lower() if action else None
+        cancel_scheduled = scheduled_change_action == "cancel"
+        scheduled_change_effective_at = getattr(scheduled_change, "effective_at", None)
+        scheduled_items = getattr(scheduled_change, "items", None)
+        if scheduled_items:
+            first_scheduled_item = scheduled_items[0]
+            pending_price_id = getattr(first_scheduled_item, "price_id", None)
+            if pending_price_id:
+                pending_plan_key = await _get_plan_key_for_price(
+                    price_id=str(pending_price_id),
+                    client=paddle_client,
+                )
 
     logger.info(
         f"Subscription {sub_id} - status: {status}, "
@@ -120,14 +209,22 @@ async def has_active_subscription(
     )
 
     return {
-        "has_access": has_access,
-        "subscription_status": status,
-        "subscription_plan_key": plan_key,
-        "paddle_subscription_id": sub_id,
-        "organisation_created_by": created_by,
-        "next_billed_at": next_billed_at,
-        "current_period_end": current_period_end,
-        "cancel_scheduled": cancel_scheduled,
+        HAS_ACCESS_KEY: has_access,
+        SUBSCRIPTION_STATUS_KEY: status,
+        SUBSCRIPTION_PLAN_KEY: plan_key,
+        PADDLE_SUBSCRIPTION_ID: sub_id,
+        ORGANISATION_CREATED_BY: created_by,
+        NEXT_BILLED_AT_KEY: next_billed_at,
+        CURRENT_PERIOD_END_KEY: current_period_end,
+        CURRENT_PERIOD_START_KEY: current_period_start,
+        CANCEL_SCHEDULED_KEY: cancel_scheduled,
+        SUBSCRIPTION_SEATS_KEY: seats,
+        "current_price_id": current_price_id,
+        "current_price_plan_key": current_price_plan_key,
+        "scheduled_change_action": scheduled_change_action,
+        "scheduled_change_effective_at": scheduled_change_effective_at,
+        "pending_price_id": pending_price_id,
+        "pending_plan_key": pending_plan_key,
     }
 
 
@@ -514,22 +611,91 @@ async def cancel_subscription(
         logger.exception(f"Error cancelling subscription {subscription_id}: {e}")
         raise
 
-async def change_subscription(
-    *,
-    subscription_id: str,
-    new_price_id: str,
-    quantity: int = 1,
-    is_upgrade: bool,
-    client: Client | None = None,
-):
-    paddle_client = client or get_paddle_client()
 
-    subscription = await asyncio.to_thread(
-        paddle_client.subscriptions.get,
-        subscription_id,
+async def _build_updated_items(
+    *,
+    subscription,
+    new_price_id: str | None,
+    new_quantity: int | None,
+):
+    main_plan_key = _normalize_custom_data(
+        getattr(subscription, "custom_data", None)
+    ).get("plan_key")
+
+    paddle_client = get_paddle_client()
+
+    main_price_id = None
+
+    for item in subscription.items:
+        price_plan_key = await _get_plan_key_for_price(
+            price_id=item.price.id,
+            client=paddle_client,
+        )
+        if price_plan_key == main_plan_key:
+            main_price_id = item.price.id
+            break
+
+    updated_items = []
+
+    for item in subscription.items:
+        price_id = item.price.id
+        quantity = item.quantity
+
+        if new_price_id is not None and price_id == main_price_id:
+            price_id = new_price_id
+            if new_quantity is not None:
+                quantity = new_quantity
+
+        elif new_price_id is None and new_quantity is not None and price_id == main_price_id:
+            quantity = new_quantity
+
+        updated_items.append(
+            SubscriptionUpdateItem(
+                price_id=price_id,
+                quantity=quantity,
+            )
+        )
+
+    return updated_items
+
+
+async def _merge_custom_data(
+    *,
+    subscription,
+    new_plan_key: str | None,
+    org_id: str | None,
+):
+    existing = _normalize_custom_data(
+        getattr(subscription, "custom_data", None)
     )
 
-    status = str(getattr(subscription, "status", "")).lower()
+    merged = dict(existing)
+
+    if new_plan_key is not None:
+        merged["plan_key"] = new_plan_key
+
+    if org_id is not None:
+        merged[PADDLE_CUSTOM_DATA_ORG_ID_KEY] = org_id
+
+    return merged
+
+
+def _determine_proration_mode(
+    *,
+    current_plan_key: str | None,
+    new_plan_key: str | None,
+    plan_price_map: dict[str, int],
+    status: str,
+) -> SubscriptionProrationBillingMode:
+    """Determine the appropriate proration mode based on plan upgrade status."""
+    is_upgrade = False
+    if (
+        isinstance(current_plan_key, str)
+        and isinstance(new_plan_key, str)
+        and current_plan_key in plan_price_map
+        and new_plan_key in plan_price_map
+    ):
+        is_upgrade = plan_price_map[new_plan_key] > plan_price_map[current_plan_key]
 
     if is_upgrade:
         if status == "trialing":
@@ -539,19 +705,73 @@ async def change_subscription(
     else:
         proration_mode = SubscriptionProrationBillingMode.DoNotBill
 
-    plan_key = "pro_pack_monthly" if is_upgrade else "starter_pack_monthly"
+    return proration_mode
+
+
+async def update_subscription(
+    *,
+    subscription_id: str,
+    new_price_id: str | None = None,
+    new_quantity: int | None = None,
+    client: Client | None = None,
+):
+    paddle_client = client or get_paddle_client()
+
+    org_id = get_org_id_from_clerk_payload()
+
+    subscription = await asyncio.to_thread(
+        paddle_client.subscriptions.get,
+        subscription_id,
+    )
+
+    status = str(getattr(subscription, "status", "")).lower()
+
+    current_items = getattr(subscription, "items", [])
+    if not current_items:
+        raise ValueError("No subscription items found")
+
+    current_price_id = current_items[0].price.id
+
+    new_plan_key = None
+    if new_price_id:
+        new_plan_key = await _get_plan_key_for_price(
+            price_id=new_price_id,
+            client=paddle_client,
+        )
+
+    current_custom_data = _normalize_custom_data(
+        getattr(subscription, "custom_data", None)
+    )
+
+    current_plan_key = current_custom_data.get("plan_key")
+    if current_plan_key is not None:
+        current_plan_key = str(current_plan_key)
+
+    plan_price_map = _get_enabled_plan_monthly_price_map()
+
+    proration_mode = _determine_proration_mode(
+        current_plan_key=current_plan_key,
+        new_plan_key=new_plan_key,
+        plan_price_map=plan_price_map,
+        status=status,
+    )
+
+    items = await _build_updated_items(
+        subscription=subscription,
+        new_price_id=new_price_id,
+        new_quantity=new_quantity,
+    )
+
+    merged_custom_data = await _merge_custom_data(
+        subscription=subscription,
+        new_plan_key=new_plan_key or current_plan_key,
+        org_id=org_id,
+    )
 
     operation = UpdateSubscription(
-        items=[
-            SubscriptionUpdateItem(
-                price_id=new_price_id,
-                quantity=quantity,
-            )
-        ],
+        items=items,
         proration_billing_mode=proration_mode,
-        custom_data=CustomData({
-            "plan_key": plan_key,
-        }),
+        custom_data=CustomData(merged_custom_data),
     )
 
     updated = await asyncio.to_thread(
@@ -563,6 +783,102 @@ async def change_subscription(
     return {
         "subscription_id": subscription_id,
         "status": getattr(updated, "status", None),
-        "price_id": new_price_id,
+        "price_id": new_price_id or current_price_id,
+        "quantity": new_quantity,
         "proration_mode": str(proration_mode),
+    }
+
+async def update_subscription_plan(
+    *,
+    subscription_id: str,
+    new_price_id: str,
+    quantity: int,
+):
+    return await update_subscription(
+        subscription_id=subscription_id,
+        new_price_id=new_price_id,
+        new_quantity=quantity,
+    )
+
+async def update_subscription_seats(
+    *,
+    subscription_id: str,
+    new_quantity: int,
+):
+    return await update_subscription(
+        subscription_id=subscription_id,
+        new_quantity=new_quantity,
+    )
+
+async def preview_subscription_update(
+    *,
+    subscription_id: str,
+    new_price_id: str | None,
+    new_quantity: int,
+):
+    paddle_client = get_paddle_client()
+
+    subscription = await asyncio.to_thread(
+        paddle_client.subscriptions.get,
+        subscription_id,
+    )
+    current_quantity = subscription.items[0].quantity
+
+    status = str(getattr(subscription, "status", "")).lower()
+
+    items = await _build_updated_items(
+        subscription=subscription,
+        new_price_id=new_price_id,
+        new_quantity=new_quantity,
+    )
+
+    current_custom_data = _normalize_custom_data(
+        getattr(subscription, "custom_data", None)
+    )
+
+    current_plan_key = current_custom_data.get("plan_key")
+
+    new_plan_key = None
+    if new_price_id:
+        new_plan_key = await _get_plan_key_for_price(
+            price_id=new_price_id,
+            client=paddle_client,
+        )
+
+    plan_price_map = _get_enabled_plan_monthly_price_map()
+
+    if new_quantity > current_quantity and not new_price_id:
+        if status == "trialing":
+            proration_mode = SubscriptionProrationBillingMode.DoNotBill
+        else:
+            proration_mode = SubscriptionProrationBillingMode.ProratedImmediately
+    else:
+        proration_mode = _determine_proration_mode(
+            current_plan_key=current_plan_key,
+            new_plan_key=new_plan_key,
+            plan_price_map=plan_price_map,
+            status=status,
+        )
+
+    operation = PreviewUpdateSubscription(
+        items=[
+            SubscriptionUpdateItem(
+                price_id=item.price_id,
+                quantity=item.quantity,
+            )
+            for item in items
+        ],
+        proration_billing_mode=proration_mode,
+    )
+
+    preview = await asyncio.to_thread(
+        paddle_client.subscriptions.preview_update,
+        subscription_id,
+        operation,
+    )
+
+    return {
+        "immediate_transaction": getattr(preview, "immediate_transaction", None),
+        "next_transaction": getattr(preview, "next_transaction", None),
+        "update_summary": getattr(preview, "update_summary", None),
     }
