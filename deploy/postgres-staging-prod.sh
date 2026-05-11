@@ -371,6 +371,28 @@ server {
   include /etc/letsencrypt/options-ssl-nginx.conf;
   ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 
+  location /api/v1/mcp/ {
+    proxy_pass http://${APP_NAME}_upstream;
+    proxy_http_version 1.1;
+
+    # Required for SSE
+    proxy_buffering off;
+    proxy_cache off;
+    chunked_transfer_encoding off;
+
+    proxy_set_header Connection '';
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Real-IP $remote_addr;
+
+    # Long-lived stream
+    proxy_read_timeout 86400;
+    proxy_send_timeout 86400;
+
+    add_header Cache-Control no-cache;
+  }
+
   location / {
     proxy_pass http://${APP_NAME}_upstream;
     include ${PROXY_SNIPPET};
